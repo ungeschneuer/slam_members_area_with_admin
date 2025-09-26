@@ -1,0 +1,38 @@
+---
+globs: src/**/*.{js,jsx,ts,tsx}
+---
+
+# React 19 Frontend Rules
+
+## Component Guidelines
+- Use functional components with React 19 features
+- Prefer `useState`, `useReducer`, and `useRef` for state management
+- Use React 19's `use` hook for async data loading when applicable
+- Keep components small and composable
+- One component per file, named in PascalCase
+
+## File Organization
+- Components: `/src/components/` - Reusable UI components
+- Admin components: `/src/components/admin/` - Admin-specific components
+- Services: `/src/services/` - API calls and business logic
+- Hooks: `/src/hooks/` - Custom React hooks
+- Utils: `/src/utils/` - Utility functions
+
+## Styling
+- Use TailwindCSS classes for styling
+- Dark mode support via `dark:` prefix
+- Custom animations defined in [tailwind.config.js](mdc:tailwind.config.js)
+- Prefer TailwindCSS over CSS modules
+
+## Key Components
+- [src/components/MemberDashboard.jsx](mdc:src/components/MemberDashboard.jsx) - Main member interface
+- [src/components/admin/AdminDashboard.jsx](mdc:src/components/admin/AdminDashboard.jsx) - Admin interface
+- [src/components/Rounds.jsx](mdc:src/components/Rounds.jsx) - Competition rounds
+- [src/components/News.jsx](mdc:src/components/News.jsx) - News display
+- [src/components/CityTips.jsx](mdc:src/components/CityTips.jsx) - Location recommendations
+
+## Performance
+- Use lazy loading with `React.lazy()` and `Suspense`
+- Implement proper error boundaries
+- Optimize images with [src/components/LazyImage.jsx](mdc:src/components/LazyImage.jsx)
+- Use [src/components/SkeletonLoader.jsx](mdc:src/components/SkeletonLoader.jsx) for loading states

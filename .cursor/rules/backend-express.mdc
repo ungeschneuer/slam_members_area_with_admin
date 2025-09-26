@@ -1,0 +1,37 @@
+---
+globs: server/**/*.{js,ts}
+---
+
+# Express.js Backend Rules
+
+## Server Structure
+- Main entry: [server/server.js](mdc:server/server.js)
+- Routes: `/server/routes/` - API endpoint definitions
+- Services: `/server/services/` - Business logic and external integrations
+- Config: `/server/config/` - Database and server configuration
+
+## Database Integration
+- Use Prisma ORM for database operations
+- Schema defined in [prisma/schema.prisma](mdc:prisma/schema.prisma)
+- Database config in [server/config/database.js](mdc:server/config/database.js)
+- Always use parameterized queries to prevent SQL injection
+
+## API Routes
+- [server/routes/auth.js](mdc:server/routes/auth.js) - Authentication endpoints
+- [server/routes/rounds.js](mdc:server/routes/rounds.js) - Competition rounds
+- [server/routes/news.js](mdc:server/routes/news.js) - News management
+- [server/routes/participants.js](mdc:server/routes/participants.js) - Participant management
+- [server/routes/cityTips.js](mdc:server/routes/cityTips.js) - Location recommendations
+- [server/routes/analytics.js](mdc:server/routes/analytics.js) - Analytics and logging
+
+## Security & Performance
+- Use helmet for security headers
+- Implement rate limiting with express-rate-limit
+- CORS configuration for cross-origin requests
+- Input validation with express-validator
+- Compression middleware for response optimization
+
+## Real-time Features
+- WebSocket support via Socket.io
+- Push notifications via web-push
+- Real-time updates for competition status

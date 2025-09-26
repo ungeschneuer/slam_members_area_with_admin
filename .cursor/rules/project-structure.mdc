@@ -1,0 +1,33 @@
+---
+alwaysApply: true
+---
+
+# SLAM25 Members Area Project Structure
+
+This is a full-stack Poetry Slam application with a React 19 frontend and Express.js backend using PostgreSQL.
+
+## Core Architecture
+- **Frontend**: React 19 + Vite + TailwindCSS + React Router v7
+- **Backend**: Express.js + PostgreSQL + Prisma ORM
+- **Real-time**: Socket.io for WebSocket connections
+- **PWA**: Progressive Web App with service workers
+
+## Key Entry Points
+- Frontend: [index.html](mdc:index.html) → [src/main.jsx](mdc:src/main.jsx) → [src/App.jsx](mdc:src/App.jsx)
+- Backend: [server/server.js](mdc:server/server.js)
+- Database Schema: [prisma/schema.prisma](mdc:prisma/schema.prisma)
+
+## Directory Structure
+- `/src/` - React frontend components and services
+- `/server/` - Express.js backend API
+- `/database/` - SQL migrations and setup scripts
+- `/prisma/` - Database schema and migrations
+- `/public/` - Static assets and PWA files
+
+## Key Features
+- Member dashboard with competition rounds
+- Admin panel for content management
+- Real-time updates via WebSocket
+- City tips and location recommendations
+- News and community features
+- PWA capabilities with offline support

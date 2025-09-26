@@ -1,0 +1,40 @@
+---
+globs: src/components/admin/**/*,server/routes/admin*
+---
+
+# Admin Panel Rules
+
+## Admin Components
+- Main admin interface: [src/components/admin/AdminDashboard.jsx](mdc:src/components/admin/AdminDashboard.jsx)
+- Security management: [src/components/admin/AdminSecurity.jsx](mdc:src/components/admin/AdminSecurity.jsx)
+- Analytics: [src/components/admin/AdminAnalytics.jsx](mdc:src/components/admin/AdminAnalytics.jsx)
+- Content management: [src/components/admin/AdminNews.jsx](mdc:src/components/admin/AdminNews.jsx)
+
+## Admin Features
+- User role management (ADMIN, JURY, ORGANIZER, PARTICIPANT, SPECTATOR)
+- Content moderation and publishing
+- Competition round management
+- Analytics and reporting
+- System maintenance tools
+- Security monitoring
+
+## Security
+- Role-based access control
+- Audit logging for admin actions
+- Input validation and sanitization
+- Rate limiting on admin endpoints
+- Session management for admin users
+
+## Content Management
+- News article creation and editing
+- Image upload and management
+- Content scheduling and publishing
+- Category and tag management
+- Featured content selection
+
+## Performance Monitoring
+- [src/components/admin/PerformanceMonitor.jsx](mdc:src/components/admin/PerformanceMonitor.jsx)
+- Real-time system metrics
+- Database performance tracking
+- Error monitoring and alerting
+- User activity analytics
