@@ -343,7 +343,7 @@ export default function Timetable() {
                   return (
                     <Link 
                       key={`event-${event.id || eventIndex}-${eventIndex}`} 
-                      to={`/timetable/event/${event.slug}`}
+                      to={event.internal_link ? `/rounds/${event.internal_link}` : `/timetable/event/${event.slug || event.id}`}
                       className={`${colors.cardBg} rounded-lg p-3 sm:p-6 shadow-sm border ${colors.cardBorder} hover:shadow-md transition-all duration-200 block`}
                     >
                       <div className="flex items-start space-x-3 sm:space-x-4">

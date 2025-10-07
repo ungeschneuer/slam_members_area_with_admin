@@ -97,7 +97,8 @@ CREATE TABLE timetable_entries (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     end_time TIME,
-    internal_link VARCHAR(255)
+    internal_link VARCHAR(255),
+    round_id INTEGER REFERENCES rounds(id) ON DELETE CASCADE
 );
 
 -- City tips table (renamed from city_locations)
@@ -283,6 +284,7 @@ CREATE INDEX idx_timetable_date ON timetable_entries(date);
 CREATE INDEX idx_timetable_type ON timetable_entries(type);
 CREATE INDEX idx_timetable_status ON timetable_entries(status);
 CREATE INDEX idx_timetable_end_time ON timetable_entries(end_time);
+CREATE INDEX idx_timetable_round_id ON timetable_entries(round_id);
 CREATE INDEX idx_city_tips_name ON city_tips(name);
 CREATE INDEX idx_city_tips_category ON city_tips(category);
 -- CREATE INDEX idx_city_tips_rating ON city_tips(rating); -- Rating column removed

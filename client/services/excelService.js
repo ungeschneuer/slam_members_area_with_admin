@@ -23,7 +23,7 @@ const allowedRegions = [
 ];
 
 /**
- * Generates an Excel template for participant import
+ * Generates an Excel template for participant import with data validation
  * @returns {Blob} Excel file as Blob
  */
 export function generateParticipantTemplate() {
@@ -47,8 +47,8 @@ export function generateParticipantTemplate() {
   const instructions = [
     'ANLEITUNG: Füllen Sie die Zeilen mit Teilnehmerdaten aus. Erste Zeile ist ein Beispiel.',
     'Slug wird automatisch aus Name generiert, kann aber manuell angepasst werden',
-    'Erlaubte Rollen: Teilnehmer*in, Supporter*in, Crew, SLAM-MC',
-    'Erlaubte Regionen: Baden-Württemberg, Bayern, Berlin, Brandenburg, Bremen, Hamburg, Hessen, Mecklenburg-Vorpommern, Niedersachsen, Nordrhein-Westfalen, Rheinland-Pfalz, Saarland, Sachsen, Sachsen-Anhalt, Schleswig-Holstein, Thüringen, Österreich, Schweiz, Belgien, Luxemburg, Südtirol',
+    'Rolle: Verwenden Sie die Dropdown-Liste für gültige Werte',
+    'Region: Verwenden Sie die Dropdown-Liste für gültige Werte',
     'Pronomen und Instagram sind optional',
     'Löschen Sie diese Anweisungszeile vor dem Import'
   ];
@@ -72,6 +72,50 @@ export function generateParticipantTemplate() {
     { wch: 15 }, // Pronomen
     { wch: 20 }  // Instagram
   ];
+  
+  // Add data validation for Role column (column C, index 2)
+  const roleValidation = {
+    type: 'list',
+    allowBlank: false,
+    formula1: `"${allowedRoles.join(',')}"`,
+    showErrorMessage: true,
+    errorTitle: 'Ungültige Rolle',
+    error: 'Bitte wählen Sie eine gültige Rolle aus der Liste aus.',
+    showInputMessage: true,
+    promptTitle: 'Rolle auswählen',
+    prompt: 'Wählen Sie eine Rolle aus der Dropdown-Liste aus.'
+  };
+  
+  // Add data validation for Region column (column D, index 3)
+  const regionValidation = {
+    type: 'list',
+    allowBlank: false,
+    formula1: `"${allowedRegions.join(',')}"`,
+    showErrorMessage: true,
+    errorTitle: 'Ungültige Region',
+    error: 'Bitte wählen Sie eine gültige Region aus der Liste aus.',
+    showInputMessage: true,
+    promptTitle: 'Region auswählen',
+    prompt: 'Wählen Sie eine Region aus der Dropdown-Liste aus.'
+  };
+  
+  // Apply validation to all data rows (starting from row 3, excluding header and sample)
+  // We'll apply to a reasonable range (rows 3-1000)
+  for (let row = 3; row <= 1000; row++) {
+    // Role validation (column C)
+    const roleCell = XLSX.utils.encode_cell({ r: row - 1, c: 2 });
+    if (!ws[roleCell]) {
+      ws[roleCell] = { t: 's', v: '' };
+    }
+    ws[roleCell].dv = roleValidation;
+    
+    // Region validation (column D)
+    const regionCell = XLSX.utils.encode_cell({ r: row - 1, c: 3 });
+    if (!ws[regionCell]) {
+      ws[regionCell] = { t: 's', v: '' };
+    }
+    ws[regionCell].dv = regionValidation;
+  }
   
   // Add worksheet to workbook
   XLSX.utils.book_append_sheet(wb, ws, 'Teilnehmer');

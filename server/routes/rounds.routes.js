@@ -14,6 +14,7 @@ import {
 } from '../utils/routeHelpers.js';
 import { validateRound, handleValidationErrors } from '../middleware/validation.js';
 import { calculateRoundStatus } from '../utils/roundStatusUtils.js';
+import { mapRoundToTimetableEntry } from '../utils/timetableUtils.js';
 import logger from '../config/logger.js';
 
 const router = express.Router();
@@ -83,71 +84,186 @@ router.get('/slug/:slug', async (req, res) => {
 
 // Create round (admin endpoint)
 router.post('/', ...adminMiddleware(), validateRound, handleValidationErrors, async (req, res) => {
-  const { 
-    title, slug, date, startTime, endTime, location, address, description, 
-    afterPlayReport, competitionType, totalJuryMembers 
-  } = req.body;
+  const startTime = startTiming();
   
-  // Calculate status automatically based on date and time
-  const calculatedStatus = calculateRoundStatus(date, startTime, endTime);
-  
-  // Normalize data using schema
-  const normalizedData = normalizeData(req.body, {
-    totalJuryMembers: { type: 'int', fallback: 5 }
-  });
-  
-  await executeRoundCrudOperation(
-    'create',
-    `INSERT INTO rounds (title, slug, date, "startTime", "endTime", location, address, description, 
-     "afterPlayReport", "competitionType", "totalJuryMembers", status) 
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
-    [title, slug, date, startTime, endTime, location, address, description, afterPlayReport, 
-     competitionType, normalizedData.totalJuryMembers, calculatedStatus],
-    'round',
-    'CREATE_ROUND',
-    res,
-    { title, slug }
-  );
+  try {
+    const { 
+      title, slug, date, startTime: roundStartTime, endTime, location, address, description, 
+      afterPlayReport, competitionType, totalJuryMembers 
+    } = req.body;
+    
+    // Calculate status automatically based on date and time
+    const calculatedStatus = calculateRoundStatus(date, roundStartTime, endTime);
+    
+    // Normalize data using schema
+    const normalizedData = normalizeData(req.body, {
+      totalJuryMembers: { type: 'int', fallback: 5 }
+    });
+    
+    // Create the round
+    const roundQuery = `
+      INSERT INTO rounds (title, slug, date, "startTime", "endTime", location, address, description, 
+       "afterPlayReport", "competitionType", "totalJuryMembers", status) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *
+    `;
+    const roundParams = [
+      title, slug, date, roundStartTime, endTime, location, address, description, afterPlayReport, 
+      competitionType, normalizedData.totalJuryMembers, calculatedStatus
+    ];
+    
+    const roundResult = await executeQuery(roundQuery, roundParams);
+    const createdRound = roundResult.rows[0];
+    
+    // Create corresponding timetable entry
+    const timetableData = mapRoundToTimetableEntry(createdRound);
+    const timetableQuery = `
+      INSERT INTO timetable_entries (title, description, location, date, time, end_time, type, status, internal_link, round_id, slug)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *
+    `;
+    const timetableParams = [
+      timetableData.title,
+      timetableData.description,
+      timetableData.location,
+      timetableData.date,
+      timetableData.time,
+      timetableData.end_time,
+      timetableData.type,
+      timetableData.status,
+      timetableData.internal_link,
+      timetableData.round_id,
+      createdRound.slug // Use the same slug as the round
+    ];
+    
+    const timetableResult = await executeQuery(timetableQuery, timetableParams);
+    const duration = endTiming(startTime);
+    
+    logger.info('Round and timetable entry created', {
+      roundId: createdRound.id,
+      timetableId: timetableResult.rows[0].id,
+      duration: `${Math.round(duration)}ms`,
+      queryType: 'CREATE_ROUND_WITH_TIMETABLE'
+    });
+    
+    sendSuccessResponse(res, createdRound, 'CREATE_ROUND', duration, 201);
+  } catch (error) {
+    const duration = endTiming(startTime);
+    sendErrorResponse(res, error, 'Failed to create round and timetable entry');
+  }
 });
 
 // Update round (admin endpoint)
 router.put('/:id', ...adminMiddleware(), validateRound, handleValidationErrors, async (req, res) => {
-  const { id } = req.params;
-  const { 
-    title, slug, date, startTime, endTime, location, address, description, 
-    afterPlayReport, competitionType, totalJuryMembers 
-  } = req.body;
+  const startTime = startTiming();
   
-  // Get current round to check if it was cancelled
-  let currentStatus = null;
   try {
-    const currentRound = await optimizedQueryService.getRoundById(parseInt(id));
-    currentStatus = currentRound?.status;
+    const { id } = req.params;
+    const { 
+      title, slug, date, startTime: roundStartTime, endTime, location, address, description, 
+      afterPlayReport, competitionType, totalJuryMembers 
+    } = req.body;
+    
+    // Get current round to check if it was cancelled
+    let currentStatus = null;
+    try {
+      const currentRound = await optimizedQueryService.getRoundById(parseInt(id));
+      currentStatus = currentRound?.status;
+    } catch (error) {
+      logger.warn('Could not fetch current round status for update', { id, error: error.message });
+    }
+    
+    // Calculate status automatically based on date and time
+    const calculatedStatus = calculateRoundStatus(date, roundStartTime, endTime, currentStatus);
+    
+    // Normalize data using schema
+    const normalizedData = normalizeData(req.body, {
+      totalJuryMembers: { type: 'int', fallback: 5 }
+    });
+    
+    // Update the round
+    const roundQuery = `
+      UPDATE rounds SET title = $1, slug = $2, date = $3, "startTime" = $4, "endTime" = $5, location = $6, 
+       address = $7, description = $8, "afterPlayReport" = $9, "competitionType" = $10, 
+       "totalJuryMembers" = $11, status = $12, updated_at = NOW() 
+       WHERE id = $13 RETURNING *
+    `;
+    const roundParams = [
+      title, slug, date, roundStartTime, endTime, location, address, description, afterPlayReport, 
+      competitionType, normalizedData.totalJuryMembers, calculatedStatus, parseInt(id)
+    ];
+    
+    const roundResult = await executeQuery(roundQuery, roundParams);
+    const updatedRound = roundResult.rows[0];
+    
+    if (!updatedRound) {
+      const duration = endTiming(startTime);
+      return sendNotFoundResponse(res, 'Round');
+    }
+    
+    // Check if timetable entry exists for this round
+    const existingTimetableQuery = 'SELECT * FROM timetable_entries WHERE round_id = $1';
+    const existingTimetableResult = await executeQuery(existingTimetableQuery, [parseInt(id)]);
+    
+    const timetableData = mapRoundToTimetableEntry(updatedRound);
+    
+    if (existingTimetableResult.rows.length > 0) {
+      // Update existing timetable entry
+      const updateTimetableQuery = `
+        UPDATE timetable_entries 
+        SET title = $1, description = $2, location = $3, date = $4, time = $5, end_time = $6, 
+            type = $7, status = $8, internal_link = $9, slug = $10, updated_at = NOW()
+        WHERE round_id = $11 RETURNING *
+      `;
+      const updateTimetableParams = [
+        timetableData.title,
+        timetableData.description,
+        timetableData.location,
+        timetableData.date,
+        timetableData.time,
+        timetableData.end_time,
+        timetableData.type,
+        timetableData.status,
+        timetableData.internal_link,
+        updatedRound.slug, // Use the updated round slug
+        parseInt(id)
+      ];
+      
+      await executeQuery(updateTimetableQuery, updateTimetableParams);
+    } else {
+      // Create new timetable entry for backwards compatibility
+      const createTimetableQuery = `
+        INSERT INTO timetable_entries (title, description, location, date, time, end_time, type, status, internal_link, round_id, slug)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *
+      `;
+      const createTimetableParams = [
+        timetableData.title,
+        timetableData.description,
+        timetableData.location,
+        timetableData.date,
+        timetableData.time,
+        timetableData.end_time,
+        timetableData.type,
+        timetableData.status,
+        timetableData.internal_link,
+        timetableData.round_id,
+        updatedRound.slug // Use the updated round slug
+      ];
+      
+      await executeQuery(createTimetableQuery, createTimetableParams);
+    }
+    
+    const duration = endTiming(startTime);
+    
+    logger.info('Round and timetable entry updated', {
+      roundId: updatedRound.id,
+      duration: `${Math.round(duration)}ms`,
+      queryType: 'UPDATE_ROUND_WITH_TIMETABLE'
+    });
+    
+    sendSuccessResponse(res, updatedRound, 'UPDATE_ROUND', duration);
   } catch (error) {
-    logger.warn('Could not fetch current round status for update', { id, error: error.message });
+    const duration = endTiming(startTime);
+    sendErrorResponse(res, error, 'Failed to update round and timetable entry');
   }
-  
-  // Calculate status automatically based on date and time
-  const calculatedStatus = calculateRoundStatus(date, startTime, endTime, currentStatus);
-  
-  // Normalize data using schema
-  const normalizedData = normalizeData(req.body, {
-    totalJuryMembers: { type: 'int', fallback: 5 }
-  });
-  
-  await executeRoundCrudOperation(
-    'update',
-    `UPDATE rounds SET title = $1, slug = $2, date = $3, "startTime" = $4, "endTime" = $5, location = $6, 
-     address = $7, description = $8, "afterPlayReport" = $9, "competitionType" = $10, 
-     "totalJuryMembers" = $11, status = $12, updated_at = NOW() 
-     WHERE id = $13 RETURNING *`,
-    [title, slug, date, startTime, endTime, location, address, description, afterPlayReport, 
-     competitionType, normalizedData.totalJuryMembers, calculatedStatus, parseInt(id)],
-    'round',
-    'UPDATE_ROUND',
-    res,
-    { title, slug }
-  );
 });
 
 // Delete round (admin endpoint)
