@@ -1,0 +1,369 @@
+---
+alwaysApply: true
+description: Avoid custom implementations when plugins are available
+---
+
+# Avoid Custom Implementations
+
+## Core Principle: Plugin-First Development
+
+**Before writing any custom code, check if a plugin or dependency already provides the functionality.**
+
+## Common Anti-Patterns to Avoid
+
+### ❌ Custom Authentication
+```javascript
+// ❌ DON'T create custom authentication
+class CustomAuthService {
+  generateToken(payload) {
+    // Custom JWT implementation
+  }
+  
+  verifyToken(token) {
+    // Custom token verification
+  }
+}
+
+// ✅ DO use jsonwebtoken
+import jwt from 'jsonwebtoken';
+const token = jwt.sign(payload, secret, { expiresIn: '24h' });
+const decoded = jwt.verify(token, secret);
+```
+
+### ❌ Custom Password Hashing
+```javascript
+// ❌ DON'T create custom password hashing
+const hashPassword = (password) => {
+  // Custom hashing logic
+};
+
+// ✅ DO use bcrypt
+import bcrypt from 'bcrypt';
+const hashedPassword = await bcrypt.hash(password, 10);
+const isValid = await bcrypt.compare(password, hashedPassword);
+```
+
+### ❌ Custom State Management
+```javascript
+// ❌ DON'T create complex state management
+const [state, dispatch] = useReducer(complexReducer, initialState);
+const [loading, setLoading] = useState(false);
+const [error, setError] = useState(null);
+
+// ✅ DO use TanStack Query
+const { data, isLoading, error } = useQuery({
+  queryKey: ['data'],
+  queryFn: fetchData
+});
+```
+
+### ❌ Custom WebSocket Implementation
+```javascript
+// ❌ DON'T create custom WebSocket handling
+const socket = new WebSocket('ws://localhost:3000');
+socket.onopen = () => { /* custom logic */ };
+socket.onmessage = (event) => { /* custom logic */ };
+
+// ✅ DO use Socket.io
+import websocketService from '../services/websocketService.js';
+websocketService.connect();
+websocketService.subscribe('data', handleUpdate);
+```
+
+### ❌ Custom Form Handling
+```javascript
+// ❌ DON'T create custom form management
+const [formData, setFormData] = useState({});
+const [errors, setErrors] = useState({});
+const [touched, setTouched] = useState({});
+
+// ✅ DO use React Hook Form
+import { useForm } from 'react-hook-form';
+const { register, handleSubmit, formState: { errors } } = useForm();
+```
+
+### ❌ Custom Validation
+```javascript
+// ❌ DON'T create custom validation
+const validateEmail = (email) => {
+  const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return regex.test(email);
+};
+
+// ✅ DO use Zod
+import { z } from 'zod';
+const emailSchema = z.string().email();
+const result = emailSchema.safeParse(email);
+```
+
+### ❌ Custom HTTP Client
+```javascript
+// ❌ DON'T create custom HTTP client
+class CustomHttpClient {
+  async get(url) {
+    // Custom fetch implementation
+  }
+  
+  async post(url, data) {
+    // Custom POST implementation
+  }
+}
+
+// ✅ DO use fetch or axios
+const response = await fetch(url);
+const data = await response.json();
+```
+
+### ❌ Custom Logging
+```javascript
+// ❌ DON'T create custom logging
+const customLogger = {
+  info: (message) => console.log(message),
+  error: (message) => console.error(message)
+};
+
+// ✅ DO use Winston
+import winston from 'winston';
+const logger = winston.createLogger({
+  level: 'info',
+  format: winston.format.json(),
+  transports: [new winston.transports.Console()]
+});
+```
+
+### ❌ Custom CORS Handling
+```javascript
+// ❌ DON'T create custom CORS middleware
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE');
+  // Custom CORS logic
+});
+
+// ✅ DO use cors middleware
+import cors from 'cors';
+app.use(cors());
+```
+
+### ❌ Custom Security Headers
+```javascript
+// ❌ DON'T create custom security headers
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  // Custom security headers
+});
+
+// ✅ DO use helmet
+import helmet from 'helmet';
+app.use(helmet());
+```
+
+### ❌ Custom Compression
+```javascript
+// ❌ DON'T create custom compression
+app.use((req, res, next) => {
+  // Custom compression logic
+});
+
+// ✅ DO use compression middleware
+import compression from 'compression';
+app.use(compression());
+```
+
+### ❌ Custom Request Logging
+```javascript
+// ❌ DON'T create custom request logging
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.url}`);
+  next();
+});
+
+// ✅ DO use morgan
+import morgan from 'morgan';
+app.use(morgan('combined'));
+```
+
+### ❌ Custom Cookie Parsing
+```javascript
+// ❌ DON'T create custom cookie parsing
+app.use((req, res, next) => {
+  req.cookies = parseCookies(req.headers.cookie);
+  next();
+});
+
+// ✅ DO use cookie-parser
+import cookieParser from 'cookie-parser';
+app.use(cookieParser());
+```
+
+### ❌ Custom Rate Limiting
+```javascript
+// ❌ DON'T create custom rate limiting
+const rateLimitMap = new Map();
+app.use((req, res, next) => {
+  // Custom rate limiting logic
+});
+
+// ✅ DO use express-rate-limit
+import rateLimit from 'express-rate-limit';
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100 // limit each IP to 100 requests per windowMs
+});
+app.use(limiter);
+```
+
+### ❌ Custom XSS Protection
+```javascript
+// ❌ DON'T create custom XSS protection
+const sanitizeInput = (input) => {
+  // Custom XSS protection logic
+};
+
+// ✅ DO use xss library
+import xss from 'xss';
+const cleanInput = xss(userInput);
+```
+
+### ❌ Custom Database Connection Pooling
+```javascript
+// ❌ DON'T create custom connection pooling
+class CustomConnectionPool {
+  constructor() {
+    this.connections = [];
+    this.maxConnections = 10;
+  }
+}
+
+// ✅ DO use pg Pool
+import { Pool } from 'pg';
+const pool = new Pool({
+  host: process.env.DB_HOST,
+  port: process.env.DB_PORT,
+  database: process.env.DB_NAME,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  max: 20
+});
+```
+
+### ❌ Custom Error Handling
+```javascript
+// ❌ DON'T create custom error handling
+app.use((err, req, res, next) => {
+  // Custom error handling logic
+});
+
+// ✅ DO use established error handling patterns
+import { sendErrorResponse } from '../routes/optimizedRoutes.js';
+```
+
+### ❌ Custom Testing Framework
+```javascript
+// ❌ DON'T create custom testing
+class CustomTestRunner {
+  describe(name, fn) { /* custom logic */ }
+  it(name, fn) { /* custom logic */ }
+}
+
+// ✅ DO use Vitest
+import { describe, it, expect } from 'vitest';
+```
+
+### ❌ Custom Build Tooling
+```javascript
+// ❌ DON'T create custom build tools
+const customBuildTool = new CustomBuildTool();
+
+// ✅ DO use Vite
+import { defineConfig } from 'vite';
+export default defineConfig({
+  plugins: [react()]
+});
+```
+
+## Plugin Discovery Process
+
+### 1. Check package.json First
+```bash
+# Check what's already installed
+cat package.json | grep -A 50 "dependencies"
+```
+
+### 2. Search for Existing Solutions
+```bash
+# Search for specific functionality
+npm search "authentication"
+npm search "validation"
+npm search "logging"
+```
+
+### 3. Check Documentation
+- **Express.js middleware** - Check Express.js documentation
+- **React ecosystem** - Check React documentation
+- **Node.js modules** - Check Node.js built-in modules
+
+### 4. Use Established Patterns
+```javascript
+// ✅ USE established patterns from the codebase
+import { executeCrudOperation } from '../routes/optimizedRoutes.js';
+import websocketService from '../services/websocketService.js';
+import { useParticipants } from '../hooks/useParticipants.js';
+```
+
+## When Custom Code is Appropriate
+
+### ✅ Business Logic
+```javascript
+// ✅ APPROPRIATE - Domain-specific business logic
+const calculateParticipantScore = (scores) => {
+  return scores.reduce((sum, score) => sum + score, 0) / scores.length;
+};
+```
+
+### ✅ Helper Functions
+```javascript
+// ✅ APPROPRIATE - Project-specific utilities
+import { generateSlug, generateUniqueSlug } from '../utils/slugUtils.js';
+import { normalizeInstagram } from '../routes/optimizedRoutes.js';
+```
+
+### ✅ Service Wrappers
+```javascript
+// ✅ APPROPRIATE - Simplified interfaces to complex plugins
+import websocketService from '../services/websocketService.js';
+import databaseService from '../services/databaseService.js';
+```
+
+### ✅ Component Logic
+```javascript
+// ✅ APPROPRIATE - React component-specific behavior
+const ParticipantCard = ({ participant, onSelect }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  
+  return (
+    <div onClick={() => onSelect(participant)}>
+      {/* Component logic */}
+    </div>
+  );
+};
+```
+
+## Plugin Integration Checklist
+
+### Before Writing Custom Code
+- [ ] Check package.json for existing dependencies
+- [ ] Search npm for relevant packages
+- [ ] Check if functionality exists in established patterns
+- [ ] Verify if helper functions already exist
+- [ ] Consider if it's truly project-specific logic
+
+### After Choosing a Plugin
+- [ ] Read plugin documentation
+- [ ] Configure plugin properly
+- [ ] Use plugin's recommended patterns
+- [ ] Test plugin integration
+- [ ] Document plugin usage
+
+## Remember: Custom code should be the exception, not the rule. Always prefer established, tested, and maintained solutions.

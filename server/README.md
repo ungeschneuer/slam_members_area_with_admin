@@ -89,7 +89,7 @@ BACKUP_RETENTION_DAYS=30
 ### Authentication
 - `POST /api/auth/login` - User login
 - `POST /api/auth/logout` - User logout
-- `POST /api/auth/refresh` - Refresh token
+- ~~`POST /api/auth/refresh` - Refresh token~~ (Removed - using simple JWT)
 
 ### Users
 - `GET /api/users` - Get all users

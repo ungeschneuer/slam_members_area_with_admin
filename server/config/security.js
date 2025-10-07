@@ -6,7 +6,7 @@ export const rateLimitConfig = {
   // General API rate limiting
   general: rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // limit each IP to 100 requests per windowMs
+    max: process.env.NODE_ENV === 'development' ? 1000 : 100, // More permissive in development
     message: {
       error: 'Too many requests from this IP, please try again later.',
       code: 'RATE_LIMIT_EXCEEDED',
@@ -15,8 +15,10 @@ export const rateLimitConfig = {
     standardHeaders: true,
     legacyHeaders: false,
     skip: (req) => {
-      // Skip rate limiting for health checks
-      return req.path === '/health' || req.path === '/api/health';
+      // Skip rate limiting for health checks and development
+      return req.path === '/health' || 
+             req.path === '/api/health' ||
+             (process.env.NODE_ENV === 'development' && req.path.startsWith('/api/'));
     }
   }),
 
@@ -63,7 +65,7 @@ export const rateLimitConfig = {
   // Rate limiting for search operations
   search: rateLimit({
     windowMs: 60 * 1000, // 1 minute
-    max: 30, // limit each IP to 30 searches per minute
+    max: process.env.NODE_ENV === 'development' ? 1000 : 30, // More permissive in development
     message: {
       error: 'Too many search requests, please slow down.',
       code: 'SEARCH_RATE_LIMIT_EXCEEDED',
@@ -71,6 +73,22 @@ export const rateLimitConfig = {
     },
     standardHeaders: true,
     legacyHeaders: false
+  }),
+
+  // Development-specific rate limiting (very permissive)
+  development: rateLimit({
+    windowMs: 60 * 1000, // 1 minute
+    max: 10000, // Very high limit for development
+    message: {
+      error: 'Development rate limit exceeded.',
+      code: 'DEV_RATE_LIMIT_EXCEEDED',
+      retryAfter: 60
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: (req) => {
+      return process.env.NODE_ENV !== 'development';
+    }
   })
 };
 
@@ -90,11 +108,30 @@ export const securityHeaders = {
 export const corsConfig = {
   origin: (origin, callback) => {
     const allowedOrigins = [
-      'http://localhost:5173',
-      'http://localhost:5174',
-      'http://localhost:3000',
-      process.env.FRONTEND_URL
-    ].filter(Boolean);
+      'https://szene.slam25.de'
+    ];
+
+    // Add environment-specific origins
+    if (process.env.FRONTEND_URL) {
+      allowedOrigins.push(process.env.FRONTEND_URL);
+    }
+    
+    if (process.env.VITE_DEV_URL) {
+      allowedOrigins.push(process.env.VITE_DEV_URL);
+    }
+    
+    if (process.env.VITE_ALT_URL) {
+      allowedOrigins.push(process.env.VITE_ALT_URL);
+    }
+
+    // Add development origins if in development mode
+    if (process.env.NODE_ENV === 'development') {
+      const devPorts = process.env.DEV_PORTS ? process.env.DEV_PORTS.split(',') : ['5173', '5174', '3005'];
+      devPorts.forEach(port => {
+        allowedOrigins.push(`http://localhost:${port}`);
+        allowedOrigins.push(`http://127.0.0.1:${port}`);
+      });
+    }
 
     // Allow requests with no origin (mobile apps, Postman, etc.)
     if (!origin) return callback(null, true);
@@ -125,9 +162,9 @@ export const cspConfig = {
   directives: {
     defaultSrc: ["'self'"],
     styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-    scriptSrc: ["'self'"],
+    scriptSrc: ["'self'", "https://szene.slam25.de"],
     imgSrc: ["'self'", "data:", "https:", "blob:"],
-    connectSrc: ["'self'", "ws:", "wss:"],
+    connectSrc: ["'self'", "ws:", "wss:", "https://szene.slam25.de"],
     fontSrc: ["'self'", "https://fonts.gstatic.com"],
     objectSrc: ["'none'"],
     mediaSrc: ["'self'"],
@@ -189,7 +226,8 @@ export const sessionConfig = {
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    sameSite: 'strict'
+    sameSite: 'strict',
+    domain: process.env.NODE_ENV === 'production' ? '.slam25.de' : undefined
   }
 };
 
@@ -277,6 +315,10 @@ export const getSecurityConfig = () => {
     enableErrorLogging: true
   };
 };
+
+
+
+
 
 
 

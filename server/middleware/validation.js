@@ -5,7 +5,7 @@ import xss from 'xss';
 import logger from '../config/logger.js';
 
 // Generic validation error handler
-export const handleValidationErrors = (req, res, next) => {
+const handleValidationErrors = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({
@@ -22,7 +22,7 @@ export const handleValidationErrors = (req, res, next) => {
 };
 
 // Sanitize input to prevent XSS using proven library
-export const sanitizeInput = (req, res, next) => {
+const sanitizeInput = (req, res, next) => {
   try {
     const sanitize = (obj) => {
       if (typeof obj === 'string') {
@@ -74,47 +74,10 @@ export const sanitizeInput = (req, res, next) => {
   }
 };
 
-// Rate limiting for sensitive operations
-export const createRateLimit = (windowMs, maxRequests, message) => {
-  const requests = new Map();
-  
-  return (req, res, next) => {
-    const key = req.ip || req.connection.remoteAddress;
-    const now = Date.now();
-    const windowStart = now - windowMs;
-    
-    // Clean old entries
-    for (const [ip, timestamps] of requests.entries()) {
-      const validTimestamps = timestamps.filter(timestamp => timestamp > windowStart);
-      if (validTimestamps.length === 0) {
-        requests.delete(ip);
-      } else {
-        requests.set(ip, validTimestamps);
-      }
-    }
-    
-    // Check current IP
-    const userRequests = requests.get(key) || [];
-    const recentRequests = userRequests.filter(timestamp => timestamp > windowStart);
-    
-    if (recentRequests.length >= maxRequests) {
-      return res.status(429).json({
-        error: message || 'Too many requests',
-        code: 'RATE_LIMIT_EXCEEDED',
-        retryAfter: Math.ceil(windowMs / 1000)
-      });
-    }
-    
-    // Add current request
-    recentRequests.push(now);
-    requests.set(key, recentRequests);
-    
-    next();
-  };
-};
+// Removed custom Map-based rate limiter; use centralized express-rate-limit in security config
 
 // Validation rules for participants
-export const validateParticipant = [
+const validateParticipant = [
   body('name')
     .isLength({ min: 2, max: 255 })
     .withMessage('Name must be between 2 and 255 characters')
@@ -124,7 +87,7 @@ export const validateParticipant = [
   body('role')
     .isLength({ min: 2, max: 100 })
     .withMessage('Role must be between 2 and 100 characters')
-    .isIn(['Teilnehmer', 'Jury', 'Organisator', 'Moderator', 'Technik'])
+    .isIn(['Teilnehmer*in', 'Jury', 'Organisator', 'Moderator', 'Technik'])
     .withMessage('Invalid role'),
   
   body('region')
@@ -149,33 +112,35 @@ export const validateParticipant = [
 ];
 
 // Validation rules for rounds
-export const validateRound = [
+const validateRound = [
   body('title')
     .isLength({ min: 3, max: 255 })
     .withMessage('Title must be between 3 and 255 characters')
     .matches(/^[a-zA-ZäöüßÄÖÜ0-9\s\-'\.]+$/)
     .withMessage('Title contains invalid characters'),
   
-  body('startDateTime')
+  body('date')
     .isISO8601()
-    .withMessage('Start date must be a valid ISO 8601 date')
+    .withMessage('Date must be a valid ISO 8601 date')
     .custom((value) => {
       const date = new Date(value);
       const now = new Date();
-      if (date < now) {
-        throw new Error('Start date must be in the future');
+      if (date < now.setHours(0, 0, 0, 0)) {
+        throw new Error('Date must be today or in the future');
       }
       return true;
     }),
   
-  body('endDateTime')
-    .isISO8601()
-    .withMessage('End date must be a valid ISO 8601 date')
+  body('startTime')
+    .matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/)
+    .withMessage('Start time must be in HH:MM format'),
+  
+  body('endTime')
+    .matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/)
+    .withMessage('End time must be in HH:MM format')
     .custom((value, { req }) => {
-      const endDate = new Date(value);
-      const startDate = new Date(req.body.startDateTime);
-      if (endDate <= startDate) {
-        throw new Error('End date must be after start date');
+      if (req.body.startTime && value <= req.body.startTime) {
+        throw new Error('End time must be after start time');
       }
       return true;
     }),
@@ -199,14 +164,12 @@ export const validateRound = [
     .isIn(['Einzelwettbewerb', 'Teamwettbewerb', 'Show', 'Workshop'])
     .withMessage('Invalid competition type'),
   
-  body('status')
-    .optional()
-    .isIn(['SCHEDULED', 'ACTIVE', 'COMPLETED', 'CANCELLED'])
-    .withMessage('Invalid status')
+  // Status is now calculated automatically based on date and time
+  // No validation needed for status field
 ];
 
 // Validation rules for news
-export const validateNews = [
+const validateNews = [
   body('title')
     .isLength({ min: 3, max: 255 })
     .withMessage('Title must be between 3 and 255 characters')
@@ -257,7 +220,7 @@ export const validateNews = [
 ];
 
 // Validation rules for timetable entries
-export const validateTimetableEntry = [
+const validateTimetableEntry = [
   body('title')
     .isLength({ min: 3, max: 255 })
     .withMessage('Title must be between 3 and 255 characters'),
@@ -282,7 +245,7 @@ export const validateTimetableEntry = [
   
   body('type')
     .optional()
-    .isIn(['general', 'competition', 'break', 'workshop', 'social'])
+    .isIn(['general', 'team-round', 'individual-round', 'workshop', 'fun', 'aftershow'])
     .withMessage('Invalid event type'),
   
   body('status')
@@ -292,7 +255,7 @@ export const validateTimetableEntry = [
 ];
 
 // Validation rules for city tips
-export const validateCityTip = [
+const validateCityTip = [
   body('name')
     .isLength({ min: 3, max: 255 })
     .withMessage('Name must be between 3 and 255 characters'),
@@ -321,10 +284,7 @@ export const validateCityTip = [
     .isFloat({ min: -180, max: 180 })
     .withMessage('Longitude must be between -180 and 180'),
   
-  body('rating')
-    .optional()
-    .isFloat({ min: 0, max: 5 })
-    .withMessage('Rating must be between 0 and 5'),
+  
   
   body('priceRange')
     .optional()
@@ -333,7 +293,7 @@ export const validateCityTip = [
 ];
 
 // Validation rules for search queries
-export const validateSearch = [
+const validateSearch = [
   query('q')
     .isLength({ min: 2, max: 100 })
     .withMessage('Search query must be between 2 and 100 characters')
@@ -352,14 +312,14 @@ export const validateSearch = [
 ];
 
 // Validation rules for ID parameters
-export const validateId = [
+const validateId = [
   param('id')
     .isInt({ min: 1 })
     .withMessage('ID must be a positive integer')
 ];
 
 // Check if resource exists
-export const checkResourceExists = (tableName, idParam = 'id') => {
+const checkResourceExists = (tableName, idParam = 'id') => {
   return async (req, res, next) => {
     try {
       const id = req.params[idParam];
@@ -387,7 +347,7 @@ export const checkResourceExists = (tableName, idParam = 'id') => {
 };
 
 // Validate file uploads
-export const validateFileUpload = (allowedTypes, maxSize) => {
+const validateFileUpload = (allowedTypes, maxSize) => {
   return (req, res, next) => {
     if (!req.file) {
       return res.status(400).json({
@@ -417,7 +377,7 @@ export const validateFileUpload = (allowedTypes, maxSize) => {
 };
 
 // Validate JSON data
-export const validateJSON = (req, res, next) => {
+const validateJSON = (req, res, next) => {
   if (req.body && typeof req.body === 'object') {
     try {
       // Check for circular references
@@ -435,7 +395,7 @@ export const validateJSON = (req, res, next) => {
 };
 
 // Validate pagination
-export const validatePagination = [
+const validatePagination = [
   query('page')
     .optional()
     .isInt({ min: 1 })
@@ -448,7 +408,7 @@ export const validatePagination = [
 ];
 
 // Validate sort parameters
-export const validateSort = (allowedFields) => [
+const validateSort = (allowedFields) => [
   query('sort')
     .optional()
     .isIn(allowedFields)
@@ -459,3 +419,20 @@ export const validateSort = (allowedFields) => [
     .isIn(['asc', 'desc'])
     .withMessage('Order must be either asc or desc')
 ];
+
+export {
+  handleValidationErrors,
+  sanitizeInput,
+  validateParticipant,
+  validateRound,
+  validateNews,
+  validateTimetableEntry,
+  validateCityTip,
+  validateSearch,
+  validateId,
+  checkResourceExists,
+  validateFileUpload,
+  validateJSON,
+  validatePagination,
+  validateSort
+};

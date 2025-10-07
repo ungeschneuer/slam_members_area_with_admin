@@ -77,7 +77,7 @@ const logger = winston.createLogger({
 });
 
 // Security logger for sensitive operations
-export const securityLogger = winston.createLogger({
+const securityLogger = winston.createLogger({
   level: 'info',
   format: winston.format.combine(
     winston.format.timestamp(),
@@ -97,7 +97,7 @@ export const securityLogger = winston.createLogger({
 });
 
 // Performance logger for monitoring
-export const performanceLogger = winston.createLogger({
+const performanceLogger = winston.createLogger({
   level: 'info',
   format: winston.format.combine(
     winston.format.timestamp(),
@@ -117,7 +117,7 @@ export const performanceLogger = winston.createLogger({
 });
 
 // Audit logger for compliance
-export const auditLogger = winston.createLogger({
+const auditLogger = winston.createLogger({
   level: 'info',
   format: winston.format.combine(
     winston.format.timestamp(),
@@ -144,6 +144,8 @@ if (!fs.existsSync(logsDir)) {
 }
 
 export default logger;
+export { securityLogger, performanceLogger, auditLogger };
+
 
 
 

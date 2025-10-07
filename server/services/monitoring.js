@@ -2,6 +2,7 @@
 import { executeQuery, getDatabaseStats } from '../config/database.js';
 import { sessionManager } from '../config/redis.js';
 import logger from '../config/logger.js';
+import os from 'os';
 
 class MonitoringService {
   constructor() {
@@ -20,7 +21,7 @@ class MonitoringService {
     this.thresholds = {
       responseTime: 5000, // 5 seconds
       errorRate: 0.05, // 5%
-      memoryUsage: 0.8, // 80%
+      memoryUsage: 0.9, // 90% - more reasonable for development
       cpuUsage: 0.8, // 80%
       databaseConnections: 0.9 // 90%
     };
@@ -44,6 +45,11 @@ class MonitoringService {
     setInterval(() => {
       this.cleanupMetrics();
     }, 3600000);
+
+    // Optimize memory every 5 minutes
+    setInterval(() => {
+      this.optimizeMemory();
+    }, 300000);
   }
 
   // Collect system metrics
@@ -53,7 +59,10 @@ class MonitoringService {
       const memoryUsage = process.memoryUsage();
       const cpuUsage = process.cpuUsage();
       
-      this.metrics.memoryUsage = memoryUsage.heapUsed / memoryUsage.heapTotal;
+      // Calculate memory usage as percentage of RSS (Resident Set Size) vs total system memory
+      // RSS is the actual memory used by the process
+      const totalMemory = os.totalmem();
+      this.metrics.memoryUsage = memoryUsage.rss / totalMemory;
       this.metrics.cpuUsage = cpuUsage.user / 1000000; // Convert to seconds
       
       // Database metrics
@@ -75,21 +84,27 @@ class MonitoringService {
   // Store metrics in database
   async storeMetrics() {
     try {
-      await executeQuery(`
-        INSERT INTO system_metrics 
-        (requests, errors, avg_response_time, database_queries, database_errors, 
-         active_sessions, memory_usage, cpu_usage, created_at) 
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
-      `, [
-        this.metrics.requests,
-        this.metrics.errors,
-        this.getAverageResponseTime(),
-        this.metrics.databaseQueries,
-        this.metrics.databaseErrors,
-        this.metrics.activeSessions,
-        this.metrics.memoryUsage,
-        this.metrics.cpuUsage
-      ]);
+      // Store each metric as a separate row using the generic structure
+      const metrics = [
+        { name: 'requests', value: this.metrics.requests, unit: 'count' },
+        { name: 'errors', value: this.metrics.errors, unit: 'count' },
+        { name: 'avg_response_time', value: this.getAverageResponseTime(), unit: 'ms' },
+        { name: 'database_queries', value: this.metrics.databaseQueries, unit: 'count' },
+        { name: 'database_errors', value: this.metrics.databaseErrors, unit: 'count' },
+        { name: 'active_sessions', value: this.metrics.activeSessions, unit: 'count' },
+        { name: 'memory_usage', value: this.metrics.memoryUsage, unit: 'percent' },
+        { name: 'cpu_usage', value: this.metrics.cpuUsage, unit: 'percent' }
+      ];
+
+      // Insert each metric as a separate row
+      for (const metric of metrics) {
+        await executeQuery(`
+          INSERT INTO system_metrics (metric_name, metric_value, unit, created_at) 
+          VALUES ($1, $2, $3, NOW())
+        `, [metric.name, metric.value, metric.unit]);
+      }
+      
+      logger.info('Metrics stored successfully');
     } catch (error) {
       logger.error('Failed to store metrics:', error);
     }
@@ -128,6 +143,9 @@ class MonitoringService {
         message: `Memory usage ${(this.metrics.memoryUsage * 100).toFixed(2)}% exceeds threshold ${(this.thresholds.memoryUsage * 100).toFixed(2)}%`,
         timestamp: new Date().toISOString()
       });
+      
+      // Trigger immediate memory optimization
+      this.optimizeMemory();
     }
     
     // CPU usage alert
@@ -280,6 +298,31 @@ class MonitoringService {
       logger.info('Old metrics cleaned up');
     } catch (error) {
       logger.error('Failed to cleanup metrics:', error);
+    }
+  }
+
+  // Memory optimization
+  optimizeMemory() {
+    try {
+      // Force garbage collection if available
+      if (global.gc) {
+        global.gc();
+        logger.info('Garbage collection triggered');
+      }
+      
+      // Clear old metrics arrays to free memory
+      if (this.metrics.responseTime.length > 100) {
+        this.metrics.responseTime = this.metrics.responseTime.slice(-50);
+      }
+      
+      // Clear old alerts
+      if (this.alerts.length > 50) {
+        this.alerts = this.alerts.slice(-25);
+      }
+      
+      logger.info('Memory optimization completed');
+    } catch (error) {
+      logger.error('Memory optimization failed:', error);
     }
   }
 

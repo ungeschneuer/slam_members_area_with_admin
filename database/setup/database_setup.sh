@@ -204,7 +204,7 @@ JWT_SECRET=slam25_jwt_secret_2025_secure_random_string
 
 # Application Settings
 NODE_ENV=production
-PORT=3000
+PORT=3005
 EOF
 
     print_success "Environment file created: ../../.env.database"

@@ -164,7 +164,7 @@ class IncidentResponseService {
   async revokeSessionsByIP(ip) {
     try {
       await executeQuery(
-        'DELETE FROM user_sessions WHERE ip_address = $1',
+        '-- No longer tracking sessions with JWT authentication',
         [ip]
       );
       
@@ -323,6 +323,7 @@ setInterval(() => {
 }, 60 * 60 * 1000);
 
 export default incidentResponseService;
+
 
 
 

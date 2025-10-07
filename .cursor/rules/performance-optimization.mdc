@@ -1,0 +1,680 @@
+---
+alwaysApply: true
+description: Performance optimization patterns and monitoring guidelines
+---
+
+# Performance Optimization & Monitoring
+
+## Performance Architecture Overview
+
+**This Poetry Slam application is optimized for medium-scale performance with sub-second response times and real-time updates.**
+
+### Performance Targets
+- **API Endpoints**: < 200ms for simple queries, < 500ms for complex queries
+- **Database Queries**: < 100ms for single table, < 300ms for JOINs
+- **WebSocket Updates**: < 50ms for real-time updates
+- **Page Load**: < 2s for initial load, < 1s for navigation
+- **Concurrent Users**: 100-500 users
+- **Database Connections**: 10-20 concurrent connections
+
+## Database Performance Patterns
+
+### 1. Query Optimization
+```javascript
+// ✅ OPTIMIZED queries
+// Use JOINs for better performance
+const getParticipantsWithStats = async () => {
+  const query = `
+    SELECT p.*, COUNT(rp.round_id) as round_count
+    FROM participants p
+    LEFT JOIN round_participants rp ON p.id = rp.participant_id
+    GROUP BY p.id, p.name, p.region, p.pronouns, p.instagram, p.created_at, p.updated_at
+    ORDER BY p.name
+  `;
+  return await executeQuery(query, []);
+};
+
+// ❌ INEFFICIENT queries
+// N+1 query problem
+const getParticipantsWithStats = async () => {
+  const participants = await executeQuery('SELECT * FROM participants', []);
+  const stats = await Promise.all(
+    participants.rows.map(async (participant) => {
+      const count = await executeQuery(
+        'SELECT COUNT(*) FROM round_participants WHERE participant_id = $1',
+        [participant.id]
+      );
+      return { ...participant, round_count: count.rows[0].count };
+    })
+  );
+  return stats;
+};
+```
+
+### 2. Connection Pooling
+```javascript
+// ✅ APPROPRIATE connection pooling
+const pool = new Pool({
+  host: process.env.DB_HOST,
+  port: process.env.DB_PORT,
+  database: process.env.DB_NAME,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  max: 20, // Maximum number of clients in the pool
+  idleTimeoutMillis: 30000, // Close idle clients after 30 seconds
+  connectionTimeoutMillis: 2000, // Return an error after 2 seconds if connection could not be established
+});
+
+// ❌ OVER-ENGINEERED connection pooling
+const pool = new Pool({
+  host: process.env.DB_HOST,
+  port: process.env.DB_PORT,
+  database: process.env.DB_NAME,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  max: 100, // Too many connections for single server
+  min: 10, // Unnecessary minimum
+  idleTimeoutMillis: 10000,
+  connectionTimeoutMillis: 1000,
+  acquireTimeoutMillis: 5000,
+  createTimeoutMillis: 30000,
+  destroyTimeoutMillis: 5000,
+  reapIntervalMillis: 1000,
+  createRetryIntervalMillis: 200,
+  propagateCreateError: false
+});
+```
+
+### 3. Query Performance Monitoring
+```javascript
+// ✅ ALWAYS measure query performance
+const executeQuery = async (query, params) => {
+  const startTime = startTiming();
+  
+  try {
+    const result = await pool.query(query, params);
+    const duration = endTiming(startTime);
+    
+    logger.info('Query executed', {
+      query: query.substring(0, 100) + '...',
+      duration: `${Math.round(duration)}ms`,
+      rowCount: result.rows.length
+    });
+    
+    return result;
+  } catch (error) {
+    const duration = endTiming(startTime);
+    logger.error('Query failed', {
+      query: query.substring(0, 100) + '...',
+      duration: `${Math.round(duration)}ms`,
+      error: error.message
+    });
+    throw error;
+  }
+};
+
+// ❌ NO performance monitoring
+const executeQuery = async (query, params) => {
+  return await pool.query(query, params);
+};
+```
+
+## Caching Performance Patterns
+
+### 1. In-Memory Caching
+```javascript
+// ✅ APPROPRIATE caching strategy
+const cache = new Map();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+const getCachedData = (key) => {
+  const cached = cache.get(key);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return cached.data;
+  }
+  return null;
+};
+
+const setCachedData = (key, data) => {
+  cache.set(key, {
+    data,
+    timestamp: Date.now()
+  });
+};
+
+// Clear cache after updates
+const notifyDataUpdate = (entityType) => {
+  cache.delete(`cache:${entityType}`);
+  io.emit('data-update', { type: entityType, timestamp: Date.now() });
+};
+
+// ❌ OVER-ENGINEERED caching
+const redis = new Redis({
+  host: process.env.REDIS_HOST,
+  port: process.env.REDIS_PORT,
+  password: process.env.REDIS_PASSWORD,
+  retryDelayOnFailover: 100,
+  maxRetriesPerRequest: 3,
+  lazyConnect: true,
+  keepAlive: 30000,
+  family: 4,
+  db: 0
+});
+
+const cache = new RedisCache(redis, {
+  ttl: 300,
+  maxMemoryPolicy: 'allkeys-lru',
+  compression: true,
+  serialization: 'json'
+});
+```
+
+### 2. Cache Invalidation
+```javascript
+// ✅ APPROPRIATE cache invalidation
+const notifyDataUpdate = (entityType) => {
+  // Clear specific cache entries
+  cache.delete(`cache:${entityType}`);
+  
+  // Broadcast update to clients
+  io.emit('data-update', { 
+    type: entityType, 
+    timestamp: Date.now() 
+  });
+  
+  // Notify admin clients
+  io.to('admin').emit('admin-update', { 
+    type: entityType, 
+    timestamp: Date.now() 
+  });
+};
+
+// ❌ OVER-ENGINEERED cache invalidation
+const cacheInvalidator = new CacheInvalidator({
+  strategies: {
+    participants: new TimeBasedInvalidation({ ttl: 300 }),
+    rounds: new EventBasedInvalidation({ events: ['round_updated'] }),
+    news: new DependencyBasedInvalidation({ dependencies: ['author'] })
+  },
+  broadcast: new WebSocketBroadcast({
+    channels: ['admin', 'public'],
+    compression: true
+  })
+});
+```
+
+## Frontend Performance Patterns
+
+### 1. Component Optimization
+```javascript
+// ✅ APPROPRIATE component optimization
+const MemoizedParticipantCard = React.memo(ParticipantCard);
+const LazyAdminPanel = React.lazy(() => import('./AdminPanel'));
+
+const ParticipantList = ({ participants }) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  const filteredParticipants = useMemo(() => {
+    return participants.filter(participant => 
+      participant.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [participants, searchTerm]);
+  
+  return (
+    <div>
+      <input 
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+        placeholder="Search participants..."
+      />
+      {filteredParticipants.map(participant => (
+        <MemoizedParticipantCard 
+          key={participant.id} 
+          participant={participant} 
+        />
+      ))}
+    </div>
+  );
+};
+
+// ❌ OVER-OPTIMIZATION
+const OverMemoizedComponent = React.memo(SimpleComponent);
+const OverLazyComponent = React.lazy(() => import('./SmallComponent'));
+```
+
+### 2. State Management Performance
+```javascript
+// ✅ APPROPRIATE state management
+const useParticipants = () => {
+  return useQuery({
+    queryKey: ['participants'],
+    queryFn: fetchParticipants,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    cacheTime: 10 * 60 * 1000, // 10 minutes
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true
+  });
+};
+
+const ParticipantList = () => {
+  const { data: participants, isLoading, error } = useParticipants();
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  if (isLoading) return <LoadingSpinner />;
+  if (error) return <ErrorMessage error={error} />;
+  
+  return (
+    <div>
+      <input 
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+        placeholder="Search participants..."
+      />
+      {participants?.map(participant => (
+        <ParticipantCard key={participant.id} participant={participant} />
+      ))}
+    </div>
+  );
+};
+
+// ❌ OVER-ENGINEERED state management
+const useParticipants = () => {
+  const [state, dispatch] = useReducer(complexReducer, initialState);
+  const { data, loading, error } = useQuery(complexQuery);
+  
+  useEffect(() => {
+    if (data) {
+      dispatch({ type: 'SET_PARTICIPANTS', payload: data });
+    }
+  }, [data]);
+  
+  useEffect(() => {
+    if (error) {
+      dispatch({ type: 'SET_ERROR', payload: error });
+    }
+  }, [error]);
+  
+  // ... 50+ lines of complex state management
+};
+```
+
+### 3. Bundle Optimization
+```javascript
+// ✅ APPROPRIATE bundle optimization
+// Vite config for optimal bundling
+export default defineConfig({
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          router: ['react-router-dom'],
+          query: ['@tanstack/react-query']
+        }
+      }
+    },
+    chunkSizeWarningLimit: 1000
+  }
+});
+
+// ❌ OVER-OPTIMIZATION
+export default defineConfig({
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          router: ['react-router-dom'],
+          query: ['@tanstack/react-query'],
+          utils: ['lodash', 'moment', 'date-fns'],
+          ui: ['@headlessui/react', '@heroicons/react'],
+          forms: ['react-hook-form', 'yup'],
+          charts: ['recharts', 'd3'],
+          maps: ['leaflet', 'react-leaflet']
+        }
+      }
+    },
+    chunkSizeWarningLimit: 500
+  }
+});
+```
+
+## API Performance Patterns
+
+### 1. Response Optimization
+```javascript
+// ✅ OPTIMIZED API responses
+router.get('/participants', async (req, res) => {
+  try {
+    const startTime = startTiming();
+    const participants = await optimizedQueryService.getParticipantsWithStats();
+    const duration = endTiming(startTime);
+    
+    sendSuccessResponse(res, participants, 'GET_PARTICIPANTS', duration);
+  } catch (error) {
+    sendErrorResponse(res, error, 'Failed to fetch participants');
+  }
+});
+
+// ❌ INEFFICIENT API responses
+router.get('/participants', async (req, res) => {
+  try {
+    const participants = await executeQuery('SELECT * FROM participants', []);
+    const stats = await Promise.all(
+      participants.rows.map(async (participant) => {
+        const count = await executeQuery(
+          'SELECT COUNT(*) FROM round_participants WHERE participant_id = $1',
+          [participant.id]
+        );
+        return { ...participant, round_count: count.rows[0].count };
+      })
+    );
+    
+    res.json({ success: true, data: stats });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+```
+
+### 2. Request Optimization
+```javascript
+// ✅ OPTIMIZED request handling
+router.get('/participants', async (req, res) => {
+  try {
+    const { limit, offset, search } = extractQueryParams(req, { 
+      limit: 50, 
+      offset: 0 
+    });
+    
+    const startTime = startTiming();
+    const participants = await optimizedQueryService.getParticipantsWithStats(limit, offset, search);
+    const duration = endTiming(startTime);
+    
+    sendSuccessResponse(res, participants, 'GET_PARTICIPANTS', duration);
+  } catch (error) {
+    sendErrorResponse(res, error, 'Failed to fetch participants');
+  }
+});
+
+// ❌ INEFFICIENT request handling
+router.get('/participants', async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 50;
+    const offset = parseInt(req.query.offset) || 0;
+    const search = req.query.search || '';
+    
+    const participants = await executeQuery(
+      'SELECT * FROM participants WHERE name ILIKE $1 LIMIT $2 OFFSET $3',
+      [`%${search}%`, limit, offset]
+    );
+    
+    res.json({ success: true, data: participants.rows });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+```
+
+## Real-time Performance Patterns
+
+### 1. WebSocket Optimization
+```javascript
+// ✅ OPTIMIZED WebSocket usage
+const broadcastUpdate = (room, data) => {
+  io.to(room).emit('data-update', {
+    type: 'participants',
+    data: data,
+    timestamp: Date.now()
+  });
+};
+
+const notifyDataUpdate = (entityType) => {
+  // Clear cache
+  cache.delete(`cache:${entityType}`);
+  
+  // Broadcast update
+  io.emit('data-update', { 
+    type: entityType, 
+    timestamp: Date.now() 
+  });
+};
+
+// ❌ OVER-ENGINEERED WebSocket usage
+const realtimeEngine = new RealtimeEngine({
+  adapters: {
+    redis: new RedisAdapter(),
+    socketio: new SocketIOAdapter(),
+    websocket: new WebSocketAdapter()
+  },
+  channels: {
+    participants: new Channel('participants', {
+      permissions: ['read', 'write'],
+      rateLimit: { max: 100, window: 60000 },
+      persistence: true,
+      compression: true
+    })
+  },
+  middleware: [
+    new AuthMiddleware(),
+    new RateLimitMiddleware(),
+    new ValidationMiddleware()
+  ]
+});
+```
+
+### 2. Message Batching
+```javascript
+// ✅ APPROPRIATE message batching
+class WebSocketService {
+  constructor() {
+    this.messageQueue = [];
+    this.batchSize = 10;
+    this.batchTimeout = 100; // 100ms
+  }
+  
+  queueMessage(message) {
+    this.messageQueue.push(message);
+    
+    if (this.messageQueue.length >= this.batchSize) {
+      this.flushMessages();
+    } else {
+      setTimeout(() => this.flushMessages(), this.batchTimeout);
+    }
+  }
+  
+  flushMessages() {
+    if (this.messageQueue.length > 0) {
+      this.socket.emit('batch-update', this.messageQueue);
+      this.messageQueue = [];
+    }
+  }
+}
+
+// ❌ OVER-ENGINEERED message batching
+class WebSocketService {
+  constructor() {
+    this.messageProcessor = new MessageProcessor({
+      batching: new BatchingStrategy({
+        size: 10,
+        timeout: 100,
+        compression: true
+      }),
+      queuing: new QueueStrategy({
+        maxSize: 1000,
+        overflow: 'drop-oldest'
+      }),
+      serialization: new JSONSerializationStrategy()
+    });
+  }
+}
+```
+
+## Monitoring Performance Patterns
+
+### 1. Performance Metrics
+```javascript
+// ✅ APPROPRIATE performance monitoring
+const trackPerformance = (operation, duration) => {
+  logger.info('Operation completed', {
+    operation,
+    duration: `${Math.round(duration)}ms`,
+    timestamp: new Date().toISOString()
+  });
+};
+
+const executeQuery = async (query, params) => {
+  const startTime = startTiming();
+  
+  try {
+    const result = await pool.query(query, params);
+    const duration = endTiming(startTime);
+    
+    trackPerformance('DATABASE_QUERY', duration);
+    return result;
+  } catch (error) {
+    const duration = endTiming(startTime);
+    logger.error('Query failed', {
+      query: query.substring(0, 100) + '...',
+      duration: `${Math.round(duration)}ms`,
+      error: error.message
+    });
+    throw error;
+  }
+};
+
+// ❌ OVER-ENGINEERED monitoring
+const observability = {
+  metrics: new PrometheusMetrics({
+    collectDefaultMetrics: true,
+    timeout: 5000,
+    gcDurationBuckets: [0.001, 0.01, 0.1, 1, 2, 5]
+  }),
+  tracing: new JaegerTracer({
+    serviceName: 'slam25-api',
+    sampler: new ConstSampler(true),
+    reporter: new RemoteReporter({
+      channel: new HttpChannel({
+        url: 'http://jaeger:14268/api/traces'
+      })
+    })
+  }),
+  logging: new ELKStack({
+    elasticsearch: { host: 'elasticsearch:9200' },
+    kibana: { host: 'kibana:5601' },
+    logstash: { host: 'logstash:5044' }
+  })
+};
+```
+
+### 2. Error Monitoring
+```javascript
+// ✅ APPROPRIATE error monitoring
+const handleError = (error, req, res) => {
+  logger.error('API Error', {
+    error: error.message,
+    stack: error.stack,
+    url: req.url,
+    method: req.method,
+    timestamp: new Date().toISOString()
+  });
+  
+  sendErrorResponse(res, error, 'An error occurred');
+};
+
+// ❌ OVER-ENGINEERED error monitoring
+const errorTracker = new ErrorTracker({
+  providers: [
+    new SentryProvider({
+      dsn: process.env.SENTRY_DSN,
+      environment: process.env.NODE_ENV,
+      release: process.env.RELEASE
+    }),
+    new BugsnagProvider({
+      apiKey: process.env.BUGSNAG_API_KEY,
+      releaseStage: process.env.NODE_ENV
+    })
+  ],
+  filters: [
+    new ErrorFilter({ minLevel: 'error' }),
+    new RateLimitFilter({ maxPerMinute: 100 })
+  ]
+});
+```
+
+## Memory Management Patterns
+
+### 1. Frontend Memory
+```javascript
+// ✅ APPROPRIATE memory management
+useEffect(() => {
+  const interval = setInterval(() => {
+    // Update data
+  }, 30000);
+  
+  return () => clearInterval(interval);
+}, []);
+
+useEffect(() => {
+  const subscription = websocketService.subscribe('participants', handleUpdate);
+  
+  return () => subscription.unsubscribe();
+}, []);
+
+// ❌ MEMORY LEAKS
+useEffect(() => {
+  const interval = setInterval(() => {
+    // Update data
+  }, 30000);
+  
+  // Missing cleanup
+}, []);
+```
+
+### 2. Backend Memory
+```javascript
+// ✅ APPROPRIATE memory management
+const cache = new Map();
+const MAX_CACHE_SIZE = 1000;
+
+const setCachedData = (key, data) => {
+  if (cache.size >= MAX_CACHE_SIZE) {
+    const firstKey = cache.keys().next().value;
+    cache.delete(firstKey);
+  }
+  cache.set(key, data);
+};
+
+// ❌ MEMORY LEAKS
+const cache = new Map();
+const setCachedData = (key, data) => {
+  cache.set(key, data); // No size limit
+};
+```
+
+## Performance Anti-Patterns
+
+### ❌ Over-Optimization
+- Complex caching for small datasets
+- Database query optimization for simple queries
+- Advanced state management for simple UI
+- Complex real-time architecture for basic updates
+
+### ❌ Under-Optimization
+- No caching for frequently accessed data
+- N+1 database queries
+- Large bundle sizes
+- No performance monitoring
+- No error handling
+
+## Scale-Appropriate Performance Patterns
+
+### ✅ Right-Sized Solutions
+- Simple in-memory caching with TTL
+- Basic performance monitoring and logging
+- Appropriate database indexing
+- Simple WebSocket broadcasting
+- Focused component architecture
+- Essential performance optimizations only
+
+## Remember: Optimize for the actual scale and requirements, not theoretical maximums or over-engineering patterns.

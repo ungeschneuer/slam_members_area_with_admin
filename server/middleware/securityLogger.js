@@ -17,7 +17,7 @@ const SENSITIVE_PATTERNS = [
 ];
 
 // Redact sensitive data from logs
-export const redactSensitiveData = (data) => {
+const redactSensitiveData = (data) => {
   if (typeof data === 'string') {
     return data.replace(/("password":\s*"[^"]*")/gi, '"password": "[REDACTED]"')
                .replace(/("token":\s*"[^"]*")/gi, '"token": "[REDACTED]"')
@@ -43,7 +43,7 @@ export const redactSensitiveData = (data) => {
 };
 
 // Security event logger
-export const logSecurityEvent = (event, details = {}) => {
+const logSecurityEvent = (event, details = {}) => {
   const securityLog = {
     timestamp: new Date().toISOString(),
     event,
@@ -82,7 +82,7 @@ const getSeverityLevel = (event) => {
 };
 
 // Security middleware
-export const securityLogger = (req, res, next) => {
+const securityLogger = (req, res, next) => {
   const startTime = Date.now();
   
   // Log request
@@ -154,7 +154,7 @@ const isSuspiciousRequest = (req) => {
 };
 
 // Authentication failure logger
-export const logAuthFailure = (req, reason, details = {}) => {
+const logAuthFailure = (req, reason, details = {}) => {
   logSecurityEvent('AUTHENTICATION_FAILURE', {
     ip: req.ip,
     userAgent: req.get('User-Agent'),
@@ -165,7 +165,7 @@ export const logAuthFailure = (req, reason, details = {}) => {
 };
 
 // Authorization failure logger
-export const logAuthzFailure = (req, user, resource, action) => {
+const logAuthzFailure = (req, user, resource, action) => {
   logSecurityEvent('AUTHORIZATION_FAILURE', {
     ip: req.ip,
     userAgent: req.get('User-Agent'),
@@ -177,7 +177,7 @@ export const logAuthzFailure = (req, user, resource, action) => {
 };
 
 // Rate limit logger
-export const logRateLimit = (req, limit, window) => {
+const logRateLimit = (req, limit, window) => {
   logSecurityEvent('RATE_LIMIT_EXCEEDED', {
     ip: req.ip,
     userAgent: req.get('User-Agent'),
@@ -191,7 +191,7 @@ export const logRateLimit = (req, limit, window) => {
 // Brute force detection
 const bruteForceAttempts = new Map();
 
-export const detectBruteForce = (req, identifier) => {
+const detectBruteForce = (req, identifier) => {
   const key = `${req.ip}:${identifier}`;
   const now = Date.now();
   const window = 15 * 60 * 1000; // 15 minutes
@@ -234,4 +234,12 @@ setInterval(() => {
   }
 }, 5 * 60 * 1000); // Clean up every 5 minutes
 
-export default securityLogger;
+export { 
+  redactSensitiveData,
+  logSecurityEvent, 
+  securityLogger,
+  logAuthFailure,
+  logAuthzFailure,
+  logRateLimit,
+  detectBruteForce
+};

@@ -1,5 +1,5 @@
 ---
-globs: src/**/*.{js,jsx,ts,tsx}
+globs: client/**/*.{js,jsx,ts,tsx}
 ---
 
 # React 19 Frontend Rules
@@ -12,11 +12,11 @@ globs: src/**/*.{js,jsx,ts,tsx}
 - One component per file, named in PascalCase
 
 ## File Organization
-- Components: `/src/components/` - Reusable UI components
-- Admin components: `/src/components/admin/` - Admin-specific components
-- Services: `/src/services/` - API calls and business logic
-- Hooks: `/src/hooks/` - Custom React hooks
-- Utils: `/src/utils/` - Utility functions
+- Components: `/client/components/` - Reusable UI components
+- Admin components: `/client/components/admin/` - Admin-specific components
+- Services: `/client/services/` - API calls and business logic
+- Hooks: `/client/hooks/` - Custom React hooks
+- Utils: `/client/utils/` - Utility functions
 
 ## Styling
 - Use TailwindCSS classes for styling
@@ -25,14 +25,14 @@ globs: src/**/*.{js,jsx,ts,tsx}
 - Prefer TailwindCSS over CSS modules
 
 ## Key Components
-- [src/components/MemberDashboard.jsx](mdc:src/components/MemberDashboard.jsx) - Main member interface
-- [src/components/admin/AdminDashboard.jsx](mdc:src/components/admin/AdminDashboard.jsx) - Admin interface
-- [src/components/Rounds.jsx](mdc:src/components/Rounds.jsx) - Competition rounds
-- [src/components/News.jsx](mdc:src/components/News.jsx) - News display
-- [src/components/CityTips.jsx](mdc:src/components/CityTips.jsx) - Location recommendations
+- [client/components/MemberDashboard.jsx](mdc:client/components/MemberDashboard.jsx) - Main member interface
+- [client/components/admin/AdminDashboard.jsx](mdc:client/components/admin/AdminDashboard.jsx) - Admin interface
+- [client/components/Rounds.jsx](mdc:client/components/Rounds.jsx) - Competition rounds
+- [client/components/News.jsx](mdc:client/components/News.jsx) - News display
+- [client/components/CityTips.jsx](mdc:client/components/CityTips.jsx) - Location recommendations
 
 ## Performance
 - Use lazy loading with `React.lazy()` and `Suspense`
 - Implement proper error boundaries
-- Optimize images with [src/components/LazyImage.jsx](mdc:src/components/LazyImage.jsx)
-- Use [src/components/SkeletonLoader.jsx](mdc:src/components/SkeletonLoader.jsx) for loading states
+- Optimize images with [client/components/LazyImage.jsx](mdc:client/components/LazyImage.jsx)
+- Use [client/components/SkeletonLoader.jsx](mdc:client/components/SkeletonLoader.jsx) for loading states

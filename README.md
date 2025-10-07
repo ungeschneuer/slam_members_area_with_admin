@@ -14,14 +14,14 @@ A full-stack Poetry Slam application with React frontend and Express.js backend 
 ## 🏗️ Architecture
 
 - **Frontend**: React 19 + Vite + TailwindCSS + React Router v7
-- **Backend**: Express.js + PostgreSQL + Prisma ORM
+- **Backend**: Express.js + PostgreSQL
 - **Real-time**: Socket.io for WebSocket connections
 - **PWA**: Progressive Web App with service workers
 
 ## 📁 Project Structure
 
 ```
-├── src/                    # React frontend
+├── client/                 # React frontend
 │   ├── components/         # React components
 │   ├── services/          # API services
 │   └── utils/             # Utility functions
@@ -31,7 +31,6 @@ A full-stack Poetry Slam application with React frontend and Express.js backend 
 │   ├── middleware/        # Express middleware
 │   └── config/           # Configuration files
 ├── database/              # Database migrations
-├── prisma/               # Database schema
 └── public/               # Static assets
 ```
 
@@ -122,7 +121,7 @@ npm run test:coverage
 ### Authentication
 - `POST /api/auth/register` - User registration
 - `POST /api/auth/login` - User login
-- `POST /api/auth/refresh` - Refresh token
+- ~~`POST /api/auth/refresh` - Refresh token~~ (Removed - using simple JWT)
 - `POST /api/auth/logout` - User logout
 
 ### Participants
@@ -140,7 +139,7 @@ npm run test:coverage
 
 ## 🔒 Security Features
 
-- JWT-based authentication with refresh tokens
+- JWT-based authentication (stateless, no refresh tokens needed)
 - Role-based access control (admin, organizer, member)
 - XSS protection and input sanitization
 - Rate limiting and DDoS protection
@@ -157,7 +156,7 @@ npm run test:coverage
 ## 🛠️ Development Tools
 
 - **Frontend**: Vite, React 19, TailwindCSS
-- **Backend**: Express.js, Prisma ORM, Winston logging
+- **Backend**: Express.js, PostgreSQL, Winston logging
 - **Testing**: Vitest, Jest, React Testing Library
 - **Database**: PostgreSQL with migrations
 - **Real-time**: Socket.io

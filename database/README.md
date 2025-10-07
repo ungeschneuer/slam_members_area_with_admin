@@ -161,7 +161,7 @@ CREATE TABLE content (
     title VARCHAR(255) NOT NULL,
     content_type content_type NOT NULL,
     content TEXT NOT NULL,
-    author_id UUID REFERENCES users(id),
+    -- author_id UUID REFERENCES users(id), -- Removed: No author tracking needed
     is_published BOOLEAN DEFAULT false,
     published_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,

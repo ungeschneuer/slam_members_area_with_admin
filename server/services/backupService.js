@@ -11,7 +11,12 @@ const execAsync = promisify(exec);
 
 class BackupService {
   constructor() {
-    this.backupDir = process.env.BACKUP_DIR || '/var/backups/slam25';
+    // Use user-accessible backup directory for all environments
+    const defaultBackupDir = process.env.NODE_ENV === 'production' 
+      ? path.join(process.env.HOME || '/home/uberspace', 'backups/slam25')
+      : path.join(__dirname, '../../backups');
+    
+    this.backupDir = process.env.BACKUP_DIR || defaultBackupDir;
     this.maxBackups = parseInt(process.env.MAX_BACKUPS) || 30;
     this.compressionEnabled = process.env.BACKUP_COMPRESSION === 'true';
     this.encryptionEnabled = process.env.BACKUP_ENCRYPTION === 'true';

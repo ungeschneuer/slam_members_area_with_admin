@@ -1,0 +1,274 @@
+---
+alwaysApply: true
+description: Development workflow and best practices
+---
+
+# Development Workflow
+
+## Project Setup and Structure
+
+### Technology Stack
+- **Frontend**: React 19 + Vite + TailwindCSS + React Router v7
+- **Backend**: Express.js + PostgreSQL + Raw SQL
+- **Real-time**: Socket.io for WebSocket connections
+- **PWA**: Progressive Web App with service workers
+
+### Key Files and Entry Points
+- **Frontend Entry**: [index.html](mdc:index.html) → [client/main.jsx](mdc:client/main.jsx)
+- **Backend Entry**: [server/server.js](mdc:server/server.js)
+- **Database Schema**: [database/schema.sql](mdc:database/schema.sql)
+- **API Routes**: [server/routes/optimizedRoutes.js](mdc:server/routes/optimizedRoutes.js)
+
+## Development Guidelines
+
+### Code Organization
+- **Components**: [client/components/](mdc:client/components/) - React components
+- **Services**: [client/services/](mdc:client/services/) - API and utility services
+- **Routes**: [server/routes/](mdc:server/routes/) - API route handlers
+- **Middleware**: [server/middleware/](mdc:server/middleware/) - Express middleware
+
+### Helper Functions Usage
+Always use the established helper functions from [server/routes/optimizedRoutes.js](mdc:server/routes/optimizedRoutes.js):
+
+```javascript
+// Performance timing
+const startTime = startTiming();
+const duration = endTiming(startTime);
+
+// Response formatting
+sendSuccessResponse(res, data, 'OPERATION_TYPE', duration);
+sendErrorResponse(res, error, 'Error message');
+sendNotFoundResponse(res, 'Entity name');
+
+// Data processing
+const normalizedData = normalizeData(req.body, schema);
+const safeId = safeParseInt(req.params.id);
+const jsonData = safeJsonStringify(data, fallback);
+
+// Middleware
+router.post('/entity', ...adminMiddleware(), handler);
+
+// CRUD operations
+await executeCrudOperation(operation, query, params, entityType, queryType, res);
+```
+
+## Database Development
+
+### Raw SQL Approach
+- No ORM dependencies (Prisma removed)
+- Direct PostgreSQL queries with parameterized statements
+- Use `executeQuery(query, params)` for database operations
+- Always use parameterized queries to prevent SQL injection
+
+### Query Optimization
+- Use `optimizedQueryService` for complex queries
+- Include performance timing on all database operations
+- Monitor query performance with logging
+- Use JOIN queries for better performance
+
+### Database Schema
+- Schema defined in [database/schema.sql](mdc:database/schema.sql)
+- Migrations in [database/migrations/](mdc:database/migrations/)
+- Use raw SQL for all database operations
+
+## API Development Patterns
+
+### Route Structure
+```javascript
+// Standard CRUD route pattern
+router.post('/entity', ...adminMiddleware(), async (req, res) => {
+  const normalizedData = normalizeData(req.body, {
+    field1: { type: 'json', fallback: [] },
+    field2: { type: 'string', fallback: 'default' }
+  });
+  
+  await executeCrudOperation(
+    'create',
+    'INSERT INTO table (fields) VALUES ($1, $2) RETURNING *',
+    [param1, normalizedData.field1],
+    'entity',
+    'CREATE_ENTITY',
+    res
+  );
+});
+```
+
+### Response Format
+All API responses follow this structure:
+```javascript
+{
+  success: true,
+  data: result,
+  meta: {
+    queryType: 'OPERATION_TYPE',
+    duration: '123ms'
+  }
+}
+```
+
+### Error Handling
+- Use `sendErrorResponse()` for all errors
+- Use `sendSuccessResponse()` for success responses
+- Use `sendNotFoundResponse()` for 404 responses
+- Always check `res.headersSent` before sending responses
+
+## Authentication System
+
+### Cookie-Based Authentication
+- Single authentication system for admin area
+- Use `adminMiddleware()` for admin routes
+- Role-based authorization (admin, organizer)
+- No user registration (read-only portal)
+
+### Middleware Usage
+```javascript
+// Standard admin middleware
+router.post('/entity', ...adminMiddleware(), handler);
+
+// Custom roles
+router.post('/entity', ...adminMiddleware(['admin']), handler);
+```
+
+## Performance Monitoring
+
+### Timing and Logging
+```javascript
+const startTime = startTiming();
+const result = await executeQuery(query, params);
+const duration = endTiming(startTime);
+
+logger.info('Operation completed', {
+  operation: 'CREATE_ENTITY',
+  duration: `${Math.round(duration)}ms`,
+  recordCount: result.rows.length
+});
+```
+
+### Cache Management
+- Use `notifyDataUpdate(entityType)` after data modifications
+- Clear cache before WebSocket notifications
+- Monitor cache statistics with `getCacheStats()`
+
+## Testing Strategy
+
+### Unit Testing
+- Test all helper functions independently
+- Mock database connections for isolated testing
+- Test error handling paths
+- Validate response formats
+
+### Integration Testing
+- Test complete CRUD operations
+- Test middleware chain functionality
+- Test WebSocket notifications
+- Test cache invalidation
+
+### Performance Testing
+- Measure query execution times
+- Test with various data sizes
+- Monitor memory usage
+- Validate cache effectiveness
+
+## Security Considerations
+
+### Input Validation
+- Always validate input parameters
+- Use parameterized queries to prevent SQL injection
+- Sanitize user input with helper functions
+- Validate data types and ranges
+
+### Authentication and Authorization
+- Use `adminMiddleware()` for consistent auth
+- Validate user roles before operations
+- Log security-related events
+- Handle authentication errors gracefully
+
+## Deployment Guidelines
+
+### Production Setup
+- PostgreSQL database with connection pooling
+- Express.js server with performance monitoring
+- React frontend with PWA capabilities
+- WebSocket for real-time updates
+
+### Monitoring and Logging
+- Performance metrics on all operations
+- Error logging with context
+- Database health monitoring
+- Cache statistics and management
+
+## Code Quality Standards
+
+### DRY Principle
+- Use helper functions for common patterns
+- Centralize error handling and response formatting
+- Reuse middleware chains with `adminMiddleware()`
+- Standardize data validation with `normalizeData()`
+
+### Single Responsibility
+- Each helper function has one clear purpose
+- Route handlers focus on business logic
+- Separate concerns: validation, execution, response formatting
+
+### Consistent Patterns
+- All CRUD operations use `executeCrudOperation()`
+- All admin routes use `...adminMiddleware()`
+- All responses use standardized helper functions
+- All database operations include performance timing
+
+## Development Best Practices
+
+### Before Writing Code
+1. Check existing helper functions in [server/routes/optimizedRoutes.js](mdc:server/routes/optimizedRoutes.js)
+2. Use established patterns for consistency
+3. Plan data validation with schema approach
+4. Consider performance implications
+
+### During Development
+1. Use helper functions for all common patterns
+2. Include performance timing and logging
+3. Handle errors with helper functions
+4. Validate input with schema-based approach
+
+### After Development
+1. Test error handling paths
+2. Validate response formats
+3. Check performance metrics
+4. Review security considerations
+
+## Common Patterns
+
+### CRUD Operations
+```javascript
+// Create
+router.post('/entity', ...adminMiddleware(), async (req, res) => {
+  const normalizedData = normalizeData(req.body, schema);
+  await executeCrudOperation('create', query, params, 'entity', 'CREATE_ENTITY', res);
+});
+
+// Update
+router.put('/entity/:id', ...adminMiddleware(), async (req, res) => {
+  const normalizedData = normalizeData(req.body, schema);
+  await executeCrudOperation('update', query, params, 'entity', 'UPDATE_ENTITY', res);
+});
+
+// Delete
+router.delete('/entity/:id', ...adminMiddleware(), async (req, res) => {
+  await executeCrudOperation('delete', query, [safeParseInt(req.params.id)], 'entity', 'DELETE_ENTITY', res);
+});
+```
+
+### Query with Parameters
+```javascript
+router.get('/entity', async (req, res) => {
+  try {
+    const { limit, offset } = extractQueryParams(req, { limit: 50, offset: 0 });
+    const startTime = startTiming();
+    const entities = await optimizedQueryService.getEntities(limit, offset);
+    const duration = endTiming(startTime);
+    sendSuccessResponse(res, entities, 'GET_ENTITIES', duration);
+  } catch (error) {
+    sendErrorResponse(res, error, 'Failed to fetch entities');
+  }
+});
+```

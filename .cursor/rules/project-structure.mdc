@@ -1,33 +1,190 @@
 ---
 alwaysApply: true
+description: Project structure and architecture guidelines
 ---
 
-# SLAM25 Members Area Project Structure
+# SLAM25 Members Area - Project Structure
+
+## Architecture Overview
 
 This is a full-stack Poetry Slam application with a React 19 frontend and Express.js backend using PostgreSQL.
 
-## Core Architecture
+### Core Architecture
 - **Frontend**: React 19 + Vite + TailwindCSS + React Router v7
-- **Backend**: Express.js + PostgreSQL + Prisma ORM
+- **Backend**: Express.js + PostgreSQL + Raw SQL
 - **Real-time**: Socket.io for WebSocket connections
 - **PWA**: Progressive Web App with service workers
 
 ## Key Entry Points
-- Frontend: [index.html](mdc:index.html) → [src/main.jsx](mdc:src/main.jsx) → [src/App.jsx](mdc:src/App.jsx)
-- Backend: [server/server.js](mdc:server/server.js)
-- Database Schema: [prisma/schema.prisma](mdc:prisma/schema.prisma)
+- **Frontend**: [index.html](mdc:index.html) → [client/main.jsx](mdc:client/main.jsx) → [client/App.jsx](mdc:client/App.jsx)
+- **Backend**: [server/server.js](mdc:server/server.js)
+- **Database Schema**: [database/schema.sql](mdc:database/schema.sql)
 
 ## Directory Structure
-- `/src/` - React frontend components and services
-- `/server/` - Express.js backend API
-- `/database/` - SQL migrations and setup scripts
-- `/prisma/` - Database schema and migrations
-- `/public/` - Static assets and PWA files
+
+### Frontend (`/client/`)
+- **Components**: [client/components/](mdc:client/components/) - React components
+- **Services**: [client/services/](mdc:client/services/) - API and utility services
+- **Hooks**: [client/hooks/](mdc:client/hooks/) - Custom React hooks
+- **Utils**: [client/utils/](mdc:client/utils/) - Utility functions
+
+### Backend (`/server/`)
+- **Routes**: [server/routes/](mdc:server/routes/) - API route handlers
+- **Services**: [server/services/](mdc:server/services/) - Business logic services
+- **Middleware**: [server/middleware/](mdc:server/middleware/) - Express middleware
+- **Config**: [server/config/](mdc:server/config/) - Configuration files
+
+### Database (`/database/`)
+- **Schema**: [database/schema.sql](mdc:database/schema.sql) - Database schema
+- **Migrations**: [database/migrations/](mdc:database/migrations/) - Database migrations
+- **Setup**: [database/setup/](mdc:database/setup/) - Database setup scripts
 
 ## Key Features
-- Member dashboard with competition rounds
-- Admin panel for content management
+
+### Member Dashboard
+- Competition rounds and participants
 - Real-time updates via WebSocket
 - City tips and location recommendations
 - News and community features
-- PWA capabilities with offline support
+
+### Admin Panel
+- Content management for all components
+- CRUD operations for participants, rounds, news, etc.
+- Performance monitoring and analytics
+- Cache management
+
+### PWA Capabilities
+- Offline support with service workers
+- Installable as mobile app
+- Real-time updates without push notifications
+
+## API Architecture
+
+### Route Organization
+- **Public Routes**: Health checks, public data endpoints
+- **Authenticated Routes**: User-specific data
+- **Admin Routes**: CRUD operations for content management
+
+### Helper Functions
+All routes use standardized helper functions from [server/routes/optimizedRoutes.js](mdc:server/routes/optimizedRoutes.js):
+- `executeCrudOperation()` - Generic CRUD operations
+- `executeRoundCrudOperation()` - Rounds with slug generation
+- `normalizeData()` - Schema-based data validation
+- `adminMiddleware()` - Standardized admin authentication
+
+### Response Format
+All API responses follow a consistent structure:
+```javascript
+{
+  success: true,
+  data: result,
+  meta: {
+    queryType: 'OPERATION_TYPE',
+    duration: '123ms'
+  }
+}
+```
+
+## Database Patterns
+
+### Raw SQL Approach
+- No ORM dependencies (Prisma removed)
+- Direct PostgreSQL queries with parameterized statements
+- Optimized JOIN queries for performance
+- Connection pooling for scalability
+
+### Query Optimization
+- Use `optimizedQueryService` for complex queries
+- Performance timing on all database operations
+- Cache management with automatic invalidation
+- WebSocket updates for real-time data
+
+## Authentication System
+
+### Cookie-Based Authentication
+- Single authentication system for admin area
+- Session management with secure cookies
+- Role-based authorization (admin, organizer)
+- No user registration (read-only portal)
+
+### Middleware Chain
+```javascript
+// Standard admin middleware
+router.post('/entity', ...adminMiddleware(), async (req, res) => {
+  // Route handler
+});
+
+// Custom roles
+router.post('/entity', ...adminMiddleware(['admin']), async (req, res) => {
+  // Route handler
+});
+```
+
+## Development Guidelines
+
+### Code Quality Standards
+- Use helper functions for all common patterns
+- Schema-based data validation with `normalizeData()`
+- Consistent error handling with helper functions
+- Performance monitoring on all operations
+
+### File Organization
+- **Components**: Group by feature/functionality
+- **Services**: Separate API and utility services
+- **Routes**: Use helper functions for consistency
+- **Database**: Raw SQL with parameterized queries
+
+### Testing Strategy
+- Unit tests for helper functions
+- Integration tests for API endpoints
+- Performance tests for database queries
+- End-to-end tests for critical user flows
+
+## Performance Considerations
+
+### Frontend Optimization
+- React 19 with concurrent features
+- Vite for fast development and building
+- TailwindCSS for optimized CSS
+- Service workers for offline support
+
+### Backend Optimization
+- Connection pooling for database
+- Query caching with automatic invalidation
+- WebSocket for real-time updates
+- Performance monitoring and logging
+
+### Database Optimization
+- Optimized JOIN queries
+- Proper indexing strategy
+- Connection pooling
+- Query performance monitoring
+
+## Security Considerations
+
+### Data Protection
+- Parameterized queries prevent SQL injection
+- Input validation with schema-based normalization
+- Secure cookie authentication
+- No sensitive data in client-side code
+
+### Access Control
+- Role-based authorization
+- Admin-only CRUD operations
+- No user registration system
+- Read-only portal for members
+
+## Deployment Architecture
+
+### Production Setup
+- PostgreSQL database with connection pooling
+- Express.js server with performance monitoring
+- React frontend with PWA capabilities
+- WebSocket for real-time updates
+- Service workers for offline support
+
+### Monitoring and Logging
+- Performance metrics on all operations
+- Error logging with context
+- Database health monitoring
+- Cache statistics and management

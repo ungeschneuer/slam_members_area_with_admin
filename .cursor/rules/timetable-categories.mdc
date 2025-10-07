@@ -1,0 +1,52 @@
+---
+description: Timetable category system and event types
+---
+
+# Timetable Category System
+
+## Category Types
+The timetable supports these 5 main categories:
+
+1. **Team-Runde** (`team-round`) - 👥
+   - Team competitions and group events
+   - Red color theme
+   - For collaborative activities
+
+2. **Einzel-Runde** (`individual-round`) - 👤
+   - Individual competitions and solo events
+   - Blue color theme
+   - For personal performances
+
+3. **Workshop** (`workshop`) - 🎓
+   - Educational sessions and learning events
+   - Green color theme
+   - For skill development
+
+4. **Fun** (`fun`) - 🎉
+   - Fun activities, breaks, and social events
+   - Yellow color theme
+   - For entertainment and networking
+
+5. **Aftershow** (`aftershow`) - 🎭
+   - Post-event entertainment and celebrations
+   - Purple color theme
+   - For after-party activities
+
+## Implementation
+- **Frontend**: [src/components/Timetable.jsx](mdc:src/components/Timetable.jsx)
+- **Admin**: [src/components/admin/AdminTimetable.jsx](mdc:src/components/admin/AdminTimetable.jsx)
+- **Validation**: [server/middleware/validation.js](mdc:server/middleware/validation.js)
+- **Database**: Updated schema with proper constraints
+
+## Styling
+Each category has consistent color schemes:
+- Background colors with opacity
+- Text colors for readability
+- Icons for visual identification
+- Hover effects and transitions
+
+## Migration Applied
+- Updated existing data to new categories
+- Applied server validation changes
+- Updated frontend display logic
+- Maintained backward compatibility

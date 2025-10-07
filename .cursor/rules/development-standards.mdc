@@ -1,0 +1,470 @@
+---
+alwaysApply: true
+description: Development standards and code quality guidelines for the SLAM25 application
+---
+
+# Development Standards & Code Quality
+
+## Code Organization Principles
+
+### 1. File Structure Standards
+```
+client/
+  components/          # React components
+    admin/            # Admin-specific components
+    __tests__/        # Component tests
+  hooks/              # Custom React hooks
+  services/           # API and utility services
+  utils/              # Utility functions
+server/
+  routes/             # API route handlers
+  services/           # Business logic services
+  middleware/          # Express middleware
+  config/             # Configuration files
+database/
+  schema.sql          # Database schema
+  migrations/         # Database migrations
+```
+
+### 2. Naming Conventions
+```javascript
+// ✅ GOOD naming
+const ParticipantCard = ({ participant }) => { /* ... */ };
+const useParticipants = () => { /* ... */ };
+const getParticipantsWithStats = async () => { /* ... */ };
+const sendSuccessResponse = (res, data, type) => { /* ... */ };
+
+// ❌ BAD naming
+const PC = ({ p }) => { /* ... */ };
+const useP = () => { /* ... */ };
+const getPWS = async () => { /* ... */ };
+const sSR = (res, data, type) => { /* ... */ };
+```
+
+### 3. Component Architecture Standards
+```javascript
+// ✅ APPROPRIATE component structure
+const ParticipantCard = ({ participant, onSelect, className = '' }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  
+  const handleClick = () => {
+    onSelect?.(participant);
+  };
+  
+  return (
+    <div className={`participant-card ${className}`} onClick={handleClick}>
+      <h3>{participant.name}</h3>
+      <p>{participant.region}</p>
+      {isExpanded && (
+        <div className="participant-details">
+          <p>{participant.pronouns}</p>
+          <p>{participant.instagram}</p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ❌ OVER-ENGINEERED component
+const ParticipantCard = ({ participant, onSelect, onEdit, onDelete, showStats, showActions, className, theme, size, variant, ...props }) => {
+  const [state, dispatch] = useReducer(complexReducer, initialState);
+  const { data, loading, error } = useQuery(complexQuery);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+  
+  // ... 100+ lines of complex logic
+};
+```
+
+## API Development Standards
+
+### 1. Route Handler Patterns
+```javascript
+// ✅ STANDARD route pattern
+router.get('/participants', async (req, res) => {
+  try {
+    const startTime = startTiming();
+    const participants = await optimizedQueryService.getParticipantsWithStats();
+    const duration = endTiming(startTime);
+    
+    sendSuccessResponse(res, participants, 'GET_PARTICIPANTS', duration);
+  } catch (error) {
+    sendErrorResponse(res, error, 'Failed to fetch participants');
+  }
+});
+
+router.post('/participants', ...adminMiddleware(), async (req, res) => {
+  const normalizedData = normalizeData(req.body, {
+    name: { type: 'string', fallback: '' },
+    region: { type: 'string', fallback: '' },
+    pronouns: { type: 'string', fallback: '' },
+    instagram: { type: 'string', fallback: '' }
+  });
+  
+  await executeCrudOperation(
+    'create',
+    'INSERT INTO participants (name, region, pronouns, instagram) VALUES ($1, $2, $3, $4) RETURNING *',
+    [normalizedData.name, normalizedData.region, normalizedData.pronouns, normalizedData.instagram],
+    'participant',
+    'CREATE_PARTICIPANT',
+    res
+  );
+});
+
+// ❌ INCONSISTENT route pattern
+router.get('/participants', async (req, res) => {
+  const participants = await getParticipants();
+  res.json({ success: true, data: participants });
+});
+
+router.post('/participants', authenticateCookie, authorizeCookie(['admin']), async (req, res) => {
+  const { name, region, pronouns, instagram } = req.body;
+  const result = await executeQuery(
+    'INSERT INTO participants (name, region, pronouns, instagram) VALUES ($1, $2, $3, $4) RETURNING *',
+    [name, region, pronouns, instagram]
+  );
+  res.status(201).json({ success: true, data: result.rows[0] });
+});
+```
+
+### 2. Error Handling Standards
+```javascript
+// ✅ STANDARDIZED error handling
+try {
+  const result = await executeQuery(query, params);
+  sendSuccessResponse(res, result.rows[0], 'OPERATION_TYPE', duration);
+} catch (error) {
+  sendErrorResponse(res, error, 'Operation failed');
+}
+
+// ❌ MANUAL error handling
+try {
+  const result = await executeQuery(query, params);
+  res.status(200).json({ success: true, data: result.rows[0] });
+} catch (error) {
+  logger.error('Error:', error);
+  res.status(500).json({ success: false, error: 'Operation failed' });
+}
+```
+
+### 3. Response Format Standards
+```javascript
+// ✅ STANDARDIZED response format
+{
+  success: true,
+  data: result,
+  meta: {
+    queryType: 'OPERATION_TYPE',
+    duration: '123ms'
+  }
+}
+
+// ❌ INCONSISTENT response format
+{
+  success: true,
+  participants: result,
+  timestamp: Date.now()
+}
+```
+
+## Database Development Standards
+
+### 1. Query Patterns
+```javascript
+// ✅ APPROPRIATE query patterns
+// Use parameterized queries for security
+const getParticipants = async () => {
+  const query = 'SELECT * FROM participants ORDER BY name';
+  const result = await executeQuery(query, []);
+  return result.rows;
+};
+
+const getParticipantById = async (id) => {
+  const query = 'SELECT * FROM participants WHERE id = $1';
+  const result = await executeQuery(query, [id]);
+  return result.rows[0];
+};
+
+// ❌ INSECURE query patterns
+// Direct string concatenation (SQL injection risk)
+const getParticipantById = async (id) => {
+  const query = `SELECT * FROM participants WHERE id = ${id}`;
+  const result = await executeQuery(query, []);
+  return result.rows[0];
+};
+```
+
+### 2. Performance Monitoring
+```javascript
+// ✅ ALWAYS include performance timing
+const startTime = startTiming();
+const result = await executeQuery(query, params);
+const duration = endTiming(startTime);
+
+logger.info('Operation completed', {
+  operation: 'CREATE_ENTITY',
+  duration: `${Math.round(duration)}ms`,
+  recordCount: result.rows.length
+});
+
+// ❌ NO performance monitoring
+const result = await executeQuery(query, params);
+```
+
+## Frontend Development Standards
+
+### 1. Hook Usage Patterns
+```javascript
+// ✅ APPROPRIATE hook usage
+const useParticipants = () => {
+  return useQuery({
+    queryKey: ['participants'],
+    queryFn: fetchParticipants,
+    staleTime: 5 * 60 * 1000,
+    cacheTime: 10 * 60 * 1000
+  });
+};
+
+const ParticipantList = () => {
+  const { data: participants, isLoading, error } = useParticipants();
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  if (isLoading) return <LoadingSpinner />;
+  if (error) return <ErrorMessage error={error} />;
+  
+  return (
+    <div>
+      <input 
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+        placeholder="Search participants..."
+      />
+      {participants?.map(participant => (
+        <ParticipantCard key={participant.id} participant={participant} />
+      ))}
+    </div>
+  );
+};
+
+// ❌ OVER-ENGINEERED hook usage
+const useParticipants = () => {
+  const [state, dispatch] = useReducer(participantsReducer, initialState);
+  const { data, loading, error } = useQuery(complexQuery);
+  
+  useEffect(() => {
+    if (data) {
+      dispatch({ type: 'SET_PARTICIPANTS', payload: data });
+    }
+  }, [data]);
+  
+  useEffect(() => {
+    if (error) {
+      dispatch({ type: 'SET_ERROR', payload: error });
+    }
+  }, [error]);
+  
+  // ... 50+ lines of complex state management
+};
+```
+
+### 2. Component Performance
+```javascript
+// ✅ APPROPRIATE performance optimizations
+const MemoizedParticipantCard = React.memo(ParticipantCard);
+const LazyAdminPanel = React.lazy(() => import('./AdminPanel'));
+
+// ❌ PREMATURE optimizations
+// Don't memoize everything
+const OverMemoized = React.memo(SimpleComponent);
+// Don't lazy load small components
+const LazySmallComponent = React.lazy(() => import('./SmallComponent'));
+```
+
+## Testing Standards
+
+### 1. Test Organization
+```javascript
+// ✅ APPROPRIATE test structure
+describe('Participant API', () => {
+  it('should create participant', async () => {
+    const participant = { name: 'Test', region: 'Berlin' };
+    const result = await createParticipant(participant);
+    expect(result.name).toBe('Test');
+  });
+  
+  it('should get participants with stats', async () => {
+    const participants = await getParticipantsWithStats();
+    expect(Array.isArray(participants)).toBe(true);
+  });
+});
+
+// ❌ OVER-TESTING
+describe('Participant API', () => {
+  it('should create participant with valid name', async () => {});
+  it('should create participant with valid region', async () => {});
+  it('should create participant with valid pronouns', async () => {});
+  it('should create participant with valid instagram', async () => {});
+  // ... 50+ more tests for minor variations
+});
+```
+
+### 2. Test Coverage Standards
+- **Critical paths**: 100% coverage for authentication, data operations
+- **Helper functions**: 100% coverage for utility functions
+- **API endpoints**: 90% coverage for CRUD operations
+- **Components**: 80% coverage for user-facing components
+
+## Security Standards
+
+### 1. Input Validation
+```javascript
+// ✅ APPROPRIATE validation
+const normalizedData = normalizeData(req.body, {
+  name: { type: 'string', fallback: '' },
+  region: { type: 'string', fallback: '' },
+  pronouns: { type: 'string', fallback: '' },
+  instagram: { type: 'string', fallback: '' }
+});
+
+// ❌ MANUAL validation
+const { name, region, pronouns, instagram } = req.body;
+if (!name || name.length < 2) {
+  return res.status(400).json({ error: 'Name is required' });
+}
+```
+
+### 2. Authentication Patterns
+```javascript
+// ✅ STANDARDIZED authentication
+router.post('/entity', ...adminMiddleware(), async (req, res) => {
+  // Route handler
+});
+
+// ❌ MANUAL authentication
+router.post('/entity', authenticateCookie, authorizeCookie(['admin', 'organizer']), async (req, res) => {
+  // Route handler
+});
+```
+
+## Performance Standards
+
+### 1. Database Performance
+```javascript
+// ✅ OPTIMIZED queries
+const getParticipantsWithStats = async () => {
+  const query = `
+    SELECT p.*, COUNT(rp.round_id) as round_count
+    FROM participants p
+    LEFT JOIN round_participants rp ON p.id = rp.participant_id
+    GROUP BY p.id, p.name, p.region, p.pronouns, p.instagram, p.created_at, p.updated_at
+    ORDER BY p.name
+  `;
+  return await executeQuery(query, []);
+};
+
+// ❌ INEFFICIENT queries
+const getParticipantsWithStats = async () => {
+  const participants = await executeQuery('SELECT * FROM participants', []);
+  const stats = await Promise.all(
+    participants.rows.map(async (participant) => {
+      const count = await executeQuery(
+        'SELECT COUNT(*) FROM round_participants WHERE participant_id = $1',
+        [participant.id]
+      );
+      return { ...participant, round_count: count.rows[0].count };
+    })
+  );
+  return stats;
+};
+```
+
+### 2. Caching Standards
+```javascript
+// ✅ APPROPRIATE caching
+const getCachedData = (key, ttl = 300000) => {
+  const cached = cache.get(key);
+  if (cached && Date.now() - cached.timestamp < ttl) {
+    return cached.data;
+  }
+  return null;
+};
+
+// Clear cache after updates
+const notifyDataUpdate = (entityType) => {
+  cache.delete(`cache:${entityType}`);
+  io.emit('data-update', { type: entityType, timestamp: Date.now() });
+};
+
+// ❌ NO caching
+const getParticipants = async () => {
+  const result = await executeQuery('SELECT * FROM participants', []);
+  return result.rows;
+};
+```
+
+## Code Quality Metrics
+
+### 1. Complexity Standards
+- **Cyclomatic Complexity**: < 5 per function
+- **Function Length**: < 50 lines per function
+- **Component Length**: < 200 lines per component
+- **File Length**: < 500 lines per file
+
+### 2. Performance Standards
+- **API Response Time**: < 200ms for simple queries, < 500ms for complex queries
+- **Database Query Time**: < 100ms for single table, < 300ms for JOINs
+- **WebSocket Update Time**: < 50ms for real-time updates
+- **Page Load Time**: < 2s for initial load, < 1s for navigation
+
+### 3. Test Coverage Standards
+- **Helper Functions**: 100% coverage
+- **API Endpoints**: 90% coverage
+- **Critical Components**: 80% coverage
+- **Overall Coverage**: 75% minimum
+
+## Documentation Standards
+
+### 1. Code Documentation
+```javascript
+/**
+ * Executes a CRUD operation with standardized error handling and response formatting
+ * @param {string} operation - The CRUD operation to perform ('create', 'read', 'update', 'delete')
+ * @param {string} query - SQL query to execute
+ * @param {Array} params - Query parameters
+ * @param {string} entityType - Type of entity for logging
+ * @param {string} queryType - Query type for response metadata
+ * @param {Response} res - Express response object
+ */
+async function executeCrudOperation(operation, query, params, entityType, queryType, res) {
+  // Implementation...
+}
+```
+
+### 2. API Documentation
+```javascript
+// Get participants with statistics (optimized with JOINs)
+router.get('/participants', async (req, res) => {
+  // Implementation...
+});
+```
+
+## Anti-Patterns to Avoid
+
+### ❌ Code Quality Anti-Patterns
+- Manual error handling instead of helper functions
+- Inconsistent response formats
+- No performance monitoring
+- Manual input validation
+- No caching strategy
+- Over-engineering simple components
+- Under-testing critical paths
+
+### ❌ Architecture Anti-Patterns
+- Complex state management for simple data
+- Microservices for monolithic application
+- Advanced caching for small datasets
+- Complex authentication for simple use case
+- Over-optimization of simple queries
+
+## Remember: Maintain consistent patterns, use helper functions, and focus on the actual requirements rather than theoretical perfection.

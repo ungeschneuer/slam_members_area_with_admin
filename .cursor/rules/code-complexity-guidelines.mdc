@@ -1,0 +1,599 @@
+---
+alwaysApply: true
+description: Code complexity guidelines appropriate for medium-scale applications
+---
+
+# Code Complexity Guidelines
+
+## Complexity Scale for Medium-Scale Application
+
+**This Poetry Slam members area requires balanced complexity - not too simple, not over-engineered.**
+
+### Complexity Targets
+- **Cyclomatic Complexity**: < 5 per function
+- **Function Length**: < 50 lines per function
+- **Component Size**: < 200 lines per component
+- **File Size**: < 500 lines per file
+- **Nesting Depth**: < 4 levels
+
+## Frontend Complexity Guidelines
+
+### Component Complexity
+```javascript
+// ✅ APPROPRIATE complexity
+// Simple, focused component
+const ParticipantCard = ({ participant }) => (
+  <div className="participant-card">
+    <h3>{participant.name}</h3>
+    <p>{participant.region}</p>
+    <p>{participant.pronouns}</p>
+  </div>
+);
+
+// ❌ OVER-COMPLEX
+// Too many responsibilities
+const ParticipantCard = ({ participant, onEdit, onDelete, onViewStats, onSendMessage, onAddToFavorites, onShare, onReport }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editData, setEditData] = useState({});
+  
+  const handleEdit = async () => {
+    setIsLoading(true);
+    try {
+      await onEdit(participant.id, editData);
+      setIsEditing(false);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  const handleDelete = async () => {
+    if (confirm('Are you sure?')) {
+      setIsLoading(true);
+      try {
+        await onDelete(participant.id);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
+  
+  // ... 100+ more lines of complex logic
+};
+```
+
+### Hook Complexity
+```javascript
+// ✅ APPROPRIATE hook complexity
+// Simple, focused hook
+const useParticipants = () => {
+  return useQuery({
+    queryKey: ['participants'],
+    queryFn: fetchParticipants,
+    staleTime: 5 * 60 * 1000
+  });
+};
+
+// ❌ OVER-COMPLEX hook
+// Too many responsibilities
+const useParticipants = () => {
+  const [participants, setParticipants] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortBy, setSortBy] = useState('name');
+  const [sortOrder, setSortOrder] = useState('asc');
+  const [filters, setFilters] = useState({});
+  const [pagination, setPagination] = useState({ page: 1, limit: 10 });
+  const [selectedParticipants, setSelectedParticipants] = useState([]);
+  const [bulkActions, setBulkActions] = useState([]);
+  
+  const fetchParticipants = async () => {
+    setLoading(true);
+    try {
+      const response = await api.getParticipants({
+        search: searchTerm,
+        sortBy,
+        sortOrder,
+        filters,
+        page: pagination.page,
+        limit: pagination.limit
+      });
+      setParticipants(response.data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const handleSearch = (term) => {
+    setSearchTerm(term);
+    setPagination({ page: 1, limit: 10 });
+  };
+  
+  const handleSort = (field, order) => {
+    setSortBy(field);
+    setSortOrder(order);
+  };
+  
+  const handleFilter = (newFilters) => {
+    setFilters(newFilters);
+    setPagination({ page: 1, limit: 10 });
+  };
+  
+  const handleBulkAction = async (action, participantIds) => {
+    setLoading(true);
+    try {
+      await api.bulkAction(action, participantIds);
+      await fetchParticipants();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // ... 50+ more lines of complex logic
+};
+```
+
+### State Management Complexity
+```javascript
+// ✅ APPROPRIATE state complexity
+// Simple state management
+const ParticipantList = () => {
+  const { data: participants, isLoading } = useParticipants();
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  const filteredParticipants = participants?.filter(p => 
+    p.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+  
+  if (isLoading) return <LoadingSpinner />;
+  
+  return (
+    <div>
+      <input 
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+        placeholder="Search participants..."
+      />
+      {filteredParticipants?.map(participant => (
+        <ParticipantCard key={participant.id} participant={participant} />
+      ))}
+    </div>
+  );
+};
+
+// ❌ OVER-COMPLEX state management
+// Complex state machine for simple data
+const ParticipantList = () => {
+  const [state, dispatch] = useReducer(participantsReducer, initialState);
+  const { data, loading, error } = useQuery(complexQuery);
+  
+  useEffect(() => {
+    if (data) {
+      dispatch({ type: 'SET_PARTICIPANTS', payload: data });
+    }
+  }, [data]);
+  
+  useEffect(() => {
+    if (error) {
+      dispatch({ type: 'SET_ERROR', payload: error });
+    }
+  }, [error]);
+  
+  useEffect(() => {
+    if (loading) {
+      dispatch({ type: 'SET_LOADING', payload: true });
+    }
+  }, [loading]);
+  
+  const handleSearch = (term) => {
+    dispatch({ type: 'SET_SEARCH_TERM', payload: term });
+  };
+  
+  const handleSort = (field, order) => {
+    dispatch({ type: 'SET_SORT', payload: { field, order } });
+  };
+  
+  const handleFilter = (filters) => {
+    dispatch({ type: 'SET_FILTERS', payload: filters });
+  };
+  
+  // ... 100+ more lines of complex state management
+};
+```
+
+## Backend Complexity Guidelines
+
+### Function Complexity
+```javascript
+// ✅ APPROPRIATE function complexity
+// Simple, focused function
+const getParticipants = async () => {
+  const query = 'SELECT * FROM participants ORDER BY name';
+  const result = await executeQuery(query, []);
+  return result.rows;
+};
+
+// ❌ OVER-COMPLEX function
+// Too many responsibilities
+const getParticipants = async (options = {}) => {
+  const {
+    search = '',
+    sortBy = 'name',
+    sortOrder = 'asc',
+    filters = {},
+    page = 1,
+    limit = 10,
+    includeStats = false,
+    includeRounds = false,
+    includeScores = false,
+    includeRankings = false
+  } = options;
+  
+  let query = 'SELECT p.*';
+  let joins = [];
+  let whereConditions = [];
+  let params = [];
+  
+  if (includeStats) {
+    query += ', COUNT(rp.round_id) as round_count';
+    joins.push('LEFT JOIN round_participants rp ON p.id = rp.participant_id');
+  }
+  
+  if (includeRounds) {
+    query += ', r.title as round_title, r.date as round_date';
+    joins.push('LEFT JOIN rounds r ON rp.round_id = r.id');
+  }
+  
+  if (includeScores) {
+    query += ', s.score, s.judge_id';
+    joins.push('LEFT JOIN scores s ON rp.id = s.round_participant_id');
+  }
+  
+  if (includeRankings) {
+    query += ', ROW_NUMBER() OVER (ORDER BY s.score DESC) as ranking';
+  }
+  
+  if (search) {
+    whereConditions.push('(p.name ILIKE $' + (params.length + 1) + ' OR p.region ILIKE $' + (params.length + 1) + ')');
+    params.push(`%${search}%`);
+  }
+  
+  if (filters.region) {
+    whereConditions.push('p.region = $' + (params.length + 1));
+    params.push(filters.region);
+  }
+  
+  if (filters.pronouns) {
+    whereConditions.push('p.pronouns = $' + (params.length + 1));
+    params.push(filters.pronouns);
+  }
+  
+  if (filters.dateFrom) {
+    whereConditions.push('p.created_at >= $' + (params.length + 1));
+    params.push(filters.dateFrom);
+  }
+  
+  if (filters.dateTo) {
+    whereConditions.push('p.created_at <= $' + (params.length + 1));
+    params.push(filters.dateTo);
+  }
+  
+  query += ' FROM participants p';
+  query += joins.join(' ');
+  
+  if (whereConditions.length > 0) {
+    query += ' WHERE ' + whereConditions.join(' AND ');
+  }
+  
+  query += ' GROUP BY p.id';
+  
+  if (includeRankings) {
+    query += ' ORDER BY ranking';
+  } else {
+    query += ` ORDER BY p.${sortBy} ${sortOrder.toUpperCase()}`;
+  }
+  
+  query += ` LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+  params.push(limit, (page - 1) * limit);
+  
+  const result = await executeQuery(query, params);
+  return result.rows;
+};
+```
+
+### Route Complexity
+```javascript
+// ✅ APPROPRIATE route complexity
+// Simple, focused route
+router.get('/participants', async (req, res) => {
+  try {
+    const participants = await getParticipants();
+    sendSuccessResponse(res, participants, 'GET_PARTICIPANTS');
+  } catch (error) {
+    sendErrorResponse(res, error, 'Failed to fetch participants');
+  }
+});
+
+// ❌ OVER-COMPLEX route
+// Too many responsibilities
+router.get('/participants', async (req, res) => {
+  try {
+    const {
+      search = '',
+      sortBy = 'name',
+      sortOrder = 'asc',
+      filters = {},
+      page = 1,
+      limit = 10,
+      includeStats = false,
+      includeRounds = false,
+      includeScores = false,
+      includeRankings = false
+    } = req.query;
+    
+    // Validate parameters
+    if (sortBy && !['name', 'region', 'created_at'].includes(sortBy)) {
+      return res.status(400).json({ error: 'Invalid sortBy parameter' });
+    }
+    
+    if (sortOrder && !['asc', 'desc'].includes(sortOrder)) {
+      return res.status(400).json({ error: 'Invalid sortOrder parameter' });
+    }
+    
+    if (page < 1) {
+      return res.status(400).json({ error: 'Page must be greater than 0' });
+    }
+    
+    if (limit < 1 || limit > 100) {
+      return res.status(400).json({ error: 'Limit must be between 1 and 100' });
+    }
+    
+    // Check cache
+    const cacheKey = `participants:${JSON.stringify(req.query)}`;
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      return res.json({
+        success: true,
+        data: cached.data,
+        meta: {
+          queryType: 'GET_PARTICIPANTS',
+          duration: '0ms',
+          cached: true
+        }
+      });
+    }
+    
+    // Build query
+    let query = 'SELECT p.*';
+    let joins = [];
+    let whereConditions = [];
+    let params = [];
+    
+    if (includeStats) {
+      query += ', COUNT(rp.round_id) as round_count';
+      joins.push('LEFT JOIN round_participants rp ON p.id = rp.participant_id');
+    }
+    
+    // ... 100+ more lines of complex query building
+    
+    const startTime = startTiming();
+    const result = await executeQuery(query, params);
+    const duration = endTiming(startTime);
+    
+    // Cache result
+    cache.set(cacheKey, { data: result.rows }, 300000);
+    
+    // Log performance
+    logger.info('Participants fetched', {
+      queryType: 'GET_PARTICIPANTS',
+      duration: `${Math.round(duration)}ms`,
+      recordCount: result.rows.length
+    });
+    
+    res.json({
+      success: true,
+      data: result.rows,
+      meta: {
+        queryType: 'GET_PARTICIPANTS',
+        duration: `${Math.round(duration)}ms`,
+        cached: false
+      }
+    });
+  } catch (error) {
+    logger.error('Error fetching participants', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch participants'
+    });
+  }
+});
+```
+
+### Service Complexity
+```javascript
+// ✅ APPROPRIATE service complexity
+// Simple, focused service
+const participantService = {
+  async getParticipants() {
+    const query = 'SELECT * FROM participants ORDER BY name';
+    const result = await executeQuery(query, []);
+    return result.rows;
+  },
+  
+  async createParticipant(data) {
+    const query = 'INSERT INTO participants (name, region, pronouns) VALUES ($1, $2, $3) RETURNING *';
+    const result = await executeQuery(query, [data.name, data.region, data.pronouns]);
+    return result.rows[0];
+  }
+};
+
+// ❌ OVER-COMPLEX service
+// Too many responsibilities
+class ParticipantService {
+  constructor(database, cache, logger, metrics, validator, transformer) {
+    this.database = database;
+    this.cache = cache;
+    this.logger = logger;
+    this.metrics = metrics;
+    this.validator = validator;
+    this.transformer = transformer;
+  }
+  
+  async getParticipants(options = {}) {
+    const {
+      search = '',
+      sortBy = 'name',
+      sortOrder = 'asc',
+      filters = {},
+      page = 1,
+      limit = 10,
+      includeStats = false,
+      includeRounds = false,
+      includeScores = false,
+      includeRankings = false
+    } = options;
+    
+    // Validate options
+    const validationResult = this.validator.validateGetParticipantsOptions(options);
+    if (!validationResult.isValid) {
+      throw new ValidationError(validationResult.errors);
+    }
+    
+    // Check cache
+    const cacheKey = this.generateCacheKey('participants', options);
+    const cached = await this.cache.get(cacheKey);
+    if (cached) {
+      this.metrics.increment('cache.hit');
+      return cached;
+    }
+    
+    this.metrics.increment('cache.miss');
+    
+    // Build query
+    const queryBuilder = new QueryBuilder()
+      .select('p.*')
+      .from('participants p');
+    
+    if (includeStats) {
+      queryBuilder.select('COUNT(rp.round_id) as round_count');
+      queryBuilder.leftJoin('round_participants rp', 'p.id = rp.participant_id');
+    }
+    
+    if (includeRounds) {
+      queryBuilder.select('r.title as round_title, r.date as round_date');
+      queryBuilder.leftJoin('rounds r', 'rp.round_id = r.id');
+    }
+    
+    if (includeScores) {
+      queryBuilder.select('s.score, s.judge_id');
+      queryBuilder.leftJoin('scores s', 'rp.id = s.round_participant_id');
+    }
+    
+    if (includeRankings) {
+      queryBuilder.select('ROW_NUMBER() OVER (ORDER BY s.score DESC) as ranking');
+    }
+    
+    // Apply filters
+    if (search) {
+      queryBuilder.where('(p.name ILIKE ? OR p.region ILIKE ?)', [`%${search}%`, `%${search}%`]);
+    }
+    
+    if (filters.region) {
+      queryBuilder.where('p.region = ?', [filters.region]);
+    }
+    
+    if (filters.pronouns) {
+      queryBuilder.where('p.pronouns = ?', [filters.pronouns]);
+    }
+    
+    if (filters.dateFrom) {
+      queryBuilder.where('p.created_at >= ?', [filters.dateFrom]);
+    }
+    
+    if (filters.dateTo) {
+      queryBuilder.where('p.created_at <= ?', [filters.dateTo]);
+    }
+    
+    // Apply sorting
+    if (includeRankings) {
+      queryBuilder.orderBy('ranking');
+    } else {
+      queryBuilder.orderBy(`p.${sortBy}`, sortOrder);
+    }
+    
+    // Apply pagination
+    queryBuilder.limit(limit).offset((page - 1) * limit);
+    
+    const query = queryBuilder.build();
+    const params = queryBuilder.getParams();
+    
+    const startTime = startTiming();
+    const result = await this.database.query(query, params);
+    const duration = endTiming(startTime);
+    
+    // Transform data
+    const transformedData = this.transformer.transformParticipants(result.rows);
+    
+    // Cache result
+    await this.cache.set(cacheKey, transformedData, 300000);
+    
+    // Log performance
+    this.logger.info('Participants fetched', {
+      queryType: 'GET_PARTICIPANTS',
+      duration: `${Math.round(duration)}ms`,
+      recordCount: result.rows.length
+    });
+    
+    this.metrics.histogram('participants.fetch.duration', duration);
+    this.metrics.counter('participants.fetch.count').inc();
+    
+    return transformedData;
+  }
+}
+```
+
+## Complexity Anti-Patterns
+
+### ❌ Over-Complexity
+- Functions with too many responsibilities
+- Components with too many props
+- Complex state management for simple data
+- Over-engineered service layers
+- Complex routing for simple navigation
+
+### ❌ Under-Complexity
+- No error handling
+- No input validation
+- No performance monitoring
+- No testing
+- No security considerations
+
+## Complexity Guidelines
+
+### ✅ Right-Sized Complexity
+- Functions with single responsibility
+- Components with focused purpose
+- Simple state management
+- Basic error handling and validation
+- Appropriate testing coverage
+- Security considerations
+
+### Complexity Metrics
+- **Cyclomatic Complexity**: < 5 per function
+- **Function Length**: < 50 lines per function
+- **Component Size**: < 200 lines per component
+- **File Size**: < 500 lines per file
+- **Nesting Depth**: < 4 levels
+
+## Remember: Choose complexity that matches the actual requirements and scale, not theoretical maximums or over-engineering patterns.

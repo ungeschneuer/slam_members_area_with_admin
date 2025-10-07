@@ -1,0 +1,309 @@
+---
+globs: server/routes/*.js,client/services/*.js,client/hooks/*.js
+description: When to use project helper functions vs installed plugins
+---
+
+# Helper Functions vs Plugins
+
+## Project Helper Functions (Use These)
+
+### Server-Side Helpers
+```javascript
+// ✅ USE project helpers from optimizedRoutes.js
+import { 
+  executeCrudOperation,
+  sendSuccessResponse,
+  sendErrorResponse,
+  sendNotFoundResponse,
+  normalizeData,
+  safeParseInt,
+  safeJsonStringify,
+  adminMiddleware,
+  notifyDataUpdate
+} from '../routes/optimizedRoutes.js';
+
+// ✅ USE database helpers
+import { executeQuery, checkDatabaseHealth } from '../config/database.js';
+
+// ✅ USE authentication helpers
+import { authenticateCookie, authorize as authorizeCookie } from '../middleware/cookieAuth.js';
+```
+
+### Client-Side Helpers
+```javascript
+// ✅ USE project services
+import websocketService from '../services/websocketService.js';
+import databaseService from '../services/databaseService.js';
+import cookieAuthService from '../services/cookieAuthService.js';
+
+// ✅ USE project hooks
+import { useParticipants, useRounds, useNews } from '../hooks/useParticipants.js';
+import { useLiveData } from '../hooks/useLiveData.js';
+```
+
+### Utility Helpers
+```javascript
+// ✅ USE project utilities
+import { generateSlug, generateUniqueSlug } from '../utils/slugUtils.js';
+import { normalizeInstagram } from '../routes/optimizedRoutes.js';
+```
+
+## When to Use Plugins Instead
+
+### ❌ Don't Recreate Plugin Functionality
+```javascript
+// ❌ DON'T create custom JWT handling
+const customJWT = {
+  sign: (payload) => { /* custom logic */ },
+  verify: (token) => { /* custom logic */ }
+};
+
+// ✅ DO use jsonwebtoken plugin
+import jwt from 'jsonwebtoken';
+const token = jwt.sign(payload, secret, { expiresIn: '24h' });
+```
+
+### ❌ Don't Create Custom State Management
+```javascript
+// ❌ DON'T create custom data fetching
+const [data, setData] = useState([]);
+const [loading, setLoading] = useState(false);
+const [error, setError] = useState(null);
+
+// ✅ DO use TanStack Query
+import { useQuery } from '@tanstack/react-query';
+const { data, isLoading, error } = useQuery({
+  queryKey: ['data'],
+  queryFn: fetchData
+});
+```
+
+### ❌ Don't Create Custom WebSocket
+```javascript
+// ❌ DON'T create custom WebSocket
+const socket = new WebSocket('ws://localhost:3000');
+
+// ✅ DO use project WebSocket service (which wraps Socket.io)
+import websocketService from '../services/websocketService.js';
+websocketService.connect();
+```
+
+## Plugin Usage Patterns
+
+### Express Middleware Stack
+```javascript
+// ✅ USE Express plugins for middleware
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import compression from 'compression';
+import morgan from 'morgan';
+import cookieParser from 'cookie-parser';
+
+app.use(helmet());                    // Security headers
+app.use(cors());                      // CORS handling
+app.use(compression());               // Response compression
+app.use(morgan('combined'));          // Request logging
+app.use(cookieParser());              // Cookie parsing
+```
+
+### Database Operations
+```javascript
+// ✅ USE pg plugin for database
+import { Pool } from 'pg';
+import { executeQuery } from '../config/database.js';
+
+// ✅ USE project database service
+import optimizedQueryService from '../services/optimizedQueryService.js';
+```
+
+### Authentication & Security
+```javascript
+// ✅ USE security plugins
+import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
+import xss from 'xss';
+
+// ✅ USE project auth helpers
+import { authenticateCookie, authorize as authorizeCookie } from '../middleware/cookieAuth.js';
+```
+
+### React State Management
+```javascript
+// ✅ USE TanStack Query for server state
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+
+// ✅ USE project hooks
+import { useParticipants, useRounds, useNews } from '../hooks/useParticipants.js';
+```
+
+### Form Handling
+```javascript
+// ✅ USE React Hook Form
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+
+// ✅ USE Zod for validation
+const schema = z.object({
+  name: z.string().min(2),
+  email: z.string().email()
+});
+```
+
+## Project-Specific Patterns
+
+### CRUD Operations
+```javascript
+// ✅ USE project CRUD helpers
+await executeCrudOperation(
+  'create',
+  'INSERT INTO participants (name, region) VALUES ($1, $2) RETURNING *',
+  [name, region],
+  'participant',
+  'CREATE_PARTICIPANT',
+  res
+);
+
+// ❌ DON'T create custom CRUD
+const customCreate = async (table, data) => {
+  // Custom CRUD logic
+};
+```
+
+### Response Formatting
+```javascript
+// ✅ USE project response helpers
+sendSuccessResponse(res, data, 'GET_PARTICIPANTS', duration);
+sendErrorResponse(res, error, 'Failed to fetch participants');
+sendNotFoundResponse(res, 'Participant');
+
+// ❌ DON'T create custom response formatting
+res.status(200).json({ success: true, data: result });
+```
+
+### Data Normalization
+```javascript
+// ✅ USE project data normalization
+const normalizedData = normalizeData(req.body, {
+  tags: { type: 'json', fallback: [] },
+  status: { type: 'string', fallback: 'DRAFT' }
+});
+
+// ❌ DON'T create custom normalization
+const customNormalize = (data) => {
+  // Custom normalization logic
+};
+```
+
+### WebSocket Integration
+```javascript
+// ✅ USE project WebSocket service
+import websocketService from '../services/websocketService.js';
+
+websocketService.subscribe('participants', handleUpdate);
+websocketService.emit('data-update', data);
+
+// ❌ DON'T create custom WebSocket handling
+const customSocket = new WebSocket('ws://localhost:3000');
+```
+
+## File Organization
+
+### Server Routes
+```javascript
+// ✅ USE project route patterns
+router.post('/participants', ...adminMiddleware(), async (req, res) => {
+  const normalizedData = normalizeData(req.body, schema);
+  
+  await executeCrudOperation(
+    'create',
+    query,
+    params,
+    'participant',
+    'CREATE_PARTICIPANT',
+    res
+  );
+});
+```
+
+### Client Services
+```javascript
+// ✅ USE project service patterns
+import websocketService from '../services/websocketService.js';
+import databaseService from '../services/databaseService.js';
+import cookieAuthService from '../services/cookieAuthService.js';
+```
+
+### Client Hooks
+```javascript
+// ✅ USE project hook patterns
+import { useParticipants, useRounds, useNews } from '../hooks/useParticipants.js';
+import { useLiveData } from '../hooks/useLiveData.js';
+```
+
+## Anti-Patterns to Avoid
+
+### ❌ Don't Recreate Project Helpers
+```javascript
+// ❌ DON'T recreate project functionality
+const customResponse = (res, data) => {
+  res.json({ success: true, data });
+};
+
+// ✅ DO use project helpers
+import { sendSuccessResponse } from '../routes/optimizedRoutes.js';
+sendSuccessResponse(res, data, 'OPERATION_TYPE', duration);
+```
+
+### ❌ Don't Bypass Project Services
+```javascript
+// ❌ DON'T bypass project services
+const directSocket = new WebSocket('ws://localhost:3000');
+
+// ✅ DO use project services
+import websocketService from '../services/websocketService.js';
+websocketService.connect();
+```
+
+### ❌ Don't Create Custom Database Wrappers
+```javascript
+// ❌ DON'T create custom database wrappers
+class CustomDatabase {
+  async query(sql, params) {
+    // Custom database logic
+  }
+}
+
+// ✅ DO use project database service
+import { executeQuery } from '../config/database.js';
+import optimizedQueryService from '../services/optimizedQueryService.js';
+```
+
+## Decision Matrix
+
+### Use Project Helpers When:
+- ✅ **CRUD operations** - Use `executeCrudOperation`
+- ✅ **Response formatting** - Use `sendSuccessResponse`, `sendErrorResponse`
+- ✅ **Data normalization** - Use `normalizeData`
+- ✅ **Authentication** - Use `adminMiddleware`
+- ✅ **WebSocket communication** - Use `websocketService`
+- ✅ **Database queries** - Use `executeQuery`, `optimizedQueryService`
+
+### Use Plugins When:
+- ✅ **Security headers** - Use `helmet`
+- ✅ **CORS handling** - Use `cors`
+- ✅ **Request logging** - Use `morgan`
+- ✅ **Password hashing** - Use `bcrypt`
+- ✅ **JWT tokens** - Use `jsonwebtoken`
+- ✅ **State management** - Use `@tanstack/react-query`
+- ✅ **Form handling** - Use `react-hook-form`
+- ✅ **Validation** - Use `zod`
+
+### Use Custom Code When:
+- ✅ **Business logic** - Domain-specific calculations
+- ✅ **Project utilities** - Slug generation, Instagram normalization
+- ✅ **Component logic** - React component-specific behavior
+- ✅ **Service wrappers** - Simplified interfaces to complex plugins
+
+## Remember: Use project helpers for project-specific patterns, plugins for generic functionality, and custom code only for truly unique business logic.

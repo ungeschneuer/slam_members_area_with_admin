@@ -1,0 +1,390 @@
+---
+description: Guide to using installed plugins in SLAM25 project
+---
+
+# Installed Plugins Guide
+
+## Core Backend Plugins
+
+### Express.js Ecosystem
+```javascript
+// ✅ USE Express.js with plugins
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import compression from 'compression';
+import morgan from 'morgan';
+import cookieParser from 'cookie-parser';
+import rateLimit from 'express-rate-limit';
+
+// Middleware stack
+app.use(helmet());                    // Security headers
+app.use(cors());                      // CORS handling
+app.use(compression());               // Response compression
+app.use(morgan('combined'));          // Request logging
+app.use(cookieParser());              // Cookie parsing
+app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 100 })); // Rate limiting
+```
+
+### Database & PostgreSQL
+```javascript
+// ✅ USE pg for PostgreSQL
+import { Pool } from 'pg';
+import { executeQuery } from '../config/database.js';
+
+// Connection pooling
+const pool = new Pool({
+  host: process.env.DB_HOST,
+  port: process.env.DB_PORT,
+  database: process.env.DB_NAME,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  max: 20
+});
+
+// ✅ USE project database service
+import optimizedQueryService from '../services/optimizedQueryService.js';
+```
+
+### Authentication & Security
+```javascript
+// ✅ USE JWT for authentication
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcrypt';
+import xss from 'xss';
+
+// Token operations
+const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '24h' });
+const decoded = jwt.verify(token, JWT_SECRET);
+
+// Password operations
+const hashedPassword = await bcrypt.hash(password, 10);
+const isValid = await bcrypt.compare(password, hashedPassword);
+
+// XSS protection
+const cleanInput = xss(userInput);
+```
+
+### Real-time Communication
+```javascript
+// ✅ USE Socket.io for WebSocket
+import { Server } from 'socket.io';
+import { io } from 'socket.io-client';
+
+// Server-side
+const io = new Server(server, {
+  cors: { origin: "*" }
+});
+
+// Client-side
+import websocketService from '../services/websocketService.js';
+websocketService.connect();
+```
+
+## Frontend Plugins
+
+### React Ecosystem
+```javascript
+// ✅ USE React 19 with hooks
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+
+// Routing
+<BrowserRouter>
+  <Routes>
+    <Route path="/participants" element={<Participants />} />
+    <Route path="/rounds" element={<Rounds />} />
+  </Routes>
+</BrowserRouter>
+```
+
+### State Management
+```javascript
+// ✅ USE TanStack Query for server state
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+
+// Data fetching
+const { data, isLoading, error } = useQuery({
+  queryKey: ['participants'],
+  queryFn: fetchParticipants,
+  staleTime: 5 * 60 * 1000
+});
+
+// Mutations
+const mutation = useMutation({
+  mutationFn: createParticipant,
+  onSuccess: () => {
+    queryClient.invalidateQueries(['participants']);
+  }
+});
+
+// ✅ USE Zustand for client state
+import { create } from 'zustand';
+const useStore = create((set) => ({
+  count: 0,
+  increment: () => set((state) => ({ count: state.count + 1 }))
+}));
+```
+
+### Form Handling
+```javascript
+// ✅ USE React Hook Form with Zod validation
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+
+// Validation schema
+const schema = z.object({
+  name: z.string().min(2),
+  email: z.string().email(),
+  region: z.string().min(2)
+});
+
+// Form setup
+const { register, handleSubmit, formState: { errors } } = useForm({
+  resolver: zodResolver(schema)
+});
+```
+
+### Error Handling
+```javascript
+// ✅ USE React Error Boundary
+import { ErrorBoundary } from 'react-error-boundary';
+
+// Error boundary wrapper
+<ErrorBoundary fallback={<ErrorFallback />}>
+  <App />
+</ErrorBoundary>
+```
+
+## Testing Plugins
+
+### Vitest Testing Framework
+```javascript
+// ✅ USE Vitest for testing
+import { describe, it, expect, beforeEach } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import { userEvent } from '@testing-library/user-event';
+
+// Component testing
+describe('ParticipantCard', () => {
+  it('should render participant information', () => {
+    render(<ParticipantCard participant={mockParticipant} />);
+    expect(screen.getByText(mockParticipant.name)).toBeInTheDocument();
+  });
+  
+  it('should handle click events', async () => {
+    const user = userEvent.setup();
+    render(<ParticipantCard participant={mockParticipant} onSelect={mockOnSelect} />);
+    
+    await user.click(screen.getByRole('button'));
+    expect(mockOnSelect).toHaveBeenCalledWith(mockParticipant);
+  });
+});
+```
+
+### Testing Library
+```javascript
+// ✅ USE Testing Library for React testing
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { userEvent } from '@testing-library/user-event';
+
+// User interaction testing
+const user = userEvent.setup();
+await user.click(screen.getByRole('button'));
+await user.type(screen.getByLabelText('Name'), 'John Doe');
+```
+
+## Build & Development Tools
+
+### Vite Build Tool
+```javascript
+// ✅ USE Vite configuration
+import { defineConfig } from 'vite';
+import { plugin as react } from '@vitejs/plugin-react';
+
+export default defineConfig({
+  plugins: [react()],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          router: ['react-router-dom'],
+          query: ['@tanstack/react-query']
+        }
+      }
+    }
+  }
+});
+```
+
+### TailwindCSS
+```javascript
+// ✅ USE TailwindCSS classes
+<div className="bg-blue-500 text-white p-4 rounded-lg shadow-md">
+  <h2 className="text-xl font-bold mb-2">Participant</h2>
+  <p className="text-sm opacity-90">{participant.region}</p>
+</div>
+
+// ❌ AVOID custom CSS when TailwindCSS suffices
+<div style={{ backgroundColor: 'blue', color: 'white' }}>
+  Content
+</div>
+```
+
+### PostCSS & Autoprefixer
+```javascript
+// ✅ USE PostCSS configuration
+// postcss.config.js
+export default {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {}
+  }
+};
+```
+
+## Utility Plugins
+
+### Winston Logging
+```javascript
+// ✅ USE Winston for logging
+import winston from 'winston';
+
+const logger = winston.createLogger({
+  level: 'info',
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.json()
+  ),
+  transports: [
+    new winston.transports.File({ filename: 'error.log', level: 'error' }),
+    new winston.transports.File({ filename: 'combined.log' })
+  ]
+});
+
+// Usage
+logger.info('Operation completed', { operation: 'CREATE_PARTICIPANT', duration: '123ms' });
+logger.error('Database error', { error: error.message, query: query.substring(0, 100) });
+```
+
+### Zod Validation
+```javascript
+// ✅ USE Zod for validation
+import { z } from 'zod';
+
+// Schema definition
+const participantSchema = z.object({
+  name: z.string().min(2, 'Name must be at least 2 characters'),
+  region: z.string().min(2, 'Region must be at least 2 characters'),
+  pronouns: z.string().optional(),
+  instagram: z.string().url().optional()
+});
+
+// Validation
+const result = participantSchema.safeParse(data);
+if (!result.success) {
+  return res.status(400).json({ errors: result.error.errors });
+}
+```
+
+### Leaflet Maps
+```javascript
+// ✅ USE Leaflet for maps
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import L from 'leaflet';
+
+// Map component
+<MapContainer center={[51.505, -0.09]} zoom={13}>
+  <TileLayer
+    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+  />
+  <Marker position={[51.505, -0.09]}>
+    <Popup>Event Location</Popup>
+  </Marker>
+</MapContainer>
+```
+
+## Plugin Configuration
+
+### Environment Variables
+```javascript
+// ✅ USE environment variables for plugin config
+const config = {
+  database: {
+    host: process.env.DB_HOST,
+    port: process.env.DB_PORT,
+    database: process.env.DB_NAME,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD
+  },
+  jwt: {
+    secret: process.env.JWT_SECRET,
+    expiresIn: process.env.JWT_EXPIRES_IN || '24h'
+  },
+  cors: {
+    origin: process.env.CORS_ORIGIN || '*'
+  }
+};
+```
+
+### Plugin-Specific Configuration Files
+```javascript
+// ✅ USE dedicated config files
+// tailwind.config.js - TailwindCSS configuration
+// vite.config.js - Vite build configuration
+// jest.config.cjs - Jest testing configuration
+// postcss.config.js - PostCSS configuration
+```
+
+## Plugin Integration Patterns
+
+### Service Layer Integration
+```javascript
+// ✅ USE plugin-based services
+// client/services/websocketService.js - Socket.io wrapper
+// client/services/cookieAuthService.js - Authentication wrapper
+// server/services/optimizedQueryService.js - Database service
+
+// Example service integration
+import websocketService from '../services/websocketService.js';
+import databaseService from '../services/databaseService.js';
+```
+
+### Middleware Integration
+```javascript
+// ✅ USE plugin-based middleware
+// server/middleware/cookieAuth.js - JWT authentication
+// server/middleware/validation.js - Zod validation
+// server/middleware/securityLogger.js - Winston logging
+
+// Example middleware integration
+import { authenticateCookie, authorize as authorizeCookie } from '../middleware/cookieAuth.js';
+```
+
+## Plugin Update Strategy
+
+### Regular Updates
+```bash
+# ✅ Keep dependencies updated
+npm update
+npm audit fix
+
+# ✅ Check for security vulnerabilities
+npm audit
+```
+
+### Version Management
+```javascript
+// ✅ Use specific versions for stability
+"dependencies": {
+  "express": "^4.18.2",
+  "react": "^19.1.0",
+  "socket.io": "^4.8.1",
+  "@tanstack/react-query": "^5.90.2"
+}
+```
+
+## Remember: Always check package.json first, then use established patterns before implementing custom solutions.
