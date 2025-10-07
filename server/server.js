@@ -32,6 +32,7 @@ import backupRoutes from './routes/backup.js';
 import statsRoutes from './routes/stats.js';
 import searchRoutes from './routes/search.js';
 import exportRoutes from './routes/export.js';
+import integrityRoutes from './routes/integrity.js';
 
 // Import database connection
 import { pool } from './config/database.js';
@@ -178,6 +179,7 @@ app.use('/api/backup', backupRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/export', exportRoutes);
+app.use('/api/integrity', integrityRoutes);
 
 // Round participants route (special case)
 app.use('/api/round-participants', (req, res, next) => {
