@@ -48,7 +48,8 @@ export const roundSchema = baseEventSchema.extend({
   totalJuryMembers: z.number().min(1).max(20),
   tournamentParticipants: z.array(participantSchema).optional(),
   groups: z.array(z.any()).optional(),
-  featureArtists: z.array(participantSchema).optional()
+  featureArtists: z.array(participantSchema).optional(),
+  moderation: z.array(participantSchema).optional()
 });
 
 // Timetable-specific schema
@@ -88,7 +89,8 @@ export const getDefaultValues = (type) => {
         totalJuryMembers: 5,
         tournamentParticipants: [],
         groups: [],
-        featureArtists: []
+        featureArtists: [],
+        moderation: []
       };
     
     case 'timetable':
@@ -118,7 +120,7 @@ export const getRoleOptions = (type) => {
         'Abendleitung',
         'Laptop / Technik',
         'Moderation',
-        'Wettberwerbsleitung',
+        'Wettbewerbsleitung',
         'DJ',
         'Backstage Betreuung',
         'Akkreditierung',

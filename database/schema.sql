@@ -1,6 +1,6 @@
 -- SLAM25 Database Schema
 -- PostgreSQL Database Design for Poetry Slam Management System
--- Updated to match actual database structure
+-- Updated to match actual database structure after cleanup
 
 -- Enable necessary extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -23,10 +23,7 @@ CREATE TABLE users (
     email_verified BOOLEAN DEFAULT false
 );
 
--- User sessions table (REMOVED - using stateless JWT authentication)
--- Sessions are now handled via JWT tokens in httpOnly cookies
-
--- Participants table (simplified structure)
+-- Participants table
 CREATE TABLE participants (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
@@ -34,11 +31,12 @@ CREATE TABLE participants (
     region VARCHAR(100) NOT NULL,
     pronouns VARCHAR(50),
     instagram VARCHAR(255),
+    slug VARCHAR(255) NOT NULL UNIQUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Rounds table (simplified structure)
+-- Rounds table
 CREATE TABLE rounds (
     id SERIAL PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
@@ -50,16 +48,34 @@ CREATE TABLE rounds (
     description TEXT,
     "afterPlayReport" TEXT,
     "competitionType" VARCHAR(100) DEFAULT 'Einzelwettbewerb',
-    crew JSONB DEFAULT '[]',
-    "tournamentParticipants" INTEGER[] DEFAULT '{}',
-    groups JSONB DEFAULT '[]',
-    "featureArtists" JSONB DEFAULT '[]',
     "totalJuryMembers" INTEGER DEFAULT 5,
     status VARCHAR(50) DEFAULT 'SCHEDULED',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     slug VARCHAR(255) NOT NULL UNIQUE,
     CONSTRAINT rounds_time_check CHECK ("endTime" > "startTime")
+);
+
+-- Round participants junction table
+CREATE TABLE round_participants (
+    id SERIAL PRIMARY KEY,
+    round_id INTEGER NOT NULL REFERENCES rounds(id) ON DELETE CASCADE,
+    participant_id INTEGER NOT NULL REFERENCES participants(id) ON DELETE CASCADE,
+    role VARCHAR(100) DEFAULT 'Teilnehmer',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT round_participants_round_id_participant_id_key UNIQUE (round_id, participant_id)
+);
+
+-- Round crew junction table
+CREATE TABLE round_crew (
+    id SERIAL PRIMARY KEY,
+    round_id INTEGER NOT NULL REFERENCES rounds(id) ON DELETE CASCADE,
+    participant_id INTEGER NOT NULL REFERENCES participants(id) ON DELETE CASCADE,
+    role VARCHAR(100) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT round_crew_round_id_participant_id_key UNIQUE (round_id, participant_id)
 );
 
 -- News table
@@ -74,11 +90,11 @@ CREATE TABLE news (
     priority VARCHAR(50) DEFAULT 'NORMAL',
     tags TEXT[] DEFAULT '{}',
     status VARCHAR(50) DEFAULT 'DRAFT',
-    -- "authorId" VARCHAR(100), -- Removed: No author tracking needed
     "featuredImageUrl" TEXT,
     "publishedAt" TIMESTAMP,
     "isBreakingNews" BOOLEAN DEFAULT false,
-    "breakingNewsUntil" TIMESTAMP
+    "breakingNewsUntil" TIMESTAMP,
+    slug VARCHAR(255) NOT NULL UNIQUE
 );
 
 -- Timetable entries table
@@ -90,18 +106,17 @@ CREATE TABLE timetable_entries (
     location VARCHAR(255),
     date DATE NOT NULL,
     time TIME NOT NULL,
-    type VARCHAR(100) DEFAULT 'general', -- Valid values: team-round, individual-round, workshop, fun, aftershow, general
+    end_time TIME,
+    type VARCHAR(100) DEFAULT 'general',
     status VARCHAR(50) DEFAULT 'confirmed',
-    participants JSONB DEFAULT '[]',
-    "additionalLinks" JSONB DEFAULT '[]',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    end_time TIME,
     internal_link VARCHAR(255),
-    round_id INTEGER REFERENCES rounds(id) ON DELETE CASCADE
+    round_id INTEGER REFERENCES rounds(id) ON DELETE CASCADE,
+    slug VARCHAR(255) NOT NULL UNIQUE
 );
 
--- City tips table (renamed from city_locations)
+-- City tips table
 CREATE TABLE city_tips (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
@@ -110,7 +125,6 @@ CREATE TABLE city_tips (
     address TEXT,
     latitude NUMERIC(10, 8),
     longitude NUMERIC(11, 8),
-    
     price_range VARCHAR(50),
     opening_hours JSONB,
     contact_info JSONB,
@@ -124,12 +138,9 @@ CREATE TABLE city_tips (
     status VARCHAR(50) DEFAULT 'ACTIVE',
     CONSTRAINT city_tips_latitude_check CHECK (latitude IS NULL OR (latitude BETWEEN -90 AND 90)),
     CONSTRAINT city_tips_longitude_check CHECK (longitude IS NULL OR (longitude BETWEEN -180 AND 180)),
-    
     CONSTRAINT city_tips_slug_format CHECK (slug ~ '^[a-z0-9-]+$'),
     CONSTRAINT city_tips_status_check CHECK (status IN ('ACTIVE', 'INACTIVE', 'DRAFT', 'ARCHIVED'))
 );
-
--- Analytics tables removed - not needed for read-only portal
 
 -- Info pages table
 CREATE TABLE info_pages (
@@ -150,18 +161,6 @@ CREATE TABLE info_pages (
     "updatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Info page images table
-CREATE TABLE info_page_images (
-    id SERIAL PRIMARY KEY,
-    "pageId" INTEGER NOT NULL REFERENCES info_pages(id) ON DELETE CASCADE,
-    "fileName" VARCHAR(255) NOT NULL,
-    "originalName" VARCHAR(255) NOT NULL,
-    "filePath" VARCHAR(500) NOT NULL,
-    "fileSize" INTEGER NOT NULL,
-    "mimeType" VARCHAR(100) NOT NULL,
-    "uploadedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
 -- Links table
 CREATE TABLE links (
     id SERIAL PRIMARY KEY,
@@ -178,6 +177,24 @@ CREATE TABLE links (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Schnellzugriff links table
+CREATE TABLE schnellzugriff_links (
+    id SERIAL PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    url VARCHAR(500) NOT NULL,
+    icon VARCHAR(10) DEFAULT '🔗',
+    color VARCHAR(20) DEFAULT 'blue',
+    sort_order INTEGER DEFAULT 0,
+    is_active BOOLEAN DEFAULT true,
+    is_external BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT schnellzugriff_links_color_check CHECK (color IN ('blue', 'purple', 'green', 'red', 'yellow', 'indigo', 'pink', 'orange', 'teal', 'cyan')),
+    CONSTRAINT schnellzugriff_links_title_length CHECK (char_length(title) >= 1),
+    CONSTRAINT schnellzugriff_links_url_length CHECK (char_length(url) >= 1)
+);
+
 -- Countdown configuration table
 CREATE TABLE countdown_config (
     id SERIAL PRIMARY KEY,
@@ -192,63 +209,14 @@ CREATE TABLE countdown_config (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 
--- Audit log table
-CREATE TABLE audit_log (
+-- Settings table
+CREATE TABLE settings (
     id SERIAL PRIMARY KEY,
-    action VARCHAR(10) NOT NULL,
-    table_name VARCHAR(50) NOT NULL,
-    record_id INTEGER,
-    old_values JSONB,
-    new_values JSONB,
-    created_at TIMESTAMP DEFAULT now()
-);
-
--- Security incidents table
-CREATE TABLE security_incidents (
-    id SERIAL PRIMARY KEY,
-    incident_id VARCHAR(255) NOT NULL UNIQUE,
-    type VARCHAR(100) NOT NULL,
-    ip_address INET NOT NULL,
-    count INTEGER DEFAULT 1,
-    status VARCHAR(50) DEFAULT 'ACTIVE',
-    severity VARCHAR(20) DEFAULT 'MEDIUM',
-    action VARCHAR(100),
-    details JSONB,
-    first_seen TIMESTAMP DEFAULT now(),
-    last_seen TIMESTAMP DEFAULT now(),
-    escalated_at TIMESTAMP,
-    created_at TIMESTAMP DEFAULT now()
-);
-
--- System metrics table
-CREATE TABLE system_metrics (
-    id SERIAL PRIMARY KEY,
-    metric_name VARCHAR(100) NOT NULL,
-    metric_value NUMERIC(15,4) NOT NULL,
-    unit VARCHAR(20),
-    tags JSONB,
-    created_at TIMESTAMP DEFAULT now()
-);
-
--- System alerts table
-CREATE TABLE system_alerts (
-    id SERIAL PRIMARY KEY,
-    alert_type VARCHAR(100) NOT NULL,
-    severity VARCHAR(20) NOT NULL,
-    message TEXT NOT NULL,
-    details JSONB,
-    is_resolved BOOLEAN DEFAULT false,
-    resolved_at TIMESTAMP,
-    created_at TIMESTAMP DEFAULT now()
-);
-
--- Token revocations table
-CREATE TABLE token_revocations (
-    id SERIAL PRIMARY KEY,
-    token_hash VARCHAR(255) NOT NULL UNIQUE,
-    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-    revoked_at TIMESTAMP DEFAULT now(),
-    reason VARCHAR(100)
+    key VARCHAR(255) NOT NULL UNIQUE,
+    value TEXT NOT NULL,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Migrations table
@@ -263,48 +231,67 @@ CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_users_username ON users(username);
 CREATE INDEX idx_users_role ON users(role);
 CREATE INDEX idx_users_created_at ON users(created_at);
--- User session indexes (REMOVED - no longer needed with JWT authentication)
+
 CREATE INDEX idx_participants_name ON participants(name);
 CREATE INDEX idx_participants_region ON participants(region);
 CREATE INDEX idx_participants_role ON participants(role);
 CREATE INDEX idx_participants_created_at ON participants(created_at);
+CREATE INDEX idx_participants_slug ON participants(slug);
+
 CREATE INDEX idx_rounds_title ON rounds(title);
-CREATE INDEX idx_rounds_startdatetime ON rounds("startDateTime");
 CREATE INDEX idx_rounds_location ON rounds(location);
 CREATE INDEX idx_rounds_competitiontype ON rounds("competitionType");
 CREATE INDEX idx_rounds_status ON rounds(status);
 CREATE INDEX idx_rounds_slug ON rounds(slug);
+
+CREATE INDEX idx_round_participants_round_id ON round_participants(round_id);
+CREATE INDEX idx_round_participants_participant_id ON round_participants(participant_id);
+CREATE INDEX idx_round_participants_role ON round_participants(role);
+CREATE INDEX idx_round_participants_created_at ON round_participants(created_at);
+
+CREATE INDEX idx_round_crew_round_id ON round_crew(round_id);
+CREATE INDEX idx_round_crew_participant_id ON round_crew(participant_id);
+CREATE INDEX idx_round_crew_role ON round_crew(role);
+
 CREATE INDEX idx_news_title ON news(title);
 CREATE INDEX idx_news_category ON news(category);
 CREATE INDEX idx_news_status ON news(status);
 CREATE INDEX idx_news_publishedat ON news("publishedAt");
 CREATE INDEX idx_news_breaking_news ON news("isBreakingNews", "breakingNewsUntil") WHERE "isBreakingNews" = true;
+CREATE INDEX idx_news_slug ON news(slug);
+
 CREATE INDEX idx_timetable_title ON timetable_entries(title);
 CREATE INDEX idx_timetable_date ON timetable_entries(date);
 CREATE INDEX idx_timetable_type ON timetable_entries(type);
 CREATE INDEX idx_timetable_status ON timetable_entries(status);
-CREATE INDEX idx_timetable_end_time ON timetable_entries(end_time);
-CREATE INDEX idx_timetable_round_id ON timetable_entries(round_id);
+CREATE INDEX idx_timetable_slug ON timetable_entries(slug);
+
 CREATE INDEX idx_city_tips_name ON city_tips(name);
 CREATE INDEX idx_city_tips_category ON city_tips(category);
--- CREATE INDEX idx_city_tips_rating ON city_tips(rating); -- Rating column removed
 CREATE INDEX idx_city_tips_slug ON city_tips(slug);
 CREATE INDEX idx_city_tips_featured ON city_tips(is_featured);
 CREATE INDEX idx_city_tips_status ON city_tips(status);
--- Analytics table indexes removed
+
 CREATE INDEX idx_info_pages_slug ON info_pages(slug);
 CREATE INDEX idx_info_pages_category ON info_pages(category);
 CREATE INDEX idx_info_pages_status ON info_pages(status);
 CREATE INDEX idx_info_pages_published ON info_pages("isPublished");
 CREATE INDEX idx_info_pages_order ON info_pages("order");
 CREATE INDEX idx_info_pages_created_at ON info_pages("createdAt");
+
 CREATE INDEX idx_links_active ON links(is_active);
 CREATE INDEX idx_links_category ON links(category);
-CREATE INDEX idx_links_sort ON links(sort_order);
 CREATE INDEX idx_links_sort_order ON links(sort_order);
 CREATE INDEX idx_links_created_at ON links(created_at);
+
+CREATE INDEX idx_schnellzugriff_links_active ON schnellzugriff_links(is_active);
+CREATE INDEX idx_schnellzugriff_links_sort_order ON schnellzugriff_links(sort_order);
+CREATE INDEX idx_schnellzugriff_links_created_at ON schnellzugriff_links(created_at);
+
 CREATE INDEX idx_countdown_config_active ON countdown_config(is_active);
 CREATE INDEX idx_countdown_config_updated ON countdown_config(updated_at);
+
+CREATE INDEX idx_settings_key ON settings(key);
 
 -- Create updated_at trigger function
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -319,17 +306,20 @@ $$ language 'plpgsql';
 CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_participants_updated_at BEFORE UPDATE ON participants FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_rounds_updated_at BEFORE UPDATE ON rounds FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_round_participants_updated_at BEFORE UPDATE ON round_participants FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_round_crew_updated_at BEFORE UPDATE ON round_crew FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_news_updated_at BEFORE UPDATE ON news FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_timetable_updated_at BEFORE UPDATE ON timetable_entries FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
--- CREATE TRIGGER update_city_locations_updated_at BEFORE UPDATE ON city_locations FOR EACH ROW EXECUTE FUNCTION update_updated_at_column(); -- Table renamed to city_tips
 CREATE TRIGGER update_city_tips_updated_at BEFORE UPDATE ON city_tips FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_info_pages_updated_at BEFORE UPDATE ON info_pages FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_links_updated_at BEFORE UPDATE ON links FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_schnellzugriff_links_updated_at BEFORE UPDATE ON schnellzugriff_links FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_countdown_config_updated_at BEFORE UPDATE ON countdown_config FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_settings_updated_at BEFORE UPDATE ON settings FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Create views for common queries
--- CREATE VIEW published_news AS
--- SELECT * FROM news WHERE is_published = true AND published_at IS NOT NULL; -- View removed, using direct queries instead
-
 CREATE VIEW upcoming_rounds AS
-SELECT * FROM rounds WHERE startdatetime > CURRENT_TIMESTAMP ORDER BY startdatetime ASC;
+SELECT * FROM rounds WHERE date > CURRENT_DATE ORDER BY date ASC;
 
 CREATE VIEW active_participants AS
 SELECT * FROM participants ORDER BY name ASC;
@@ -346,17 +336,6 @@ CREATE OR REPLACE FUNCTION get_round_count()
 RETURNS INTEGER AS $$
 BEGIN
     RETURN (SELECT COUNT(*) FROM rounds);
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE OR REPLACE FUNCTION cleanup_expired_sessions()
-RETURNS INTEGER AS $$
-DECLARE
-    deleted_count INTEGER;
-BEGIN
-    -- No longer needed with JWT authentication
-    GET DIAGNOSTICS deleted_count = ROW_COUNT;
-    RETURN deleted_count;
 END;
 $$ LANGUAGE plpgsql;
 

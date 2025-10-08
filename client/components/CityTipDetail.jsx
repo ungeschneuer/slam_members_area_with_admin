@@ -193,7 +193,7 @@ const CityTipDetail = () => {
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-red-800 dark:text-red-200">Fehler</h3>
-                <p className="text-red-600 dark:text-red-400">{error}</p>
+                <p className="text-red-600 dark:text-red-400">{error?.message || error}</p>
               </div>
             </div>
             <button 

@@ -19,7 +19,44 @@ import logger from '../config/logger.js';
 
 const router = express.Router();
 
-// Get individual round by ID
+// Get rounds with detailed information (optimized with JOINs)
+router.get('/', async (req, res) => {
+  try {
+    const startTime = startTiming();
+    const rounds = await optimizedQueryService.getRoundsWithDetails();
+    const duration = endTiming(startTime);
+    
+    logger.info('Optimized rounds query completed', {
+      duration: `${Math.round(duration)}ms`,
+      roundCount: rounds.length,
+      queryType: 'JOIN_OPTIMIZED'
+    });
+    
+    sendSuccessResponse(res, rounds, 'GET_ROUNDS', duration);
+  } catch (error) {
+    sendErrorResponse(res, error, 'Failed to fetch rounds with details');
+  }
+});
+
+// Get round by slug (moved before /:id route to avoid conflicts)
+router.get('/slug/:slug', async (req, res) => {
+  try {
+    const startTime = startTiming();
+    const round = await optimizedQueryService.getRoundBySlug(req.params.slug);
+    const duration = endTiming(startTime);
+    
+    if (!round) {
+      sendNotFoundResponse(res, 'Round');
+      return;
+    }
+    
+    sendSuccessResponse(res, round, 'GET_ROUND_BY_SLUG', duration);
+  } catch (error) {
+    sendErrorResponse(res, error, 'Failed to fetch round by slug');
+  }
+});
+
+// Get individual round by ID (moved after /slug/:slug route to avoid conflicts)
 router.get('/:id', async (req, res) => {
   const { id } = req.params;
   const startTime = startTiming();
@@ -42,43 +79,6 @@ router.get('/:id', async (req, res) => {
     sendSuccessResponse(res, round, 'GET_ROUND', duration);
   } catch (error) {
     sendErrorResponse(res, error, 'Failed to fetch round by ID');
-  }
-});
-
-// Get rounds with detailed information (optimized with JOINs)
-router.get('/', async (req, res) => {
-  try {
-    const startTime = startTiming();
-    const rounds = await optimizedQueryService.getRoundsWithDetails();
-    const duration = endTiming(startTime);
-    
-    logger.info('Optimized rounds query completed', {
-      duration: `${Math.round(duration)}ms`,
-      roundCount: rounds.length,
-      queryType: 'JOIN_OPTIMIZED'
-    });
-    
-    sendSuccessResponse(res, rounds, 'GET_ROUNDS', duration);
-  } catch (error) {
-    sendErrorResponse(res, error, 'Failed to fetch rounds with details');
-  }
-});
-
-// Get round by slug
-router.get('/slug/:slug', async (req, res) => {
-  try {
-    const startTime = startTiming();
-    const round = await optimizedQueryService.getRoundBySlug(req.params.slug);
-    const duration = endTiming(startTime);
-    
-    if (!round) {
-      sendNotFoundResponse(res, 'Round');
-      return;
-    }
-    
-    sendSuccessResponse(res, round, 'GET_ROUND_BY_SLUG', duration);
-  } catch (error) {
-    sendErrorResponse(res, error, 'Failed to fetch round by slug');
   }
 });
 
@@ -288,6 +288,23 @@ router.post('/:roundId/participants', ...adminMiddleware(), async (req, res) => 
   
   try {
     const startTime = startTiming();
+    
+    // Check if participant is already in the round
+    const existingQuery = 'SELECT id FROM round_participants WHERE round_id = $1 AND participant_id = $2';
+    const existingResult = await executeQuery(existingQuery, [parseInt(roundId), parseInt(participantId)]);
+    
+    if (existingResult.rows.length > 0) {
+      const duration = endTiming(startTime);
+      return res.status(409).json({
+        success: false,
+        error: 'Participant is already associated with this round',
+        meta: {
+          queryType: 'ADD_ROUND_PARTICIPANT',
+          duration: `${Math.round(duration)}ms`
+        }
+      });
+    }
+    
     const result = await executeQuery(
       'INSERT INTO round_participants (round_id, participant_id, role) VALUES ($1, $2, $3) RETURNING *',
       [parseInt(roundId), parseInt(participantId), role]
@@ -296,6 +313,17 @@ router.post('/:roundId/participants', ...adminMiddleware(), async (req, res) => 
     
     sendSuccessResponse(res, result.rows[0], 'ADD_ROUND_PARTICIPANT', duration, 201);
   } catch (error) {
+    const duration = endTiming(startTime);
+    if (error.code === '23505') { // Unique constraint violation
+      return res.status(409).json({
+        success: false,
+        error: 'Participant is already associated with this round',
+        meta: {
+          queryType: 'ADD_ROUND_PARTICIPANT',
+          duration: `${Math.round(duration)}ms`
+        }
+      });
+    }
     sendErrorResponse(res, error, 'Failed to add participant to round');
   }
 });
@@ -331,6 +359,23 @@ router.post('/:roundId/crew', ...adminMiddleware(), async (req, res) => {
   
   try {
     const startTime = startTiming();
+    
+    // Check if this specific role already exists for this person
+    const existingQuery = 'SELECT id FROM round_crew WHERE round_id = $1 AND participant_id = $2 AND role = $3';
+    const existingResult = await executeQuery(existingQuery, [parseInt(roundId), parseInt(participantId), role]);
+    
+    if (existingResult.rows.length > 0) {
+      const duration = endTiming(startTime);
+      return res.status(409).json({
+        success: false,
+        error: 'This person already has this specific role in this round',
+        meta: {
+          queryType: 'ADD_ROUND_CREW',
+          duration: `${Math.round(duration)}ms`
+        }
+      });
+    }
+    
     const result = await executeQuery(
       'INSERT INTO round_crew (round_id, participant_id, role) VALUES ($1, $2, $3) RETURNING *',
       [parseInt(roundId), parseInt(participantId), role]
@@ -339,11 +384,22 @@ router.post('/:roundId/crew', ...adminMiddleware(), async (req, res) => {
     
     sendSuccessResponse(res, result.rows[0], 'ADD_ROUND_CREW', duration, 201);
   } catch (error) {
+    const duration = endTiming(startTime);
+    if (error.code === '23505') { // Unique constraint violation
+      return res.status(409).json({
+        success: false,
+        error: 'This person already has this specific role in this round',
+        meta: {
+          queryType: 'ADD_ROUND_CREW',
+          duration: `${Math.round(duration)}ms`
+        }
+      });
+    }
     sendErrorResponse(res, error, 'Failed to add crew member to round');
   }
 });
 
-// Remove crew member from round
+// Remove crew member from round (all roles)
 router.delete('/:roundId/crew/:participantId', ...adminMiddleware(), async (req, res) => {
   const { roundId, participantId } = req.params;
   
@@ -360,9 +416,32 @@ router.delete('/:roundId/crew/:participantId', ...adminMiddleware(), async (req,
       return;
     }
     
-    sendSuccessResponse(res, result.rows[0], 'REMOVE_ROUND_CREW', duration);
+    sendSuccessResponse(res, result.rows, 'REMOVE_ROUND_CREW', duration);
   } catch (error) {
     sendErrorResponse(res, error, 'Failed to remove crew member from round');
+  }
+});
+
+// Remove specific crew role from round
+router.delete('/:roundId/crew/:participantId/:role', ...adminMiddleware(), async (req, res) => {
+  const { roundId, participantId, role } = req.params;
+  
+  try {
+    const startTime = startTiming();
+    const result = await executeQuery(
+      'DELETE FROM round_crew WHERE round_id = $1 AND participant_id = $2 AND role = $3 RETURNING *',
+      [parseInt(roundId), parseInt(participantId), role]
+    );
+    const duration = endTiming(startTime);
+    
+    if (result.rows.length === 0) {
+      sendNotFoundResponse(res, 'Round crew role relationship');
+      return;
+    }
+    
+    sendSuccessResponse(res, result.rows[0], 'REMOVE_ROUND_CREW_ROLE', duration);
+  } catch (error) {
+    sendErrorResponse(res, error, 'Failed to remove crew role from round');
   }
 });
 
@@ -406,6 +485,49 @@ router.delete('/:roundId/feature-artists/:participantId', ...adminMiddleware(), 
     sendSuccessResponse(res, result.rows[0], 'REMOVE_ROUND_FEATURE_ARTIST', duration);
   } catch (error) {
     sendErrorResponse(res, error, 'Failed to remove feature artist from round');
+  }
+});
+
+// ROUND MODERATION MANAGEMENT
+// Add moderator to round
+router.post('/:roundId/moderation', ...adminMiddleware(), async (req, res) => {
+  const { roundId } = req.params;
+  const { participantId, name, displayOrder = 1, description = '' } = req.body;
+  
+  try {
+    const startTime = startTiming();
+    const result = await executeQuery(
+      'INSERT INTO round_moderation (round_id, participant_id, name, display_order, description) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [parseInt(roundId), parseInt(participantId), name, displayOrder, description]
+    );
+    const duration = endTiming(startTime);
+    
+    sendSuccessResponse(res, result.rows[0], 'ADD_ROUND_MODERATION', duration);
+  } catch (error) {
+    sendErrorResponse(res, error, 'Failed to add moderator to round');
+  }
+});
+
+// Remove moderator from round
+router.delete('/:roundId/moderation/:participantId', ...adminMiddleware(), async (req, res) => {
+  const { roundId, participantId } = req.params;
+  
+  try {
+    const startTime = startTiming();
+    const result = await executeQuery(
+      'DELETE FROM round_moderation WHERE round_id = $1 AND participant_id = $2 RETURNING *',
+      [parseInt(roundId), parseInt(participantId)]
+    );
+    const duration = endTiming(startTime);
+    
+    if (result.rows.length === 0) {
+      sendNotFoundResponse(res, 'Round moderation relationship');
+      return;
+    }
+    
+    sendSuccessResponse(res, result.rows[0], 'REMOVE_ROUND_MODERATION', duration);
+  } catch (error) {
+    sendErrorResponse(res, error, 'Failed to remove moderator from round');
   }
 });
 

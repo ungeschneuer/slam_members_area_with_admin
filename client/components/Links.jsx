@@ -151,7 +151,7 @@ const Links = () => {
               Fehler beim Laden der Links
             </h2>
             <p className="text-lg text-gray-600 dark:text-gray-400 mb-8 max-w-md mx-auto">
-              {error}
+              {error?.message || error}
             </p>
             <HoverTransition className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-purple-700 shadow-lg hover:shadow-xl">
               <button 
@@ -223,7 +223,7 @@ const Links = () => {
                           target={link.isExternal ? '_blank' : '_self'}
                           rel={link.isExternal ? 'noopener noreferrer' : undefined}
                           onClick={(e) => handleLinkClick(link, e)}
-                          className="group relative block p-0 rounded-2xl overflow-hidden focus:outline-none focus:ring-4 focus:ring-blue-500/20"
+                          className="group relative block p-0 rounded-2xl overflow-hidden focus:outline-none"
                           aria-label={`${link.title} - ${link.description}`}
                         >
                         {/* Background gradient based on color */}

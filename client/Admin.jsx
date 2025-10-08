@@ -139,7 +139,7 @@ function AdminLogin({ onLogin }) {
                   </svg>
                 </div>
                 <div className="ml-3">
-                  <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
+                  <p className="text-sm text-red-800 dark:text-red-200">{error?.message || error}</p>
                 </div>
               </div>
             </div>

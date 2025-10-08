@@ -244,12 +244,12 @@ const RoundDetail = () => {
                   // Handle both old string format and new object format
                   const isObject = typeof member === 'object' && member !== null;
                   const participantId = isObject ? getParticipantId(member) : null;
-                  const role = isObject ? member.role : null;
+                  const role = isObject ? (member.roles || member.role) : null;
                   const name = isObject ? getParticipantName(participantId) : member;
                   const participant = participantId ? getParticipantById(participantId) : null;
                   
                   return (
-                    <div key={index}>
+                    <div key={`crew-member-${participantId || index}-${index}`}>
                       {participantId && participant ? (
                         <Link
                           to={`/participants/${participant.id}`}
@@ -265,7 +265,7 @@ const RoundDetail = () => {
                               </p>
                               {role && (
                                 <p className="text-sm text-gray-500 dark:text-gray-400 break-words leading-tight mt-1">
-                                  {role}
+                                  {Array.isArray(role) ? role.join(', ') : role}
                                 </p>
                               )}
                             </div>
@@ -286,7 +286,7 @@ const RoundDetail = () => {
                               </p>
                               {role && (
                                 <p className="text-sm text-gray-500 dark:text-gray-400 break-words leading-tight mt-1">
-                                  {role}
+                                  {Array.isArray(role) ? role.join(', ') : role}
                                 </p>
                               )}
                             </div>
@@ -314,7 +314,7 @@ const RoundDetail = () => {
                   const participant = participantId ? getParticipantById(participantId) : null;
                   
                   return (
-                    <div key={index}>
+                    <div key={`feature-artist-${participantId || index}-${index}`}>
                       {participantId && participant ? (
                         <Link
                           to={`/participants/${participant.id}`}
@@ -330,7 +330,7 @@ const RoundDetail = () => {
                               </p>
                               {role && (
                                 <p className="text-sm text-gray-500 dark:text-gray-400 break-words leading-tight mt-1">
-                                  {role}
+                                  {Array.isArray(role) ? role.join(', ') : role}
                                 </p>
                               )}
                             </div>
@@ -351,7 +351,7 @@ const RoundDetail = () => {
                               </p>
                               {role && (
                                 <p className="text-sm text-gray-500 dark:text-gray-400 break-words leading-tight mt-1">
-                                  {role}
+                                  {Array.isArray(role) ? role.join(', ') : role}
                                 </p>
                               )}
                             </div>
@@ -506,7 +506,7 @@ const RoundDetail = () => {
                                 {participant.name}
                               </p>
                               <p className="text-sm text-gray-500 dark:text-gray-400 break-words leading-tight mt-1">
-                                {participant.role} • {participant.region}
+                                {participant.region}
                               </p>
                             </div>
                             <svg className="w-4 h-4 text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200 flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">

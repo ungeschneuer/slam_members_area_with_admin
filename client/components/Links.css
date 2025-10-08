@@ -74,10 +74,10 @@
   animation-delay: 0.4s;
 }
 
-/* Enhanced focus states */
+/* Remove focus states completely */
 .links-card:focus {
-  outline: none;
-  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.3);
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 /* Smooth transitions */

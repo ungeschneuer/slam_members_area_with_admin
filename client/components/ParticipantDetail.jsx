@@ -335,7 +335,7 @@ export default function ParticipantDetail() {
                     
                     return roles.map((role, index) => (
                       <span 
-                        key={index}
+                        key={`role-${role}-${index}`}
                         className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getRoleColor(role)}`}
                       >
                         {role}

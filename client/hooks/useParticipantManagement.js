@@ -31,7 +31,15 @@ export const useParticipantManagement = ({
     if (editingItem) {
       // Use junction table hook for existing items
       try {
-        await junctionTables[participantType].add.mutateAsync({
+        // Map tournamentParticipants to participants in junction tables
+        const junctionKey = participantType === 'tournamentParticipants' ? 'participants' : participantType;
+        
+        if (!junctionTables[junctionKey]) {
+          console.error(`Junction table not found for participantType: ${participantType}, junctionKey: ${junctionKey}`);
+          return;
+        }
+        
+        await junctionTables[junctionKey].add.mutateAsync({
           roundId: editingItem.id,
           participantId,
           role
@@ -86,7 +94,15 @@ export const useParticipantManagement = ({
     if (editingItem) {
       // Use junction table hook for existing items
       try {
-        await junctionTables[participantType].remove.mutateAsync({
+        // Map tournamentParticipants to participants in junction tables
+        const junctionKey = participantType === 'tournamentParticipants' ? 'participants' : participantType;
+        
+        if (!junctionTables[junctionKey]) {
+          console.error(`Junction table not found for participantType: ${participantType}, junctionKey: ${junctionKey}`);
+          return;
+        }
+        
+        await junctionTables[junctionKey].remove.mutateAsync({
           roundId: editingItem.id,
           participantId
         });
@@ -127,9 +143,11 @@ export const useParticipantManagement = ({
         (currentItem[participantType] || []) : 
         (editingItem ? editForm.getValues(participantType) || [] : addForm.getValues(participantType) || []);
       
-      const isAlreadySelected = currentParticipants.some(p => 
-        getParticipantId(p.participantId || p) === participant.id
-      );
+      const isAlreadySelected = currentParticipants.some(p => {
+        // Handle both object format (from backend) and simple ID format
+        const participantId = typeof p === 'object' && p.participantId ? p.participantId : p;
+        return getParticipantId(participantId) === participant.id;
+      });
       
       return fullName.includes(searchLower) && !isAlreadySelected;
     });

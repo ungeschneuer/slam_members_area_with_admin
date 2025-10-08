@@ -60,7 +60,7 @@ export default function AdminForm({
           <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
             <div className="flex items-center">
               <span className="text-red-600 dark:text-red-400 mr-2">⚠️</span>
-              <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
+              <p className="text-sm text-red-800 dark:text-red-200">{error?.message || error}</p>
             </div>
           </div>
         )}

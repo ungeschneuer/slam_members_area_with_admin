@@ -177,7 +177,7 @@ export default function CityTips() {
           <span className="text-3xl">⚠️</span>
         </div>
         <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Fehler beim Laden der Stadt-Tipps</h3>
-        <p className="text-gray-600 dark:text-gray-400">{error}</p>
+        <p className="text-gray-600 dark:text-gray-400">{error?.message || error}</p>
       </div>
     );
   }

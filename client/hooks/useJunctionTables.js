@@ -98,6 +98,24 @@ export const useRemoveRoundCrew = () => {
   });
 };
 
+export const useRemoveRoundCrewRole = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: ({ roundId, participantId, role }) => 
+      junctionTableService.removeRoundCrewRole(roundId, participantId, role),
+    onSuccess: (data, variables) => {
+      // Invalidate and refetch rounds data
+      queryClient.invalidateQueries({ queryKey: ['rounds'] });
+      queryClient.invalidateQueries({ queryKey: ['rounds', variables.roundId] });
+      queryClient.invalidateQueries({ queryKey: ['participants'] });
+    },
+    onError: (error) => {
+      console.error('Error removing crew role from round:', error);
+    }
+  });
+};
+
 export const useUpdateRoundCrew = () => {
   const queryClient = useQueryClient();
   
@@ -252,11 +270,15 @@ export const useRoundJunctionTables = (roundId) => {
   
   const addCrew = useAddRoundCrew();
   const removeCrew = useRemoveRoundCrew();
+  const removeCrewRole = useRemoveRoundCrewRole();
   const updateCrew = useUpdateRoundCrew();
   
   const addFeatureArtist = useAddRoundFeatureArtist();
   const removeFeatureArtist = useRemoveRoundFeatureArtist();
   const updateFeatureArtists = useUpdateRoundFeatureArtists();
+  
+  const addModeration = useAddRoundModeration();
+  const removeModeration = useRemoveRoundModeration();
   
   return {
     participants: {
@@ -267,14 +289,56 @@ export const useRoundJunctionTables = (roundId) => {
     crew: {
       add: addCrew,
       remove: removeCrew,
+      removeRole: removeCrewRole,
       update: updateCrew
     },
     featureArtists: {
       add: addFeatureArtist,
       remove: removeFeatureArtist,
       update: updateFeatureArtists
+    },
+    moderation: {
+      add: addModeration,
+      remove: removeModeration
     }
   };
+};
+
+// ROUND MODERATION HOOKS
+export const useAddRoundModeration = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: ({ roundId, participantId, name, displayOrder, description }) => 
+      junctionTableService.addRoundModeration(roundId, participantId, name, displayOrder, description),
+    onSuccess: (data, variables) => {
+      // Invalidate and refetch rounds data
+      queryClient.invalidateQueries({ queryKey: ['rounds'] });
+      queryClient.invalidateQueries({ queryKey: ['rounds', variables.roundId] });
+      queryClient.invalidateQueries({ queryKey: ['participants'] });
+    },
+    onError: (error) => {
+      console.error('Error adding moderator to round:', error);
+    }
+  });
+};
+
+export const useRemoveRoundModeration = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: ({ roundId, participantId }) => 
+      junctionTableService.removeRoundModeration(roundId, participantId),
+    onSuccess: (data, variables) => {
+      // Invalidate and refetch rounds data
+      queryClient.invalidateQueries({ queryKey: ['rounds'] });
+      queryClient.invalidateQueries({ queryKey: ['rounds', variables.roundId] });
+      queryClient.invalidateQueries({ queryKey: ['participants'] });
+    },
+    onError: (error) => {
+      console.error('Error removing moderator from round:', error);
+    }
+  });
 };
 
 export const useTimetableJunctionTables = (entryId) => {

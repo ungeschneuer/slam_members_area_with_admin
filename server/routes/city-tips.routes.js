@@ -14,32 +14,6 @@ import logger from '../config/logger.js';
 
 const router = express.Router();
 
-// Get individual city tip by ID
-router.get('/:id', async (req, res) => {
-  const { id } = req.params;
-  const startTime = startTiming();
-  
-  try {
-    const cityTip = await optimizedQueryService.getCityTipById(parseInt(id));
-    const duration = endTiming(startTime);
-    
-    if (!cityTip) {
-      logger.info('City tip not found', { id, duration: `${Math.round(duration)}ms` });
-      return sendNotFoundResponse(res, 'City tip');
-    }
-    
-    logger.info('Optimized city tip by ID query completed', {
-      id,
-      duration: `${Math.round(duration)}ms`,
-      queryType: 'BASIC'
-    });
-    
-    sendSuccessResponse(res, cityTip, 'GET_CITY_TIP', duration);
-  } catch (error) {
-    sendErrorResponse(res, error, 'Failed to fetch city tip by ID');
-  }
-});
-
 // Get city tips with filtering (merged duplicate endpoints)
 router.get('/', async (req, res) => {
   try {
@@ -79,7 +53,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Get city tip by slug
+// Get city tip by slug (moved before /:id route to avoid conflicts)
 router.get('/slug/:slug', async (req, res) => {
   try {
     const { slug } = req.params;
@@ -103,6 +77,32 @@ router.get('/slug/:slug', async (req, res) => {
     sendSuccessResponse(res, data, 'GET_CITY_TIP_BY_SLUG', duration);
   } catch (error) {
     sendErrorResponse(res, error, 'Failed to fetch city tip by slug');
+  }
+});
+
+// Get individual city tip by ID (moved after /slug/:slug route to avoid conflicts)
+router.get('/:id', async (req, res) => {
+  const { id } = req.params;
+  const startTime = startTiming();
+  
+  try {
+    const cityTip = await optimizedQueryService.getCityTipById(parseInt(id));
+    const duration = endTiming(startTime);
+    
+    if (!cityTip) {
+      logger.info('City tip not found', { id, duration: `${Math.round(duration)}ms` });
+      return sendNotFoundResponse(res, 'City tip');
+    }
+    
+    logger.info('Optimized city tip by ID query completed', {
+      id,
+      duration: `${Math.round(duration)}ms`,
+      queryType: 'BASIC'
+    });
+    
+    sendSuccessResponse(res, cityTip, 'GET_CITY_TIP', duration);
+  } catch (error) {
+    sendErrorResponse(res, error, 'Failed to fetch city tip by ID');
   }
 });
 

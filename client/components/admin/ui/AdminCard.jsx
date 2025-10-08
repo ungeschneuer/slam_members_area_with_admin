@@ -61,7 +61,7 @@ export default function AdminCard({
             <p className="text-sm text-red-700 dark:text-red-300">Failed to load content</p>
           </div>
         </div>
-        <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+        <p className="text-sm text-red-600 dark:text-red-400">{error?.message || error}</p>
       </div>
     );
   }

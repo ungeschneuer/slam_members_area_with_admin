@@ -25,6 +25,11 @@ export default function AdminRounds() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingRound, setEditingRound] = useState(null);
   const [selectedRound, setSelectedRound] = useState(null);
+  const [managingCrewRoles, setManagingCrewRoles] = useState(null); // { participantId, name, roles }
+  
+  // Moderation management state
+  const [moderationSearchTerm, setModerationSearchTerm] = useState('');
+  const [showModerationSearch, setShowModerationSearch] = useState(false);
   
   // Junction table hooks for managing relationships
   const junctionTables = useRoundJunctionTables(editingRound?.id || selectedRound?.id);
@@ -44,6 +49,10 @@ export default function AdminRounds() {
 
   const { fields: featureFields, append: appendFeature, remove: removeFeatureRHF } = useFieldArray({ control: addForm.control, name: 'featureArtists' });
   const { fields: editFeatureFields, append: appendEditFeature, remove: removeEditFeature } = useFieldArray({ control: editForm?.control, name: 'featureArtists' });
+  
+  // Moderation field arrays
+  const { fields: moderationFields, append: appendModeration, remove: removeModerationRHF } = useFieldArray({ control: addForm.control, name: 'moderation' });
+  const { fields: editModerationFields, append: appendEditModeration, remove: removeEditModeration } = useFieldArray({ control: editForm?.control, name: 'moderation' });
   
   // Groups field arrays
   const { fields: groupFields, append: appendGroup, remove: removeGroupRHF } = useFieldArray({ control: addForm.control, name: 'groups' });
@@ -130,15 +139,8 @@ export default function AdminRounds() {
   }, [participantsData]);
 
   const getAvailableParticipants = () => {
-    const currentRound = editingRound;
-    return (participants || []).filter(participant => {
-      if (!participant || !participant.id || !participant.name) return false;
-      const fullName = participant.name.toLowerCase();
-      const searchLower = participantSearchTerm.toLowerCase();
-      const isAlreadySelected = (currentRound?.tournamentParticipants || []).some(p => getParticipantId(p) === participant.id);
-      
-      return fullName.includes(searchLower) && !isAlreadySelected;
-    });
+    // Use the shared hook's filtering logic which handles the correct data structure
+    return getAvailableParticipantsShared('tournamentParticipants', editingRound);
   };
 
   const getAvailableCrewMembers = () => {
@@ -246,6 +248,173 @@ export default function AdminRounds() {
       const current = addForm.getValues('featureArtists') || [];
       const idx = current.findIndex(f => getParticipantId(f.participantId) === participantId);
       if (idx > -1) removeFeatureRHF(idx);
+    }
+  };
+
+  // Moderation management functions
+  const getAvailableModerators = () => {
+    // Use RHF form values instead of legacy state
+    const currentModeration = editingRound 
+      ? editForm.getValues('moderation') || []
+      : addForm.getValues('moderation') || [];
+    
+    return (participants || []).filter(participant => {
+      if (!participant || !participant.id || !participant.name) return false;
+      const fullName = participant.name.toLowerCase();
+      const searchLower = moderationSearchTerm.toLowerCase();
+      
+      // Check if already added
+      const isAlreadyAdded = currentModeration.some(mod => 
+        getParticipantId(mod.participantId) === participant.id
+      );
+      
+      return !isAlreadyAdded && 
+        (searchLower === '' || fullName.includes(searchLower));
+    });
+  };
+
+  const addModerator = async (participantId) => {
+    const participant = participants.find(p => p.id === participantId);
+    if (!participant) return;
+
+    if (editingRound) {
+      // Mirror to RHF array for UI while backend junction is authoritative
+      appendEditModeration({
+        participantId,
+        name: participant.name,
+        order: (editForm.getValues('moderation') || []).length + 1,
+        description: ''
+      });
+      try {
+        await junctionTables.moderation.add.mutateAsync({
+          roundId: editingRound.id,
+          participantId,
+          name: participant.name,
+          displayOrder: (editingRound.moderation || []).length + 1,
+          description: ''
+        });
+      } catch (error) {
+        console.error('Error adding moderator to round:', error);
+      }
+    } else {
+      // For new rounds, add via RHF field array
+      appendModeration({
+        participantId,
+        name: participant.name,
+        order: (addForm.getValues('moderation') || []).length + 1,
+        description: ''
+      });
+      setModerationSearchTerm('');
+      setShowModerationSearch(false);
+    }
+  };
+
+  const removeModerator = async (participantId) => {
+    if (editingRound) {
+      // Mirror remove in RHF array for UI
+      const current = editForm.getValues('moderation') || [];
+      const idx = current.findIndex(m => getParticipantId(m.participantId) === participantId);
+      if (idx > -1) removeEditModeration(idx);
+      try {
+        await junctionTables.moderation.remove.mutateAsync({
+          roundId: editingRound.id,
+          participantId
+        });
+      } catch (error) {
+        console.error('Error removing moderator from round:', error);
+      }
+    } else {
+      // For new rounds, remove via RHF field array
+      const current = addForm.getValues('moderation') || [];
+      const idx = current.findIndex(m => getParticipantId(m.participantId) === participantId);
+      if (idx > -1) removeModerationRHF(idx);
+    }
+  };
+
+  // Crew role management functions
+  const openCrewRoleManagement = (crewMember) => {
+    setManagingCrewRoles({
+      participantId: crewMember.participantId,
+      name: getParticipantName(crewMember.participantId),
+      roles: crewMember.roles || [crewMember.role]
+    });
+  };
+
+  const closeCrewRoleManagement = () => {
+    setManagingCrewRoles(null);
+  };
+
+  const addCrewRole = async (participantId, role) => {
+    try {
+      await junctionTables.crew.add.mutateAsync({
+        roundId: editingRound.id,
+        participantId,
+        role
+      });
+      
+      // Update the form state to reflect the change
+      const currentCrew = editForm.getValues('crew') || [];
+      const crewMemberIndex = currentCrew.findIndex(c => getParticipantId(c.participantId) === participantId);
+      
+      if (crewMemberIndex >= 0) {
+        // Update existing crew member with new role
+        const updatedCrew = [...currentCrew];
+        if (updatedCrew[crewMemberIndex].roles) {
+          updatedCrew[crewMemberIndex].roles = [...updatedCrew[crewMemberIndex].roles, role];
+        } else {
+          updatedCrew[crewMemberIndex].roles = [updatedCrew[crewMemberIndex].role, role];
+        }
+        editForm.setValue('crew', updatedCrew);
+      }
+      
+      // Update managing state
+      if (managingCrewRoles && managingCrewRoles.participantId === participantId) {
+        setManagingCrewRoles(prev => ({
+          ...prev,
+          roles: [...prev.roles, role]
+        }));
+      }
+    } catch (error) {
+      console.error('Error adding crew role:', error);
+    }
+  };
+
+  const removeCrewRole = async (participantId, role) => {
+    try {
+      await junctionTables.crew.removeRole.mutateAsync({
+        roundId: editingRound.id,
+        participantId,
+        role
+      });
+      
+      // Update the form state to reflect the change
+      const currentCrew = editForm.getValues('crew') || [];
+      const crewMemberIndex = currentCrew.findIndex(c => getParticipantId(c.participantId) === participantId);
+      
+      if (crewMemberIndex >= 0) {
+        const updatedCrew = [...currentCrew];
+        if (updatedCrew[crewMemberIndex].roles) {
+          updatedCrew[crewMemberIndex].roles = updatedCrew[crewMemberIndex].roles.filter(r => r !== role);
+          if (updatedCrew[crewMemberIndex].roles.length === 0) {
+            // Remove the crew member entirely if no roles left
+            updatedCrew.splice(crewMemberIndex, 1);
+          }
+        } else {
+          // If it was a single role, remove the crew member
+          updatedCrew.splice(crewMemberIndex, 1);
+        }
+        editForm.setValue('crew', updatedCrew);
+      }
+      
+      // Update managing state
+      if (managingCrewRoles && managingCrewRoles.participantId === participantId) {
+        setManagingCrewRoles(prev => ({
+          ...prev,
+          roles: prev.roles.filter(r => r !== role)
+        }));
+      }
+    } catch (error) {
+      console.error('Error removing crew role:', error);
     }
   };
 
@@ -468,7 +637,8 @@ export default function AdminRounds() {
         crew: editingRound.crew || [],
         tournamentParticipants: editingRound.tournamentParticipants || [],
         groups: editingRound.groups || [],
-        featureArtists: editingRound.featureArtists || []
+        featureArtists: editingRound.featureArtists || [],
+        moderation: editingRound.moderation || []
       });
     }
   }, [editingRound, resetEdit]);
@@ -493,7 +663,8 @@ export default function AdminRounds() {
         juryScores: group.juryScores || {},
         winners: group.winners || []
       })),
-      featureArtists: round.featureArtists || []
+      featureArtists: round.featureArtists || [],
+      moderation: round.moderation || []
     });
   };
 
@@ -543,7 +714,7 @@ export default function AdminRounds() {
   );
 
   if (loading) return <LoadingSpinner size="xl" text="Runden werden geladen..." />;
-  if (error) return <div className="text-red-600">Fehler beim Laden der Runden: {error}</div>;
+  if (error) return <div className="text-red-600">Fehler beim Laden der Runden: {error?.message || error}</div>;
 
   return (
     <div className="space-y-6">
@@ -880,7 +1051,7 @@ export default function AdminRounds() {
                   <div className="max-h-40 overflow-y-auto space-y-2">
                     {getAvailableCrewMembers().map((participant, index) => (
                       <div
-                        key={participant.id || `crew-member-${index}`}
+                        key={`crew-member-${participant.id}-${index}`}
                         onClick={() => addCrewMember(participant.id)}
                         className="flex items-center justify-between p-2 bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer transition-colors"
                       >
@@ -900,88 +1071,37 @@ export default function AdminRounds() {
               {((editingRound ? editForm.getValues('crew') : addForm.getValues('crew')) || []).length > 0 && (
                 <div className="space-y-2">
                   {((editingRound ? editForm.getValues('crew') : addForm.getValues('crew')) || []).map((crewMember, index) => (
-                    <div key={crewMember.participantId || `crew-edit-${index}`} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                    <div key={`crew-edit-${crewMember.participantId || index}-${index}`} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
                       <div>
                         <span className="font-medium text-gray-900 dark:text-white">
                           {getParticipantName(crewMember.participantId)}
                         </span>
                         <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">
-                          ({crewMember.role})
+                          ({crewMember.roles ? crewMember.roles.join(', ') : crewMember.role})
                         </span>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => removeCrewMember(crewMember.participantId)}
-                        className="px-2 py-1 text-xs bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 rounded hover:bg-red-200 dark:hover:bg-red-800"
-                      >
-                        Entfernen
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => removeCrewMember(crewMember.participantId)}
+                          className="px-2 py-1 text-xs bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 rounded hover:bg-red-200 dark:hover:bg-red-800"
+                        >
+                          Alle Rollen entfernen
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openCrewRoleManagement(crewMember)}
+                          className="px-2 py-1 text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 rounded hover:bg-yellow-200 dark:hover:bg-yellow-800"
+                        >
+                          Rollen verwalten
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
               )}
             </div>
 
-            {/* Tournament Participants */}
-            <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Turnier-Teilnehmer*innen</h3>
-              
-              <button
-                type="button"
-                onClick={() => setShowParticipantSearch(!showParticipantSearch)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors mb-4"
-              >
-                {showParticipantSearch ? 'Suche schließen' : '+ Turnier-Teilnehmer*innen hinzufügen'}
-              </button>
-
-              {showParticipantSearch && (
-                <div className="mb-4 p-4 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700">
-                  <input
-                    type="text"
-                    placeholder="Nach Turnier-Teilnehmer*innen suchen..."
-                    value={participantSearchTerm}
-                    onChange={(e) => setParticipantSearchTerm(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white mb-3"
-                  />
-                  <div className="max-h-40 overflow-y-auto space-y-2">
-                    {getAvailableParticipants().map((participant, index) => (
-                      <div
-                        key={participant.id || `tournament-participant-${index}`}
-                        onClick={() => addTournamentParticipant(participant.id)}
-                        className="flex items-center justify-between p-2 bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer transition-colors"
-                      >
-                        <span className="text-sm text-gray-700 dark:text-gray-300">
-                          {participant.name}
-                        </span>
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                          {participant.role}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Selected Tournament Participants */}
-              {((editingRound ? editForm.getValues('tournamentParticipants') : addForm.getValues('tournamentParticipants')) || []).length > 0 && (
-                <div className="space-y-2">
-                  {((editingRound ? editForm.getValues('tournamentParticipants') : addForm.getValues('tournamentParticipants')) || []).map((participantId, index) => (
-                    <div key={participantId || `tournament-edit-${index}`} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                      <span className="font-medium text-gray-900 dark:text-white">
-                        {getParticipantName(participantId)}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => removeTournamentParticipant(participantId)}
-                        className="px-2 py-1 text-xs bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 rounded hover:bg-red-200 dark:hover:bg-red-800"
-                      >
-                        Entfernen
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
 
             {/* Groups Management */}
             <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
@@ -1043,7 +1163,7 @@ export default function AdminRounds() {
                           <div className="max-h-40 overflow-y-auto space-y-2">
                             {getAvailableGroupParticipants(group.id).map((participantId, index) => (
                               <div
-                                key={participantId || `group-selection-${index}`}
+                                key={`group-selection-${participantId || index}-${index}`}
                                 onClick={() => addGroupParticipant(group.id, participantId)}
                                 className="flex items-center justify-between p-2 bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer transition-colors"
                               >
@@ -1061,7 +1181,7 @@ export default function AdminRounds() {
                         <div className="space-y-3">
                           <h5 className="font-medium text-gray-900 dark:text-white">Teilnehmer*innen in dieser Gruppe:</h5>
                           {group.order.map((participantId, index) => (
-                            <div key={participantId || `group-participant-${index}`} className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
+                            <div key={`group-participant-${participantId || index}-${index}`} className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
                               <div className="flex items-center justify-between mb-2">
                                 <div className="flex items-center space-x-3">
                                   <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
@@ -1151,7 +1271,7 @@ export default function AdminRounds() {
                   <div className="max-h-40 overflow-y-auto space-y-2">
                     {getAvailableFeatureArtists().map((participant, index) => (
                       <div
-                        key={participant.id || `feature-artist-${index}`}
+                        key={`feature-artist-${participant.id}-${index}`}
                         onClick={() => addFeatureArtist(participant.id)}
                         className="flex items-center justify-between p-2 bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-600 hover:bg-purple-50 dark:hover:bg-purple-900/20 cursor-pointer transition-colors"
                       >
@@ -1171,7 +1291,7 @@ export default function AdminRounds() {
               {((editingRound ? editingRound.featureArtists : featureFields) || []).length > 0 && (
                 <div className="space-y-2">
                                       {(editingRound ? editingRound.featureArtists : featureFields || []).map((feature, index) => (
-                    <div key={feature.participantId || feature.id || `feature-edit-${index}`} className="flex items-center justify-between p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-700">
+                    <div key={`feature-edit-${feature.participantId || feature.id || index}-${index}`} className="flex items-center justify-between p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-700">
                       <div>
                         <span className="font-medium text-gray-900 dark:text-white">
                           {feature.name}
@@ -1183,6 +1303,133 @@ export default function AdminRounds() {
                       <button
                         type="button"
                         onClick={() => removeFeatureArtist(feature.participantId)}
+                        className="px-2 py-1 text-xs bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 rounded hover:bg-red-200 dark:hover:bg-red-800"
+                      >
+                        Entfernen
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Moderation */}
+            <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Moderation</h3>
+              
+              <button
+                type="button"
+                onClick={() => setShowModerationSearch(!showModerationSearch)}
+                className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors mb-4"
+              >
+                {showModerationSearch ? 'Suche schließen' : '+ Moderator*in hinzufügen'}
+              </button>
+
+              {showModerationSearch && (
+                <div className="mb-4 p-4 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700">
+                  <input
+                    type="text"
+                    placeholder="Nach Moderator*innen suchen..."
+                    value={moderationSearchTerm}
+                    onChange={(e) => setModerationSearchTerm(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white mb-3"
+                  />
+                  <div className="max-h-40 overflow-y-auto space-y-2">
+                    {getAvailableModerators().map((participant, index) => (
+                      <div
+                        key={`moderator-${participant.id}-${index}`}
+                        onClick={() => addModerator(participant.id)}
+                        className="flex items-center justify-between p-2 bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-600 hover:bg-orange-50 dark:hover:bg-orange-900/20 cursor-pointer transition-colors"
+                      >
+                        <span className="text-sm text-gray-700 dark:text-gray-300">
+                          {participant.name}
+                        </span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          Moderator*in
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Selected Moderators */}
+              {((editingRound ? editingRound.moderation : moderationFields) || []).length > 0 && (
+                <div className="space-y-2">
+                  {(editingRound ? editingRound.moderation : moderationFields || []).map((moderator, index) => (
+                    <div key={`moderator-edit-${moderator.participantId || moderator.id || index}-${index}`} className="flex items-center justify-between p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-700">
+                      <div>
+                        <span className="font-medium text-gray-900 dark:text-white">
+                          {moderator.name}
+                        </span>
+                        <span className="ml-2 text-sm text-orange-600 dark:text-orange-400">
+                          (Moderation #{moderator.order})
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeModerator(moderator.participantId)}
+                        className="px-2 py-1 text-xs bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 rounded hover:bg-red-200 dark:hover:bg-red-800"
+                      >
+                        Entfernen
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Tournament Participants */}
+            <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Turnier-Teilnehmer*innen</h3>
+              
+              <button
+                type="button"
+                onClick={() => setShowParticipantSearch(!showParticipantSearch)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors mb-4"
+              >
+                {showParticipantSearch ? 'Suche schließen' : '+ Turnier-Teilnehmer*innen hinzufügen'}
+              </button>
+
+              {showParticipantSearch && (
+                <div className="mb-4 p-4 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700">
+                  <input
+                    type="text"
+                    placeholder="Nach Turnier-Teilnehmer*innen suchen..."
+                    value={participantSearchTerm}
+                    onChange={(e) => setParticipantSearchTerm(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white mb-3"
+                  />
+                  <div className="max-h-40 overflow-y-auto space-y-2">
+                    {getAvailableParticipants().map((participant, index) => (
+                      <div
+                        key={`tournament-participant-${participant.id}-${index}`}
+                        onClick={() => addTournamentParticipant(participant.id)}
+                        className="flex items-center justify-between p-2 bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer transition-colors"
+                      >
+                        <span className="text-sm text-gray-700 dark:text-gray-300">
+                          {participant.name}
+                        </span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          {participant.role}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Selected Tournament Participants */}
+              {((editingRound ? editForm.getValues('tournamentParticipants') : addForm.getValues('tournamentParticipants')) || []).length > 0 && (
+                <div className="space-y-2">
+                  {((editingRound ? editForm.getValues('tournamentParticipants') : addForm.getValues('tournamentParticipants')) || []).map((participantId, index) => (
+                    <div key={`tournament-edit-${participantId || index}-${index}`} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                      <span className="font-medium text-gray-900 dark:text-white">
+                        {getParticipantName(participantId)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeTournamentParticipant(participantId)}
                         className="px-2 py-1 text-xs bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 rounded hover:bg-red-200 dark:hover:bg-red-800"
                       >
                         Entfernen
@@ -1273,22 +1520,22 @@ export default function AdminRounds() {
                 <h4 className="font-medium text-gray-900 dark:text-white mb-2">Crew:</h4>
                 <div className="flex flex-wrap gap-2">
                   {round.crew.map((crewMember, index) => (
-                    <span key={crewMember.participantId || `crew-${index}`} className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded text-sm">
-                      {getParticipantName(crewMember.participantId)} ({crewMember.role})
+                    <span key={`crew-display-${crewMember.participantId || index}-${index}`} className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded text-sm">
+                      {getParticipantName(crewMember.participantId)} ({crewMember.roles ? crewMember.roles.join(', ') : crewMember.role})
                     </span>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* Tournament Participants */}
-            {round.tournamentParticipants && round.tournamentParticipants.length > 0 && (
+            {/* Moderation */}
+            {round.moderation && round.moderation.length > 0 && (
               <div className="mb-4">
-                <h4 className="font-medium text-gray-900 dark:text-white mb-2">Turnier-Teilnehmer*innen ({round.tournamentParticipants.length}):</h4>
+                <h4 className="font-medium text-gray-900 dark:text-white mb-2">Moderation:</h4>
                 <div className="flex flex-wrap gap-2">
-                  {round.tournamentParticipants.map((participantId, index) => (
-                    <span key={participantId || `tournament-display-${index}`} className="px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded text-sm">
-                      {getParticipantName(participantId)}
+                  {round.moderation.map((moderator, index) => (
+                    <span key={`moderator-display-${moderator.participantId || index}-${index}`} className="px-2 py-1 bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200 rounded text-sm">
+                      {moderator.name} (Moderation #{moderator.order})
                     </span>
                   ))}
                 </div>
@@ -1301,8 +1548,22 @@ export default function AdminRounds() {
                 <h4 className="font-medium text-gray-900 dark:text-white mb-2">Feature Artists:</h4>
                 <div className="flex flex-wrap gap-2">
                   {round.featureArtists.map((feature, index) => (
-                    <span key={feature.participantId || `feature-${index}`} className="px-2 py-1 bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 rounded text-sm">
+                    <span key={`feature-display-${feature.participantId || index}-${index}`} className="px-2 py-1 bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 rounded text-sm">
                       {feature.name} (Feature #{feature.order})
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Tournament Participants */}
+            {round.tournamentParticipants && round.tournamentParticipants.length > 0 && (
+              <div className="mb-4">
+                <h4 className="font-medium text-gray-900 dark:text-white mb-2">Turnier-Teilnehmer*innen ({round.tournamentParticipants.length}):</h4>
+                <div className="flex flex-wrap gap-2">
+                  {round.tournamentParticipants.map((participantId, index) => (
+                    <span key={`tournament-display-${participantId || index}-${index}`} className="px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded text-sm">
+                      {getParticipantName(participantId)}
                     </span>
                   ))}
                 </div>
@@ -1324,7 +1585,7 @@ export default function AdminRounds() {
                           const isWinner = group.winners.includes(participantId);
                           
                           return (
-                            <div key={participantId || `group-display-participant-${index}`} className={`flex items-center justify-between p-2 rounded ${isWinner ? 'bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700' : 'bg-gray-50 dark:bg-gray-700'}`}>
+                            <div key={`group-display-participant-${participantId || index}-${index}`} className={`flex items-center justify-between p-2 rounded ${isWinner ? 'bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700' : 'bg-gray-50 dark:bg-gray-700'}`}>
                               <div className="flex items-center space-x-2">
                                 <span className="font-medium text-gray-900 dark:text-white">
                                   {getParticipantName(participantId)}
@@ -1359,6 +1620,70 @@ export default function AdminRounds() {
           <p className="text-gray-600 dark:text-gray-400">
             {searchTerm ? 'Versuchen Sie einen anderen Suchbegriff.' : 'Fügen Sie die erste Runde hinzu.'}
           </p>
+        </div>
+      )}
+
+      {/* Crew Role Management Modal */}
+      {managingCrewRoles && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              Rollen verwalten für {managingCrewRoles.name}
+            </h3>
+            
+            {/* Current Roles */}
+            <div className="mb-4">
+              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Aktuelle Rollen:</h4>
+              <div className="space-y-2">
+                {managingCrewRoles.roles.map((role, index) => (
+                  <div key={index} className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded">
+                    <span className="text-sm text-gray-900 dark:text-white">{role}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeCrewRole(managingCrewRoles.participantId, role)}
+                      className="px-2 py-1 text-xs bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 rounded hover:bg-red-200 dark:hover:bg-red-800"
+                    >
+                      Entfernen
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Add New Role */}
+            <div className="mb-4">
+              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Neue Rolle hinzufügen:</h4>
+              <div className="flex gap-2">
+                <select
+                  value={selectedCrewRole}
+                  onChange={(e) => setSelectedCrewRole(e.target.value)}
+                  className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                >
+                  {crewRoles.map(role => (
+                    <option key={role} value={role}>{role}</option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => addCrewRole(managingCrewRoles.participantId, selectedCrewRole)}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                >
+                  Hinzufügen
+                </button>
+              </div>
+            </div>
+
+            {/* Close Button */}
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={closeCrewRoleManagement}
+                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+              >
+                Schließen
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

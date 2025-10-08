@@ -344,7 +344,7 @@ export default function MemberDashboard() {
               // Loading state with skeleton
               Array.from({ length: 3 }).map((_, index) => (
                 <div
-                  key={index}
+                  key={`skeleton-${index}`}
                   className="bg-gray-50 dark:bg-gray-700 rounded-xl p-4 sm:p-6 animate-pulse"
                   aria-label="Lade Stadt-Tipps..."
                 >

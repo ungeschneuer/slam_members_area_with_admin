@@ -37,7 +37,7 @@ export default function Participants() {
   }, [participantsData]);
 
   if (loading) return <LoadingSpinner size="xl" text="Teilnehmer*innen werden geladen..." />;
-  if (error) return <div className="text-red-600">Fehler beim Laden der Teilnehmer*innen: {error}</div>;
+  if (error) return <div className="text-red-600">Fehler beim Laden der Teilnehmer*innen: {error?.message || error}</div>;
 
   // Show offline status if not online
   if (!isOnline) {
@@ -284,7 +284,7 @@ export default function Participants() {
                                      role === 'Videograf*in' || role === 'Videograf' ? '🎥' : '👤';
                         
                         return (
-                          <span key={index} className="inline-block mr-1">
+                          <span key={`role-${role}-${index}`} className="inline-block mr-1">
                             {emoji} {role}
                           </span>
                         );

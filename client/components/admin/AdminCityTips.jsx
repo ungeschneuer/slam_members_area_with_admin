@@ -222,7 +222,7 @@ export default function AdminCityTips() {
   );
 
   if (loading) return <LoadingSpinner size="xl" text="Stadt-Tipps werden geladen..." />;
-  if (error) return <div className="text-red-600">Fehler beim Laden der Stadt-Tipps: {error}</div>;
+  if (error) return <div className="text-red-600">Fehler beim Laden der Stadt-Tipps: {error?.message || error}</div>;
 
   return (
     <div className="space-y-6">

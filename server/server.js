@@ -23,7 +23,71 @@ dotenv.config();
 
 const app = express();
 const server = createServer(app);
-// Get allowed origins from environment variables
+// Centralized CORS configuration
+const getCorsConfig = () => {
+  const allowedOrigins = [
+    'https://szene.slam25.de'
+  ];
+  
+  // Add environment-specific origins
+  if (process.env.FRONTEND_URL) {
+    allowedOrigins.push(process.env.FRONTEND_URL);
+  }
+  
+  if (process.env.VITE_DEV_URL) {
+    allowedOrigins.push(process.env.VITE_DEV_URL);
+  }
+  
+  if (process.env.VITE_ALT_URL) {
+    allowedOrigins.push(process.env.VITE_ALT_URL);
+  }
+  
+  // Add development origins if in development mode
+  if (process.env.NODE_ENV === 'development') {
+    const devPorts = process.env.DEV_PORTS ? process.env.DEV_PORTS.split(',') : ['5173', '5174', '5178'];
+    devPorts.forEach(port => {
+      allowedOrigins.push(`http://localhost:${port}`);
+      allowedOrigins.push(`http://127.0.0.1:${port}`);
+    });
+  }
+  
+  return {
+    origin: (origin, callback) => {
+      // Allow requests with no origin (mobile apps, curl, etc.)
+      if (!origin) return callback(null, true);
+      
+      // Check if origin is in allowed list
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      
+      // Additional development checks
+      if (process.env.NODE_ENV === 'development' && 
+          (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:'))) {
+        return callback(null, true);
+      }
+      
+      // For disallowed origins, don't set CORS headers but don't throw error
+      return callback(null, false);
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowedHeaders: [
+      'Content-Type', 
+      'Authorization', 
+      'X-Requested-With', 
+      'Accept', 
+      'Origin',
+      'Access-Control-Request-Method',
+      'Access-Control-Request-Headers'
+    ],
+    exposedHeaders: ['X-Total-Count', 'X-Rate-Limit-Remaining'],
+    optionsSuccessStatus: 200,
+    preflightContinue: false
+  };
+};
+
+// Get allowed origins for Socket.io
 const getAllowedOrigins = () => {
   const origins = [
     'https://szene.slam25.de'
@@ -101,35 +165,8 @@ app.use((req, res, next) => {
   next();
 });
 
-// Handle OPTIONS requests for CORS preflight
-app.options('/api/*', (req, res) => {
-  const origin = req.headers.origin;
-  if (origin) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-  } else {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-  }
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, Access-Control-Request-Method, Access-Control-Request-Headers');
-  res.setHeader('Access-Control-Expose-Headers', 'X-Total-Count, X-Rate-Limit-Remaining');
-  res.status(200).end();
-});
-
-// Centralized rate limiting with CORS headers
+// Centralized rate limiting (CORS handled by cors middleware)
 app.use('/api/', (req, res, next) => {
-  // Set CORS headers before rate limiting
-  const origin = req.headers.origin;
-  if (origin) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-  } else {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-  }
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, Access-Control-Request-Method, Access-Control-Request-Headers');
-  res.setHeader('Access-Control-Expose-Headers', 'X-Total-Count, X-Rate-Limit-Remaining');
-  
   // Use development rate limiting in development mode
   const rateLimiter = process.env.NODE_ENV === 'development' 
     ? rateLimitConfig.development 
@@ -159,69 +196,10 @@ app.use(cookieParser());
 // Compression middleware
 app.use(compression());
 
-// CORS configuration - More permissive for development
-app.use(cors({
-  origin: (origin, callback) => {
-    // Allow requests with no origin (mobile apps, curl, etc.)
-    if (!origin) return callback(null, true);
-    
-    const allowedOrigins = getAllowedOrigins();
-    
-    // Add additional development origins
-    if (process.env.NODE_ENV === 'development') {
-      const devPorts = process.env.DEV_PORTS ? process.env.DEV_PORTS.split(',') : ['3000', '3001', '5173', '5174', '5178', '8080'];
-      devPorts.forEach(port => {
-        allowedOrigins.push(`http://localhost:${port}`);
-        allowedOrigins.push(`http://127.0.0.1:${port}`);
-      });
-    }
-    
-    if (allowedOrigins.includes(origin) || 
-        (process.env.NODE_ENV === 'development' && origin.startsWith('http://localhost:')) ||
-        (process.env.NODE_ENV === 'development' && origin.startsWith('http://127.0.0.1:'))) {
-      return callback(null, true);
-    }
-    
-    callback(new Error('Not allowed by CORS'));
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: [
-    'Content-Type', 
-    'Authorization', 
-    'X-Requested-With', 
-    'Accept', 
-    'Origin',
-    'Access-Control-Request-Method',
-    'Access-Control-Request-Headers'
-  ],
-  exposedHeaders: ['X-Total-Count', 'X-Rate-Limit-Remaining'],
-  optionsSuccessStatus: 200,
-  preflightContinue: false
-}));
+// CORS configuration - Centralized and secure
+app.use(cors(getCorsConfig()));
 
-// Global CORS middleware for all responses
-app.use((req, res, next) => {
-  // Set CORS headers for all responses
-  const origin = req.headers.origin;
-  if (origin) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-  } else {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-  }
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, Access-Control-Request-Method, Access-Control-Request-Headers');
-  res.setHeader('Access-Control-Expose-Headers', 'X-Total-Count, X-Rate-Limit-Remaining');
-  
-  // Handle preflight requests
-  if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
-  }
-  
-  next();
-});
+// CORS is now handled entirely by the cors middleware above
 
 // Logging middleware with safe stream to avoid EPIPE on aborted pipes
 if (process.env.NODE_ENV !== 'test') {

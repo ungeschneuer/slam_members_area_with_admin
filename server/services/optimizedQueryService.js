@@ -131,13 +131,25 @@ class OptimizedQueryService {
             '[]'::json
           ) as tournament_participants,
           COALESCE(
-            json_agg(
-              DISTINCT jsonb_build_object(
-                'participantId', rc.participant_id,
-                'name', pc.name,
-                'role', rc.role
+            (
+              SELECT json_agg(
+                jsonb_build_object(
+                  'participantId', crew_data.participant_id,
+                  'name', crew_data.name,
+                  'roles', crew_data.roles
+                )
               )
-            ) FILTER (WHERE rc.participant_id IS NOT NULL),
+              FROM (
+                SELECT 
+                  rc.participant_id,
+                  pc.name,
+                  json_agg(rc.role ORDER BY rc.role) as roles
+                FROM round_crew rc
+                LEFT JOIN participants pc ON rc.participant_id = pc.id
+                WHERE rc.round_id = r.id
+                GROUP BY rc.participant_id, pc.name
+              ) crew_data
+            ),
             '[]'::json
           ) as crew,
           COALESCE(
@@ -150,13 +162,23 @@ class OptimizedQueryService {
               )
             ) FILTER (WHERE rfa.participant_id IS NOT NULL),
             '[]'::json
-          ) as feature_artists
+          ) as feature_artists,
+          COALESCE(
+            json_agg(
+              DISTINCT jsonb_build_object(
+                'participantId', rm.participant_id,
+                'name', rm.name,
+                'displayOrder', rm.display_order,
+                'description', rm.description
+              )
+            ) FILTER (WHERE rm.participant_id IS NOT NULL),
+            '[]'::json
+          ) as moderation
         FROM rounds r
         LEFT JOIN round_participants rp ON r.id = rp.round_id
         LEFT JOIN participants p ON rp.participant_id = p.id
-        LEFT JOIN round_crew rc ON r.id = rc.round_id
-        LEFT JOIN participants pc ON rc.participant_id = pc.id
         LEFT JOIN round_feature_artists rfa ON r.id = rfa.round_id
+        LEFT JOIN round_moderation rm ON r.id = rm.round_id
         WHERE r.id = $1
         GROUP BY r.id
       `;
@@ -173,10 +195,12 @@ class OptimizedQueryService {
       round.tournamentParticipants = round.tournament_participants || [];
       round.crew = round.crew || [];
       round.featureArtists = round.feature_artists || [];
+      round.moderation = round.moderation || [];
       
       // Remove the raw junction table fields
       delete round.tournament_participants;
       delete round.feature_artists;
+      delete round.moderation;
 
       // Calculate status automatically
       const roundsWithCalculatedStatus = calculateRoundsStatus([round]);
@@ -260,13 +284,25 @@ class OptimizedQueryService {
             '[]'::json
           ) as tournament_participants,
           COALESCE(
-            json_agg(
-              DISTINCT jsonb_build_object(
-                'participantId', rc.participant_id,
-                'name', pc.name,
-                'role', rc.role
+            (
+              SELECT json_agg(
+                jsonb_build_object(
+                  'participantId', crew_data.participant_id,
+                  'name', crew_data.name,
+                  'roles', crew_data.roles
+                )
               )
-            ) FILTER (WHERE rc.participant_id IS NOT NULL),
+              FROM (
+                SELECT 
+                  rc.participant_id,
+                  pc.name,
+                  json_agg(rc.role ORDER BY rc.role) as roles
+                FROM round_crew rc
+                LEFT JOIN participants pc ON rc.participant_id = pc.id
+                WHERE rc.round_id = r.id
+                GROUP BY rc.participant_id, pc.name
+              ) crew_data
+            ),
             '[]'::json
           ) as crew,
           COALESCE(
@@ -279,13 +315,23 @@ class OptimizedQueryService {
               )
             ) FILTER (WHERE rfa.participant_id IS NOT NULL),
             '[]'::json
-          ) as feature_artists
+          ) as feature_artists,
+          COALESCE(
+            json_agg(
+              DISTINCT jsonb_build_object(
+                'participantId', rm.participant_id,
+                'name', rm.name,
+                'displayOrder', rm.display_order,
+                'description', rm.description
+              )
+            ) FILTER (WHERE rm.participant_id IS NOT NULL),
+            '[]'::json
+          ) as moderation
         FROM rounds r
         LEFT JOIN round_participants rp ON r.id = rp.round_id
         LEFT JOIN participants p ON rp.participant_id = p.id
-        LEFT JOIN round_crew rc ON r.id = rc.round_id
-        LEFT JOIN participants pc ON rc.participant_id = pc.id
         LEFT JOIN round_feature_artists rfa ON r.id = rfa.round_id
+        LEFT JOIN round_moderation rm ON r.id = rm.round_id
         GROUP BY r.id
         ORDER BY r.date ASC, r."startTime" ASC
       `;
@@ -301,9 +347,11 @@ class OptimizedQueryService {
           tournamentParticipants: round.tournament_participants || [],
           crew: round.crew || [],
           featureArtists: round.feature_artists || [],
+          moderation: round.moderation || [],
           // Remove the raw junction table fields
           tournament_participants: undefined,
-          feature_artists: undefined
+          feature_artists: undefined,
+          moderation: undefined
         };
       });
 
@@ -446,7 +494,8 @@ class OptimizedQueryService {
         LEFT JOIN participants p ON tp.participant_id = p.id
         WHERE te.id = $1
         GROUP BY te.id, te.title, te.date, te.time, te.location, 
-                 te.description, te."additionalLinks", te.created_at, te.updated_at
+                 te.description, te."detailedDescription", te.type, te.status, 
+                 te.end_time, te.internal_link, te.round_id, te.slug, te.created_at, te.updated_at
       `;
 
       const timetableResult = await executeQuery(timetableQuery, [id]);
@@ -508,7 +557,8 @@ class OptimizedQueryService {
         LEFT JOIN timetable_participants tp ON te.id = tp.timetable_entry_id
         LEFT JOIN participants p ON tp.participant_id = p.id
         GROUP BY te.id, te.title, te.date, te.time, te.location, 
-                 te.description, te."additionalLinks", te.created_at, te.updated_at
+                 te.description, te."detailedDescription", te.type, te.status, 
+                 te.end_time, te.internal_link, te.round_id, te.slug, te.created_at, te.updated_at
         ORDER BY te.date ASC, te.time ASC
       `;
 
@@ -1088,7 +1138,7 @@ class OptimizedQueryService {
         WHERE te.slug = $1
         GROUP BY te.id, te.title, te.description, te."detailedDescription", 
                  te.location, te.date, te.time, te.type, te.status, 
-                 te."additionalLinks", te.slug, te.created_at, te.updated_at, te.end_time, te.internal_link
+                 te.slug, te.created_at, te.updated_at, te.end_time, te.internal_link, te.round_id
       `;
 
       const timetableResult = await executeQuery(timetableQuery, [slug]);

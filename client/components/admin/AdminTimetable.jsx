@@ -306,7 +306,7 @@ export default function AdminTimetable() {
           <span className="text-3xl">⚠️</span>
         </div>
         <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Fehler beim Laden des Zeitplans</h3>
-        <p className="text-gray-600 dark:text-gray-400">{error}</p>
+        <p className="text-gray-600 dark:text-gray-400">{error?.message || error}</p>
       </div>
     );
   }
@@ -548,7 +548,7 @@ export default function AdminTimetable() {
             const participantRole = participant.role || '';
             
             return (
-              <div key={index} className="flex items-center space-x-3 mb-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+              <div key={`timetable-event-${index}`} className="flex items-center space-x-3 mb-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
                 {isNew ? (
                   <>
                     <select
@@ -668,7 +668,7 @@ export default function AdminTimetable() {
           </div>
           
           {(isNew ? linkFields : editLinkFields).map((link, index) => (
-            <div key={link.id ?? index} className="flex items-center space-x-3 mb-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+            <div key={`timetable-link-${link.id || index}-${index}`} className="flex items-center space-x-3 mb-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
               {isNew ? (
                 <>
                   <select

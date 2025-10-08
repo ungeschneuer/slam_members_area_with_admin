@@ -35,33 +35,6 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Get individual news article by slug
-router.get('/:slug', async (req, res) => {
-  const { slug } = req.params;
-  const startTime = startTiming();
-  
-  try {
-    const newsArticle = await optimizedQueryService.getNewsBySlugWithDetails(slug);
-    const duration = endTiming(startTime);
-    
-    if (!newsArticle) {
-      logger.info('News article not found', { slug, duration: `${Math.round(duration)}ms` });
-      return sendNotFoundResponse(res, 'News article');
-    }
-    
-    logger.info('Optimized news article by slug query completed', {
-      slug,
-      duration: `${Math.round(duration)}ms`,
-      queryType: 'BASIC'
-    });
-    
-    sendSuccessResponse(res, newsArticle, 'GET_NEWS_ARTICLE', duration);
-  } catch (error) {
-    sendErrorResponse(res, error, 'Failed to fetch news article by slug');
-  }
-});
-
-
 // Get individual news article by ID with details (alias for consistency)
 router.get('/detail/:id', async (req, res) => {
   const { id } = req.params;
@@ -109,6 +82,32 @@ router.get('/breaking-news', async (req, res) => {
     sendSuccessResponse(res, breakingNews, 'GET_BREAKING_NEWS', duration);
   } catch (error) {
     sendErrorResponse(res, error, 'Failed to fetch breaking news');
+  }
+});
+
+// Get individual news article by slug (moved after specific routes to avoid conflicts)
+router.get('/:slug', async (req, res) => {
+  const { slug } = req.params;
+  const startTime = startTiming();
+  
+  try {
+    const newsArticle = await optimizedQueryService.getNewsBySlugWithDetails(slug);
+    const duration = endTiming(startTime);
+    
+    if (!newsArticle) {
+      logger.info('News article not found', { slug, duration: `${Math.round(duration)}ms` });
+      return sendNotFoundResponse(res, 'News article');
+    }
+    
+    logger.info('Optimized news article by slug query completed', {
+      slug,
+      duration: `${Math.round(duration)}ms`,
+      queryType: 'BASIC'
+    });
+    
+    sendSuccessResponse(res, newsArticle, 'GET_NEWS_ARTICLE', duration);
+  } catch (error) {
+    sendErrorResponse(res, error, 'Failed to fetch news article by slug');
   }
 });
 

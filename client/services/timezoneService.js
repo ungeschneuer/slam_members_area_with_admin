@@ -9,7 +9,7 @@
  */
 export async function getCurrentTimeInConfiguredTimezone() {
   try {
-    const response = await fetch(`${import.meta.env.VITE_API_URL}/admin/settings`);
+    const response = await fetch(`${import.meta.env.VITE_API_URL}/settings`);
     const data = await response.json();
     
     if (data.success && data.data.timezone) {
@@ -50,7 +50,7 @@ export async function getCurrentTimeInConfiguredTimezone() {
  */
 export async function formatDateInConfiguredTimezone(date, options = {}) {
   try {
-    const response = await fetch(`${import.meta.env.VITE_API_URL}/admin/settings`);
+    const response = await fetch(`${import.meta.env.VITE_API_URL}/settings`);
     const data = await response.json();
     
     if (data.success && data.data.timezone) {
@@ -77,7 +77,7 @@ export async function formatDateInConfiguredTimezone(date, options = {}) {
  */
 export async function getTimezoneOffset() {
   try {
-    const response = await fetch(`${import.meta.env.VITE_API_URL}/admin/settings`);
+    const response = await fetch(`${import.meta.env.VITE_API_URL}/settings`);
     const data = await response.json();
     
     if (data.success && data.data.timezone) {

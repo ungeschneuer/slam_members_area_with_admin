@@ -35,7 +35,7 @@ export default function CheckboxInput({
                   checked={field.value}
                   disabled={disabled}
                   aria-invalid={hasError ? 'true' : 'false'}
-                  className={`h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded ${hasError ? 'border-red-500' : ''} ${className}`}
+                  className={`h-4 w-4 text-blue-600 focus:ring-2 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded ${hasError ? 'border-red-500 focus:ring-red-500' : ''} ${className}`}
                 />
               </div>
               <div className="ml-3 text-sm">
@@ -69,7 +69,7 @@ export default function CheckboxInput({
             disabled={disabled}
             aria-invalid={hasError ? 'true' : 'false'}
             {...(register ? register(name, rules) : {})}
-            className={`h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded ${hasError ? 'border-red-500' : ''} ${className}`}
+            className={`h-4 w-4 text-blue-600 focus:ring-2 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded ${hasError ? 'border-red-500 focus:ring-red-500' : ''} ${className}`}
           />
         </div>
         <div className="ml-3 text-sm">

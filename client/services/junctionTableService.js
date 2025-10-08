@@ -87,6 +87,24 @@ export const removeRoundCrew = async (roundId, participantId) => {
   }
 };
 
+export const removeRoundCrewRole = async (roundId, participantId, role) => {
+  try {
+    const response = await fetch(`/api/rounds/${roundId}/crew/${participantId}/${encodeURIComponent(role)}`, {
+      method: 'DELETE',
+      credentials: 'include'
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error removing crew role from round:', error);
+    throw error;
+  }
+};
+
 // ROUND FEATURE ARTISTS MANAGEMENT
 export const addRoundFeatureArtist = async (roundId, participantId, name, displayOrder = 1, description = '') => {
   try {
@@ -300,6 +318,47 @@ export const updateRoundFeatureArtists = async (roundId, featureArtists) => {
   }
 };
 
+// ROUND MODERATION MANAGEMENT
+export const addRoundModeration = async (roundId, participantId, name, displayOrder = 1, description = '') => {
+  try {
+    const response = await fetch(`/api/rounds/${roundId}/moderation`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify({ participantId, name, displayOrder, description })
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error adding moderator to round:', error);
+    throw error;
+  }
+};
+
+export const removeRoundModeration = async (roundId, participantId) => {
+  try {
+    const response = await fetch(`/api/rounds/${roundId}/moderation/${participantId}`, {
+      method: 'DELETE',
+      credentials: 'include'
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error removing moderator from round:', error);
+    throw error;
+  }
+};
+
 export const updateTimetableParticipants = async (entryId, participants) => {
   try {
     // First, get current participants
@@ -352,6 +411,10 @@ export default {
   addRoundFeatureArtist,
   removeRoundFeatureArtist,
   updateRoundFeatureArtists,
+  
+  // Round moderation
+  addRoundModeration,
+  removeRoundModeration,
   
   // Timetable participants
   addTimetableParticipant,

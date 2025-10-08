@@ -180,7 +180,7 @@ export default function Rounds() {
   });
 
   if (loading) return <LoadingSpinner size="xl" text="Runden werden geladen..." />;
-  if (error) return <div className="text-red-600">Fehler beim Laden der Runden: {error}</div>;
+  if (error) return <div className="text-red-600">Fehler beim Laden der Runden: {error?.message || error}</div>;
 
   return (
     <div data-testid="rounds-page" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
@@ -404,7 +404,7 @@ export default function Rounds() {
                               </div>
                               <div className="flex-1 min-w-0">
                                 <p className="font-medium text-gray-900 dark:text-white break-words group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200">{name}</p>
-                                <p className="text-sm text-gray-500 dark:text-gray-400 break-words">{crewMember.role}</p>
+                                <p className="text-sm text-gray-500 dark:text-gray-400 break-words">{crewMember.roles ? crewMember.roles.join(', ') : crewMember.role}</p>
                               </div>
                               <svg className="w-4 h-4 text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -417,7 +417,52 @@ export default function Rounds() {
                               </div>
                               <div className="flex-1 min-w-0">
                                 <p className="font-medium text-gray-900 dark:text-white break-words">{name}</p>
-                                <p className="text-sm text-gray-500 dark:text-gray-400 break-words">{crewMember.role}</p>
+                                <p className="text-sm text-gray-500 dark:text-gray-400 break-words">{crewMember.roles ? crewMember.roles.join(', ') : crewMember.role}</p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Moderation */}
+              {selectedRound.moderation && selectedRound.moderation.length > 0 && (
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Moderation</h3>
+                  <div className="space-y-3">
+                    {selectedRound.moderation.map((moderator, index) => {
+                      const participant = participants.find(p => p.id === getParticipantId(moderator));
+                      const name = participant ? participant.name : moderator.name || 'Unbekannte*r Moderator*in';
+                      
+                      return (
+                        <div key={index}>
+                          {participant ? (
+                            <Link
+                              to={`/participants/${getParticipantId(moderator)}`}
+                              className="block flex items-start space-x-3 p-4 bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20 rounded-lg hover:from-orange-100 to-red-100 dark:hover:from-orange-900/30 dark:hover:to-red-900/30 transition-colors duration-200 group"
+                            >
+                              <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-600 rounded-full flex items-center justify-center text-white text-lg font-bold flex-shrink-0 group-hover:scale-105 transition-transform duration-200">
+                                {name.charAt(0).toUpperCase()}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-gray-900 dark:text-white break-words group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors duration-200">{name}</p>
+                                <p className="text-gray-500 dark:text-gray-400 text-sm mt-1 break-words">{moderator.description}</p>
+                              </div>
+                              <svg className="w-4 h-4 text-gray-400 group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors duration-200 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                              </svg>
+                            </Link>
+                          ) : (
+                            <div className="flex items-start space-x-3 p-4 bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20 rounded-lg">
+                              <div className="w-10 h-10 bg-gradient-to-br from-gray-400 to-gray-600 rounded-full flex items-center justify-center text-white text-lg font-bold flex-shrink-0">
+                                {name.charAt(0).toUpperCase()}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-gray-900 dark:text-white break-words">{name}</p>
+                                <p className="text-gray-500 dark:text-gray-400 text-sm mt-1 break-words">{moderator.description}</p>
                               </div>
                             </div>
                           )}
@@ -600,7 +645,7 @@ export default function Rounds() {
                       const id = getParticipantId(participantId);
                       const participant = participants.find(p => p.id === id);
                       const name = participant ? participant.name : 'Unbekannte*r Teilnehmer*in';
-                      const key = typeof participantId === 'object' ? `participant-${index}` : id || `participant-${index}`;
+                      const key = typeof participantId === 'object' ? `participant-${id || index}-${index}` : id || `participant-${index}`;
                       
                       return (
                         <div key={key}>
@@ -614,7 +659,7 @@ export default function Rounds() {
                               </div>
                               <div className="flex-1 min-w-0">
                                 <p className="font-medium text-gray-900 dark:text-white break-words group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200">{name}</p>
-                                <p className="text-sm text-gray-500 dark:text-gray-400 break-words">{participant.role}</p>
+                                <p className="text-sm text-gray-500 dark:text-gray-400 break-words">{participant.region}</p>
                               </div>
                               <svg className="w-4 h-4 text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -627,6 +672,7 @@ export default function Rounds() {
                               </div>
                               <div className="flex-1 min-w-0">
                                 <p className="font-medium text-gray-900 dark:text-white break-words">{name}</p>
+                                <p className="text-sm text-gray-500 dark:text-gray-400 break-words">{crewMember.roles ? crewMember.roles.join(', ') : crewMember.role}</p>
                               </div>
                             </div>
                           )}

@@ -131,7 +131,7 @@ export default function AdminDashboard() {
   if (error) {
     return (
       <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-        <p className="text-red-800 dark:text-red-200">Fehler beim Laden der Dashboard-Daten: {error}</p>
+        <p className="text-red-800 dark:text-red-200">Fehler beim Laden der Dashboard-Daten: {error?.message || error}</p>
       </div>
     );
   }

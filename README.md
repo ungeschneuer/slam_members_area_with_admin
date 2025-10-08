@@ -40,7 +40,6 @@ A full-stack Poetry Slam application with React frontend and Express.js backend 
 
 - Node.js 18+ 
 - PostgreSQL 15+
-- Redis (optional, for session storage)
 
 ### Installation
 
@@ -114,7 +113,6 @@ npm run test:coverage
    - Set `NODE_ENV=production`
    - Configure secure database credentials
    - Set up SSL certificates
-   - Configure Redis for session storage
 
 ## 📊 API Endpoints
 

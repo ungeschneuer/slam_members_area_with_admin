@@ -22,7 +22,7 @@ export default function AdminCountdown() {
   useEffect(() => {
     const fetchTimezoneName = async () => {
       try {
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/admin/settings`);
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/settings`);
         const data = await response.json();
         
         if (data.success && data.data.timezone) {
@@ -194,7 +194,7 @@ export default function AdminCountdown() {
               </svg>
             </div>
             <div className="ml-3">
-              <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
+              <p className="text-sm text-red-800 dark:text-red-200">{error?.message || error}</p>
             </div>
           </div>
         </div>

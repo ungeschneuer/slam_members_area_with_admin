@@ -13,6 +13,33 @@ import logger from '../config/logger.js';
 
 const router = express.Router();
 
+// Public settings endpoint (timezone and app info only)
+router.get('/settings', async (req, res) => {
+  try {
+    const startTime = startTiming();
+    
+    // Get timezone from environment variable
+    const timezone = process.env.APP_TIMEZONE || 'Europe/Berlin';
+    
+    const settings = {
+      timezone: timezone,
+      app_name: 'SLAM25 Members Area',
+      app_version: process.env.npm_package_version || '1.0.0'
+    };
+    
+    const duration = endTiming(startTime);
+    
+    logger.info('Public settings fetched', {
+      timezone,
+      duration: `${Math.round(duration)}ms`
+    });
+    
+    sendSuccessResponse(res, settings, 'GET_PUBLIC_SETTINGS', duration);
+  } catch (error) {
+    sendErrorResponse(res, error, 'Failed to fetch public settings');
+  }
+});
+
 // Admin settings endpoint
 router.get('/admin/settings', ...adminMiddleware(), async (req, res) => {
   try {
