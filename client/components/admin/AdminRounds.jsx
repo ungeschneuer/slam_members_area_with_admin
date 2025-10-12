@@ -645,7 +645,22 @@ export default function AdminRounds() {
 
   const handleUpdateRound = async (data) => {
     try {
-      await updateRound.mutateAsync({ id: editingRound.id, ...editingRound, ...data });
+      // Only send fields that the backend round validation expects
+      const roundData = {
+        title: data.title,
+        slug: data.slug,
+        date: data.date,
+        startTime: data.startTime,
+        endTime: data.endTime,
+        location: data.location,
+        address: data.address,
+        description: data.description,
+        afterPlayReport: data.afterPlayReport,
+        competitionType: data.competitionType,
+        totalJuryMembers: data.totalJuryMembers
+      };
+      
+      await updateRound.mutateAsync({ id: editingRound.id, ...roundData });
       setEditingRound(null);
     } catch (error) {
       console.error('Error updating round:', error);

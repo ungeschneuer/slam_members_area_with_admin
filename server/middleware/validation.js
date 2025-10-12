@@ -119,6 +119,12 @@ const validateRound = [
     .matches(/^[a-zA-ZäöüßÄÖÜ0-9\s\-'\.]+$/)
     .withMessage('Title contains invalid characters'),
   
+  body('slug')
+    .isLength({ min: 3, max: 100 })
+    .withMessage('Slug must be between 3 and 100 characters')
+    .matches(/^[a-z0-9-]+$/)
+    .withMessage('Slug must contain only lowercase letters, numbers, and hyphens'),
+  
   body('date')
     .isISO8601()
     .withMessage('Date must be a valid ISO 8601 date')
@@ -161,8 +167,18 @@ const validateRound = [
   
   body('competitionType')
     .optional()
-    .isIn(['Einzelwettbewerb', 'Teamwettbewerb', 'Show', 'Workshop'])
+    .isIn(['Einzelwettbewerb', 'Teamwettbewerb', 'U20-Wettbewerb'])
     .withMessage('Invalid competition type'),
+  
+  body('afterPlayReport')
+    .optional()
+    .isLength({ max: 2000 })
+    .withMessage('After play report must be less than 2000 characters'),
+  
+  body('totalJuryMembers')
+    .optional()
+    .isInt({ min: 1, max: 20 })
+    .withMessage('Total jury members must be between 1 and 20'),
   
   // Status is now calculated automatically based on date and time
   // No validation needed for status field
