@@ -1,26 +1,44 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { useRounds, useParticipants, useRoundBySlug } from '../hooks/index.js';
-import { getParticipantId } from '../utils/participantUtils.js';
+import { useRounds, useParticipants, useRoundBySlug, usePageTitle } from '../hooks/index.js';
 import LoadingSpinner from './LoadingSpinner.jsx';
 import { ErrorMessage, SuccessMessage } from './StatusMessages.jsx';
+import { translateRoundStatus, getRoundStatusIcon, getRoundStatusColor } from '../utils/categoryTranslations.js';
+import { calculateTotalScore, shouldStrikeScore } from '../utils/scoreCalculation.js';
+import { hasCrewRole, getCrewRolesFromAssignment } from '../utils/crewRoleUtils.js';
+import { 
+  createParticipantLookupMap, 
+  createAssignmentLookupMap, 
+  lookupParticipantData,
+  getParticipantFallbackName 
+} from '../utils/participantLookupUtils.js';
+import { getRegionFlag, getContentTypeIcon, getContentTypeGradient } from '../utils/detailViewUtils.js';
+import BackButton from './shared/BackButton.jsx';
 
 const RoundDetail = () => {
   const { slug } = useParams();
   const navigate = useNavigate();
   const { data: round, isLoading: roundLoading, error: roundError } = useRoundBySlug(slug);
-  const { data: participantsData, isLoading: participantsLoading, error: participantsError } = useParticipants();
-  const [participants, setParticipants] = useState([]);
+  
+  // Set dynamic page title
+  usePageTitle(round?.title || 'Laden...');
+  const { data: participantsResponse = [], isLoading: participantsLoading, error: participantsError } = useParticipants();
+  const participants = participantsResponse?.data || participantsResponse || [];
   const loading = roundLoading || participantsLoading;
   const error = roundError || participantsError;
 
-  // Round data is now provided directly by useRoundBySlug hook
+  // Optimized lookup maps for O(1) participant access
+  const participantLookup = useMemo(() => 
+    createParticipantLookupMap(participants), 
+    [participants]
+  );
 
-  useEffect(() => {
-    if (participantsData) {
-      setParticipants(Array.isArray(participantsData) ? participantsData : []);
-    }
-  }, [participantsData]);
+  const assignmentLookup = useMemo(() => 
+    round?.assignments ? createAssignmentLookupMap(round.assignments) : { participantMap: new Map(), teamMap: new Map() },
+    [round?.assignments]
+  );
+
+  // Round data is now provided directly by useRoundBySlug hook
 
   const formatDate = (date) => {
     if (!date) return '';
@@ -37,25 +55,9 @@ const RoundDetail = () => {
     return time;
   };
 
-  const getStatusColor = (status) => {
-    const colors = {
-      'upcoming': 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300',
-      'active': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300',
-      'completed': 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300',
-      'cancelled': 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300'
-    };
-    return colors[status] || 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-300';
-  };
-
-  const getStatusLabel = (status) => {
-    const labels = {
-      'upcoming': 'Anstehend',
-      'active': 'Aktiv',
-      'completed': 'Abgeschlossen',
-      'cancelled': 'Abgesagt'
-    };
-    return labels[status] || status;
-  };
+  // Use centralized status functions
+  const getStatusColor = (status) => getRoundStatusColor(status, true);
+  const getStatusLabel = (status) => translateRoundStatus(status);
 
   const getCompetitionTypeLabel = (type) => {
     const labels = {
@@ -67,8 +69,25 @@ const RoundDetail = () => {
   };
 
   const getParticipantById = (participantId) => {
-    const id = getParticipantId(participantId);
-    return participants.find(p => p.id === id);
+    // First try to find in participants array
+    const participant = participants.find(p => p.id === participantId);
+    if (participant) return participant;
+    
+    // If not found, try to construct from assignment data
+    // This handles cases where participant data is embedded in assignments
+    const assignment = round?.assignments?.find(a => a.participant_id === participantId);
+    if (assignment && assignment.participant_name) {
+      return {
+        id: assignment.participant_id,
+        name: assignment.participant_name,
+        slug: assignment.participant_slug,
+        region: assignment.participant_region,
+        pronouns: assignment.participant_pronouns,
+        instagram: assignment.participant_instagram
+      };
+    }
+    
+    return null;
   };
 
   const getParticipantName = (participantId) => {
@@ -76,15 +95,6 @@ const RoundDetail = () => {
     return participant ? participant.name : 'Unbekannte*r Teilnehmer*in';
   };
 
-  const calculateTotalScore = (scores) => {
-    if (!scores || scores.length === 0) return 0;
-    const sortedScores = [...scores].sort((a, b) => a - b);
-    // Remove highest and lowest scores
-    const trimmedScores = sortedScores.slice(1, -1);
-    // Calculate average of remaining scores
-    const sum = trimmedScores.reduce((acc, score) => acc + score, 0);
-    return sum / trimmedScores.length;
-  };
 
   if (loading) {
     return (
@@ -131,28 +141,27 @@ const RoundDetail = () => {
       <div className="max-w-4xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
-          <Link 
-            to="/rounds" 
-            className="inline-flex items-center text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 mb-4"
-          >
-            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
+          <BackButton to="/rounds" className="mb-4">
             Zurück zu den Runden
-          </Link>
+          </BackButton>
           
-          <div className="flex items-start justify-between mb-4">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-                {round.title}
-              </h1>
-              <div className="flex items-center space-x-4">
-                <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(round.status)}`}>
-                  {getStatusLabel(round.status)}
-                </span>
-                <span className="text-gray-600 dark:text-gray-400">
-                  {getCompetitionTypeLabel(round.competitionType)}
-                </span>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-8">
+            <div className="flex items-start space-x-4">
+              <div className={`w-16 h-16 bg-gradient-to-br ${getContentTypeGradient('round')} rounded-full flex items-center justify-center text-white text-2xl font-bold`}>
+                {getContentTypeIcon('round')}
+              </div>
+              <div className="flex-1">
+                <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+                  {round.title}
+                </h1>
+                <div className="flex items-center space-x-4">
+                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(round.calculatedStatus || round.status)}`}>
+                    {getRoundStatusIcon(round.calculatedStatus || round.status)} {getStatusLabel(round.calculatedStatus || round.status)}
+                  </span>
+                  <span className="text-gray-600 dark:text-gray-400">
+                    {getCompetitionTypeLabel(round.competition_type)}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -161,7 +170,7 @@ const RoundDetail = () => {
         {/* Main Content */}
         <div className="space-y-6">
           {/* Date & Time */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Zeitplan</h2>
             <div className="space-y-3">
               <div className="flex items-center">
@@ -179,14 +188,14 @@ const RoundDetail = () => {
                 </svg>
                 <div>
                   <div className="font-medium text-gray-900 dark:text-white">Zeit</div>
-                  <div className="text-gray-600 dark:text-gray-400">{formatTime(round.startTime)} - {formatTime(round.endTime)}</div>
+                  <div className="text-gray-600 dark:text-gray-400">{formatTime(round.start_time)} - {formatTime(round.end_time)}</div>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Location */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Ort</h2>
             <div className="space-y-3">
               <div className="flex items-start">
@@ -204,22 +213,44 @@ const RoundDetail = () => {
             </div>
           </div>
 
+          {/* Photos Cloud Link */}
+          {round.photos_cloud_url && (
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Fotos</h2>
+              <a
+                href={round.photos_cloud_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Zur Foto-Galerie öffnen (öffnet in neuem Tab)"
+                className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 font-medium"
+              >
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                Zur Foto-Galerie
+                <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+              </a>
+            </div>
+          )}
+
           {/* Competition Details */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Wettbewerbsdetails</h2>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Typ</div>
-                <div className="text-gray-900 dark:text-white">{getCompetitionTypeLabel(round.competitionType)}</div>
+                <div className="text-gray-900 dark:text-white">{getCompetitionTypeLabel(round.competition_type)}</div>
               </div>
               <div>
                 <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Jury-Mitglieder</div>
-                <div className="text-gray-900 dark:text-white">{round.totalJuryMembers}</div>
+                <div className="text-gray-900 dark:text-white">{round.total_jury_members}</div>
               </div>
-              {round.tournamentParticipants && round.tournamentParticipants.length > 0 && (
+              {round.assignments && round.assignments.filter(a => a.roles.includes('participant')).length > 0 && (
                 <div>
                   <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Teilnehmer*innen</div>
-                  <div className="text-gray-900 dark:text-white">{round.tournamentParticipants.length}</div>
+                  <div className="text-gray-900 dark:text-white">{round.assignments.filter(a => a.roles.includes('participant')).length}</div>
                 </div>
               )}
             </div>
@@ -227,7 +258,7 @@ const RoundDetail = () => {
 
           {/* Description */}
           {round.description && (
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700">
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Beschreibung</h2>
               <div className="prose dark:prose-invert max-w-none">
                 <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{round.description}</p>
@@ -236,149 +267,281 @@ const RoundDetail = () => {
           )}
 
           {/* Crew */}
-          {round.crew && Array.isArray(round.crew) && round.crew.length > 0 && (
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+          {round.assignments && round.assignments.filter(hasCrewRole).length > 0 && (
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700">
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Crew</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-                {round.crew.map((member, index) => {
-                  // Handle both old string format and new object format
-                  const isObject = typeof member === 'object' && member !== null;
-                  const participantId = isObject ? getParticipantId(member) : null;
-                  const role = isObject ? (member.roles || member.role) : null;
-                  const name = isObject ? getParticipantName(participantId) : member;
-                  const participant = participantId ? getParticipantById(participantId) : null;
-                  
-                  return (
-                    <div key={`crew-member-${participantId || index}-${index}`}>
-                      {participantId && participant ? (
-                        <Link
-                          to={`/participants/${participant.id}`}
-                          className="block p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors duration-200 group"
-                        >
-                          <div className="flex items-start space-x-3">
-                            <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-blue-600 rounded-full flex items-center justify-center text-white text-lg font-bold group-hover:scale-105 transition-transform duration-200 flex-shrink-0">
-                              {participant.name.charAt(0).toUpperCase()}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200 break-words leading-tight">
-                                {participant.name}
-                              </p>
-                              {role && (
-                                <p className="text-sm text-gray-500 dark:text-gray-400 break-words leading-tight mt-1">
-                                  {Array.isArray(role) ? role.join(', ') : role}
+                {round.assignments
+                  .filter(hasCrewRole)
+                  .map((assignment, index) => {
+                    const participant = getParticipantById(assignment.participant_id);
+                    const crewRoles = getCrewRolesFromAssignment(assignment);
+                    const crewLabel = crewRoles.join(', ');
+                    
+                    return (
+                      <div key={`crew-member-${assignment.participant_id}-${index}`}>
+                        {participant ? (
+                          <Link
+                            to={`/participants/${participant.slug}`}
+                            className="block p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors duration-200 group"
+                          >
+                            <div className="flex items-center space-x-3">
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200 break-words leading-tight">
+                                  {participant.name}
                                 </p>
-                              )}
-                            </div>
-                            <svg className="w-4 h-4 text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200 flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                            </svg>
-                          </div>
-                        </Link>
-                      ) : (
-                        <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                          <div className="flex items-start space-x-3">
-                            <div className="w-12 h-12 bg-gradient-to-br from-gray-400 to-gray-600 rounded-full flex items-center justify-center text-white text-lg font-bold flex-shrink-0">
-                              {name.charAt(0).toUpperCase()}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium text-gray-900 dark:text-white break-words leading-tight">
-                                {name}
-                              </p>
-                              {role && (
                                 <p className="text-sm text-gray-500 dark:text-gray-400 break-words leading-tight mt-1">
-                                  {Array.isArray(role) ? role.join(', ') : role}
+                                  {crewLabel}
                                 </p>
-                              )}
+                                {participant.region && (
+                                  <p className="text-xs text-gray-400 dark:text-gray-500 break-words mt-1">
+                                    {getRegionFlag(participant.region)} {participant.region}
+                                  </p>
+                                )}
+                              </div>
+                              <svg className="w-4 h-4 text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                              </svg>
+                            </div>
+                          </Link>
+                        ) : (
+                          <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                            <div className="flex items-center space-x-3">
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-gray-900 dark:text-white break-words leading-tight">
+                                  {assignment.participant_name}
+                                </p>
+                                <p className="text-sm text-gray-500 dark:text-gray-400 break-words leading-tight mt-1">
+                                  {crewLabel}
+                                </p>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                        )}
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          )}
+
+          {/* Moderation */}
+          {round.assignments && round.assignments.filter(a => a.roles.includes('moderator')).length > 0 && (
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Moderation</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+                {round.assignments
+                  .filter(assignment => assignment.roles.includes('moderator'))
+                  .map((assignment, index) => {
+                    const participant = getParticipantById(assignment.participant_id);
+                    const description = assignment.metadata?.description || '';
+                    
+                    return (
+                      <div key={`moderator-${assignment.participant_id}-${index}`}>
+                        {participant ? (
+                          <Link
+                            to={`/participants/${participant.slug}`}
+                            className="block p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors duration-200 group"
+                          >
+                            <div className="flex items-center space-x-3">
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-gray-900 dark:text-white group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors duration-200 break-words leading-tight">
+                                  {participant.name}
+                                </p>
+                                {description && (
+                                  <p className="text-sm text-gray-500 dark:text-gray-400 break-words leading-tight mt-1">
+                                    {description}
+                                  </p>
+                                )}
+                                {participant.region && (
+                                  <p className="text-xs text-gray-400 dark:text-gray-500 break-words mt-1">
+                                    {getRegionFlag(participant.region)} {participant.region}
+                                  </p>
+                                )}
+                              </div>
+                              <svg className="w-4 h-4 text-gray-400 group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors duration-200 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                              </svg>
+                            </div>
+                          </Link>
+                        ) : (
+                          <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                            <div className="flex items-center space-x-3">
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-gray-900 dark:text-white break-words leading-tight">
+                                  {assignment.participant_name}
+                                </p>
+                                {description && (
+                                  <p className="text-sm text-gray-500 dark:text-gray-400 break-words leading-tight mt-1">
+                                    {description}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
               </div>
             </div>
           )}
 
           {/* Feature Artists */}
-          {round.featureArtists && Array.isArray(round.featureArtists) && round.featureArtists.length > 0 && (
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Feature Artists</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {round.featureArtists.map((artist, index) => {
-                  // Handle both old string format and new object format
-                  const isObject = typeof artist === 'object' && artist !== null;
-                  const participantId = isObject ? getParticipantId(artist) : null;
-                  const role = isObject ? artist.role : null;
-                  const name = isObject ? getParticipantName(participantId) : artist;
-                  const participant = participantId ? getParticipantById(participantId) : null;
-                  
-                  return (
-                    <div key={`feature-artist-${participantId || index}-${index}`}>
-                      {participantId && participant ? (
-                        <Link
-                          to={`/participants/${participant.id}`}
-                          className="block p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors duration-200 group"
-                        >
-                          <div className="flex items-start space-x-3">
-                            <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center text-white text-lg font-bold group-hover:scale-105 transition-transform duration-200 flex-shrink-0">
-                              {participant.name.charAt(0).toUpperCase()}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium text-gray-900 dark:text-white break-words group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors duration-200 leading-tight">
-                                {participant.name}
-                              </p>
-                              {role && (
-                                <p className="text-sm text-gray-500 dark:text-gray-400 break-words leading-tight mt-1">
-                                  {Array.isArray(role) ? role.join(', ') : role}
+          {round.assignments && round.assignments.filter(a => a.roles.includes('feature_artist')).length > 0 && (
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Feature-Künstler*innen</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+                {round.assignments
+                  .filter(assignment => assignment.roles.includes('feature_artist'))
+                  .map((assignment, index) => {
+                    // Handle both participants and teams as feature artists
+                    const participant = getParticipantById(assignment.participant_id);
+                    const isTeam = assignment.team_id && assignment.team_name;
+                    const order = assignment.metadata?.display_order || 0;
+                    const description = assignment.metadata?.description || '';
+                    
+                    if (isTeam) {
+                      // Display team as feature artist
+                      const teamName = assignment.team_name || 'Unbekanntes Team';
+                      const teamMembers = assignment.team_members || [];
+                      
+                      return (
+                        <div key={`feature-team-${assignment.team_id}-${index}`}>
+                          <Link
+                            to={`/teams/${assignment.team_slug || 'unknown'}`}
+                            className="block p-4 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-lg hover:from-purple-100 to-pink-100 dark:hover:from-purple-900/30 dark:hover:to-pink-900/30 transition-colors duration-200 group border border-purple-200 dark:border-purple-800"
+                          >
+                            <div className="flex items-center space-x-3">
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-gray-900 dark:text-white break-words group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors duration-200 leading-tight">
+                                  {teamName}
                                 </p>
-                              )}
+                                {order > 0 && (
+                                  <p className="text-sm text-gray-500 dark:text-gray-400 break-words leading-tight mt-1">
+                                    #{order}
+                                  </p>
+                                )}
+                                {description && (
+                                  <p className="text-sm text-gray-500 dark:text-gray-400 break-words leading-tight mt-1">
+                                    {description}
+                                  </p>
+                                )}
+                                {teamMembers.length > 0 && (
+                                  <div className="mt-2">
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Team Members:</p>
+                                    <div className="flex flex-wrap gap-1">
+                                      {teamMembers.map((member, memberIndex) => (
+                                        <span
+                                          key={memberIndex}
+                                          className="inline-flex items-center px-2 py-1 rounded text-xs bg-purple-100 text-purple-800 dark:bg-purple-800 dark:text-purple-200"
+                                        >
+                                          {member.name}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                              <svg className="w-4 h-4 text-gray-400 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors duration-200 flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                              </svg>
                             </div>
-                            <svg className="w-4 h-4 text-gray-400 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors duration-200 flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                            </svg>
-                          </div>
-                        </Link>
-                      ) : (
-                        <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                          <div className="flex items-start space-x-3">
-                            <div className="w-12 h-12 bg-gradient-to-br from-gray-400 to-gray-600 rounded-full flex items-center justify-center text-white text-lg font-bold flex-shrink-0">
-                              {name.charAt(0).toUpperCase()}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium text-gray-900 dark:text-white break-words leading-tight">
-                                {name}
-                              </p>
-                              {role && (
-                                <p className="text-sm text-gray-500 dark:text-gray-400 break-words leading-tight mt-1">
-                                  {Array.isArray(role) ? role.join(', ') : role}
-                                </p>
-                              )}
-                            </div>
-                          </div>
+                          </Link>
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
+                      );
+                    } else {
+                      // Display individual participant as feature artist
+                      const name = participant ? participant.name : assignment.participant_name || 'Unbekannte*r Feature-Künstler*in';
+                      
+                      return (
+                        <div key={`feature-participant-${assignment.participant_id}-${index}`}>
+                          {participant ? (
+                            <Link
+                              to={`/participants/${participant.slug}`}
+                              className="block p-4 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-lg hover:from-purple-100 to-pink-100 dark:hover:from-purple-900/30 dark:hover:to-pink-900/30 transition-colors duration-200 group"
+                            >
+                              <div className="flex items-center space-x-3">
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium text-gray-900 dark:text-white break-words group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors duration-200 leading-tight">
+                                    {name}
+                                  </p>
+                                  {order > 0 && (
+                                    <p className="text-sm text-gray-500 dark:text-gray-400 break-words leading-tight mt-1">
+                                      #{order}
+                                    </p>
+                                  )}
+                                  {description && (
+                                    <p className="text-sm text-gray-500 dark:text-gray-400 break-words leading-tight mt-1">
+                                      {description}
+                                    </p>
+                                  )}
+                                  {participant.region && (
+                                    <p className="text-xs text-gray-400 dark:text-gray-500 break-words mt-1">
+                                      {getRegionFlag(participant.region)} {participant.region}
+                                    </p>
+                                  )}
+                                </div>
+                                <svg className="w-4 h-4 text-gray-400 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors duration-200 flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                </svg>
+                              </div>
+                            </Link>
+                          ) : (
+                            <div className="p-4 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-lg">
+                              <div className="flex items-center space-x-3">
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium text-gray-900 dark:text-white break-words leading-tight">
+                                    {name}
+                                  </p>
+                                  {order > 0 && (
+                                    <p className="text-sm text-gray-500 dark:text-gray-400 break-words leading-tight mt-1">
+                                      #{order}
+                                    </p>
+                                  )}
+                                  {description && (
+                                    <p className="text-sm text-gray-500 dark:text-gray-400 break-words leading-tight mt-1">
+                                      {description}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
+                  })}
               </div>
             </div>
           )}
 
+
           {/* Groups and Results */}
           {round.groups && round.groups.length > 0 && (
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700">
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Gruppen & Ergebnisse</h2>
               <div className="space-y-6">
                 {round.groups.map((group, groupIndex) => (
-                  <div key={groupIndex} className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                    <h3 className="font-semibold text-gray-900 dark:text-white mb-3">Gruppe {groupIndex + 1}</h3>
-                    <div className="space-y-3">
-                      {group.participants && group.participants.map((participant, participantIndex) => {
-                        const participantData = participants.find(p => p.id === getParticipantId(participant));
-                        const scores = participant.juryScores || [];
-                        const totalScore = calculateTotalScore(scores);
-                        const isWinner = participant.isWinner;
+                    <div key={groupIndex} className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                      <h3 className="font-semibold text-gray-900 dark:text-white mb-3">Gruppe {groupIndex + 1}</h3>
+                      <div className="space-y-3">
+                        {group.participants && group.participants
+                          .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0))
+                          .map((participant, participantIndex) => {
+                          // Use centralized participant lookup logic
+                          const participantData = lookupParticipantData(
+                            participant, 
+                            participantLookup, 
+                            assignmentLookup, 
+                            round?.assignments || []
+                          );
+                          const isTeam = participantData?.isTeam || false;
+                          
+                          const scores = participant.juryScores || [];
+                          const totalScore = calculateTotalScore(scores);
+                          const isWinner = participant.isWinner;
+                          const hasScores = scores.length > 0 && scores.some(score => score > 0);
                         
                         return (
                           <div key={participantIndex} className={`p-4 rounded-lg border ${
@@ -396,59 +559,93 @@ const RoundDetail = () => {
                               </div>
                               <div className="min-w-0 flex-1">
                                 {participantData ? (
-                                  <Link
-                                    to={`/participants/${getParticipantId(participant)}`}
-                                    className={`block font-semibold text-base sm:text-lg break-words hover:underline transition-colors duration-200 ${
-                                      isWinner ? 'text-yellow-800 dark:text-yellow-200 hover:text-yellow-600 dark:hover:text-yellow-400' : 'text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400'
-                                    }`}
-                                  >
-                                    {participantData.name}
-                                    {isWinner && <span className="ml-2">👑</span>}
-                                  </Link>
+                                  <div>
+                                    {isTeam ? (
+                                      <div>
+                                        <Link
+                                          to={`/teams/${participantData.slug}`}
+                                          className={`block font-semibold text-base sm:text-lg break-words hover:underline transition-colors duration-200 ${
+                                            isWinner ? 'text-yellow-800 dark:text-yellow-200 hover:text-yellow-600 dark:hover:text-yellow-400' : 'text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400'
+                                          }`}
+                                        >
+                                          {participantData.name}
+                                          {isWinner && <span className="ml-2">👑</span>}
+                                        </Link>
+                                        <p className="text-sm text-gray-500 dark:text-gray-400 break-words">
+                                          Team • {participantData.region}
+                                        </p>
+                                        {participantData.teamMembers && participantData.teamMembers.length > 0 && (
+                                          <div className="mt-2">
+                                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Teammitglieder:</p>
+                                            <div className="flex flex-wrap gap-1">
+                                              {participantData.teamMembers.map((member, memberIndex) => (
+                                                <span
+                                                  key={memberIndex}
+                                                  className="inline-flex items-center px-2 py-1 rounded text-xs bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-200"
+                                                >
+                                                  {member.name}
+                                                </span>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <div>
+                                        <Link
+                                          to={`/participants/${participantData.slug}`}
+                                          className={`block font-semibold text-base sm:text-lg break-words hover:underline transition-colors duration-200 ${
+                                            isWinner ? 'text-yellow-800 dark:text-yellow-200 hover:text-yellow-600 dark:hover:text-yellow-400' : 'text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400'
+                                          }`}
+                                        >
+                                          {participantData.name}
+                                          {isWinner && <span className="ml-2">👑</span>}
+                                        </Link>
+                                        <p className="text-sm text-gray-500 dark:text-gray-400 break-words">
+                                          {participantData.region}
+                                        </p>
+                                      </div>
+                                    )}
+                                  </div>
                                 ) : (
                                   <p className={`font-semibold text-base sm:text-lg break-words ${
                                     isWinner ? 'text-yellow-800 dark:text-yellow-200' : 'text-gray-900 dark:text-white'
                                   }`}>
-                                    Teilnehmer*innen {getParticipantId(participant)}
+                                    {getParticipantFallbackName(participant, participantIndex)}
                                     {isWinner && <span className="ml-2">👑</span>}
                                   </p>
                                 )}
-                                {participantData && (
-                                  <p className="text-sm text-gray-500 dark:text-gray-400 break-words">
-                                    {participantData.role} • {participantData.region}
+                              </div>
+                              {/* Only show total score if there are scores */}
+                              {hasScores && (
+                                <div className="text-right flex-shrink-0">
+                                  <p className={`font-bold text-lg ${
+                                    isWinner ? 'text-yellow-800 dark:text-yellow-200' : 'text-gray-900 dark:text-white'
+                                  }`}>
+                                    {totalScore.toFixed(1)}
                                   </p>
-                                )}
-                              </div>
-                              <div className="text-right flex-shrink-0">
-                                <p className={`font-bold text-lg ${
-                                  isWinner ? 'text-yellow-800 dark:text-yellow-200' : 'text-gray-900 dark:text-white'
-                                }`}>
-                                  {totalScore.toFixed(1)}
-                                </p>
-                                <p className="text-xs text-gray-500 dark:text-gray-400">
-                                  Gesamtpunktzahl
-                                </p>
-                              </div>
+                                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                                    Gesamtpunktzahl
+                                  </p>
+                                </div>
+                              )}
                             </div>
                             
-                            {/* Jury Scores */}
-                            {scores.length > 0 && (
+                            {/* Jury Scores - only show if there are scores */}
+                            {hasScores && (
                               <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
                                 <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                   Jury-Bewertungen:
                                 </p>
                                 <div className="flex flex-wrap gap-2">
                                   {scores.map((score, scoreIndex) => {
-                                    const isHighest = score === Math.max(...scores);
-                                    const isLowest = score === Math.min(...scores);
-                                    const isDuplicate = scores.filter(s => s === score).length > 1;
-                                    const shouldStrike = (isHighest && isDuplicate) || (isLowest && isDuplicate);
+                                    const isStruck = shouldStrikeScore(score, scores, scoreIndex);
                                     
                                     return (
                                       <span
                                         key={scoreIndex}
                                         className={`px-2 py-1 rounded text-sm font-medium ${
-                                          shouldStrike 
+                                          isStruck 
                                             ? 'line-through text-gray-400 dark:text-gray-500' 
                                             : 'text-gray-700 dark:text-gray-300'
                                         }`}
@@ -471,8 +668,8 @@ const RoundDetail = () => {
           )}
 
           {/* Participants when no groups are set */}
-          {round.tournamentParticipants && round.tournamentParticipants.length > 0 && (!round.groups || round.groups.length === 0) && (
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+          {round.assignments && round.assignments.filter(a => a.roles.includes('participant')).length > 0 && (!round.groups || round.groups.length === 0) && (
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700">
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Teilnehmer*innen</h2>
               <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-4">
                 <div className="flex items-center">
@@ -485,65 +682,127 @@ const RoundDetail = () => {
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-                {round.tournamentParticipants.map((participant, index) => {
-                  const id = getParticipantId(participant);
-                  const name = participant.name || 'Unbekannte*r Teilnehmer*in';
-                  const key = `participant-${id || index}`;
-                  
-                  return (
-                    <div key={key}>
-                      {participant ? (
-                        <Link
-                          to={`/participants/${id}`}
-                          className="block p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors duration-200 group"
-                        >
-                          <div className="flex items-start space-x-3">
-                            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-lg font-bold group-hover:scale-105 transition-transform duration-200 flex-shrink-0">
-                              {participant.name.charAt(0).toUpperCase()}
+                {round.assignments
+                  .filter(assignment => assignment.roles.includes('participant'))
+                  .map((assignment, index) => {
+                    // Handle both participants and teams
+                    const participant = getParticipantById(assignment.participant_id);
+                    const isTeam = assignment.team_id && assignment.team_name;
+                    
+                    if (isTeam) {
+                      // Display team
+                      const teamName = assignment.team_name || 'Unbekanntes Team';
+                      const teamRegion = assignment.team_region || '';
+                      const teamMembers = assignment.team_members || [];
+                      const key = `team-${assignment.team_id}-${index}`;
+                      
+                      return (
+                        <div key={key} className="h-32">
+                          <Link
+                            to={`/teams/${assignment.team_slug || 'unknown'}`}
+                            className="block h-full p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors duration-200 group border border-blue-200 dark:border-blue-800"
+                          >
+                            <div className="flex flex-col h-full">
+                              <div className="flex items-start space-x-3 flex-1 min-h-0">
+                                <div className="flex-1 min-w-0 overflow-hidden">
+                                  <p className="font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200 break-words leading-tight" style={{display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'}}>
+                                    {teamName}
+                                  </p>
+                                  <p className="text-sm text-gray-500 dark:text-gray-400 break-words leading-tight mt-1" style={{display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', overflow: 'hidden'}}>
+                                    {teamRegion}
+                                  </p>
+                                </div>
+                                <svg className="w-4 h-4 text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200 flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                </svg>
+                              </div>
+                              {teamMembers.length > 0 && (
+                                <div className="mt-2 flex-shrink-0">
+                                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Team Members:</p>
+                                  <div className="flex flex-wrap gap-1 max-h-12 overflow-hidden">
+                                    {teamMembers.map((member, memberIndex) => (
+                                      <span
+                                        key={memberIndex}
+                                        className="inline-flex items-center px-2 py-1 rounded text-xs bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-200"
+                                      >
+                                        {member.name}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200 break-words leading-tight">
-                                {participant.name}
-                              </p>
-                              <p className="text-sm text-gray-500 dark:text-gray-400 break-words leading-tight mt-1">
-                                {participant.region}
-                              </p>
-                            </div>
-                            <svg className="w-4 h-4 text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200 flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                            </svg>
-                          </div>
-                        </Link>
-                      ) : (
-                        <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                          <div className="flex items-start space-x-3">
-                            <div className="w-12 h-12 bg-gradient-to-br from-gray-400 to-gray-600 rounded-full flex items-center justify-center text-white text-lg font-bold flex-shrink-0">
-                              {name.charAt(0).toUpperCase()}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium text-gray-900 dark:text-white break-words leading-tight">
-                                {name}
-                              </p>
-                            </div>
-                          </div>
+                          </Link>
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
+                      );
+                    } else {
+                      // Display individual participant
+                      const name = assignment.participant_name || 'Unbekannte*r Teilnehmer*in';
+                      const key = `participant-${assignment.participant_id}-${index}`;
+                      
+                      return (
+                        <div key={key} className="h-32">
+                          {participant ? (
+                            <Link
+                              to={`/participants/${participant.slug}`}
+                              className="block h-full p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors duration-200 group"
+                            >
+                              <div className="flex items-center space-x-3 h-full">
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200 break-words leading-tight">
+                                    {participant.name}
+                                  </p>
+                                  {participant.region && (
+                                    <p className="text-xs text-gray-400 dark:text-gray-500 break-words mt-1">
+                                      {getRegionFlag(participant.region)} {participant.region}
+                                    </p>
+                                  )}
+                                </div>
+                                <svg className="w-4 h-4 text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                </svg>
+                              </div>
+                            </Link>
+                          ) : (
+                            <div className="h-full p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                              <div className="flex items-center space-x-3 h-full">
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium text-gray-900 dark:text-white break-words leading-tight">
+                                    {name}
+                                  </p>
+                                  {assignment.participant_region && (
+                                    <p className="text-xs text-gray-400 dark:text-gray-500 break-words mt-1">
+                                      {getRegionFlag(assignment.participant_region)} {assignment.participant_region}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
+                  })}
               </div>
             </div>
           )}
 
           {/* After Play Report */}
-          {round.afterPlayReport && (
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+          {round.after_play_report && (
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700">
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Nachbericht</h2>
               <div className="prose dark:prose-invert max-w-none">
-                <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{round.afterPlayReport}</p>
+                <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{round.after_play_report}</p>
               </div>
             </div>
           )}
+        </div>
+
+        {/* Bottom Back Button */}
+        <div className="mt-8">
+          <BackButton to="/rounds">
+            Zurück zu den Runden
+          </BackButton>
         </div>
       </div>
     </div>

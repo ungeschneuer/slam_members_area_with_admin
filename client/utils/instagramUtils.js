@@ -28,20 +28,31 @@ export const formatInstagramUrl = (instagram) => {
  * @returns {string} - Canonical Instagram URL or empty string if invalid
  */
 export const normalizeInstagramInput = (input) => {
-  if (!input) return '';
-  let value = String(input).trim();
-  
-  // Strip protocol/domain if a full URL was pasted
-  value = value.replace(/^https?:\/\/(www\.)?instagram\.com\//i, '');
-  
-  // Remove leading @
-  value = value.replace(/^@/, '');
-  
-  // Remove trailing slash
-  value = value.replace(/\/$/, '');
-  
-  if (!value) return '';
-  return `https://instagram.com/${value}`;
+  try {
+    if (!input) return '';
+    let value = String(input).trim();
+    
+    // Handle empty string after trim
+    if (!value) return '';
+    
+    // Strip protocol/domain if a full URL was pasted
+    value = value.replace(/^https?:\/\/(www\.)?instagram\.com\//i, '');
+    
+    // Remove multiple leading @ symbols (fix double @@ issue)
+    value = value.replace(/^@+/, '');
+    
+    // Remove trailing slash
+    value = value.replace(/\/$/, '');
+    
+    // Handle empty string after cleaning
+    if (!value) return '';
+    
+    return `https://instagram.com/${value}`;
+  } catch (error) {
+    // Log warning but don't throw - graceful degradation
+    console.warn('Instagram input normalization failed:', error);
+    return '';
+  }
 };
 
 /**

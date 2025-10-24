@@ -1,0 +1,114 @@
+---
+alwaysApply: true
+description: Simplified state management patterns
+---
+
+# State Management - Simplified
+
+## Single Source of Truth
+
+This project uses **React Query + React Context** for all state management. No complex stores or WebSocket state.
+
+## Server State (TanStack Query)
+
+### Data Fetching
+```javascript
+// ✅ Simple data fetching
+const { data: participants, isLoading, error } = useQuery({
+  queryKey: ['participants'],
+  queryFn: fetchParticipants,
+  staleTime: 5 * 60 * 1000 // 5 minutes
+});
+```
+
+### Mutations
+```javascript
+// ✅ Simple mutations
+const createParticipant = useMutation({
+  mutationFn: createParticipantAPI,
+  onSuccess: () => {
+    queryClient.invalidateQueries(['participants']);
+  }
+});
+```
+
+### Real-time Updates
+```javascript
+// ✅ Simple polling (no WebSockets)
+const { data } = useQuery({
+  queryKey: ['participants'],
+  queryFn: fetchParticipants,
+  refetchInterval: 30000 // 30 seconds
+});
+```
+
+## Local State (React Context)
+
+### Theme Context
+```javascript
+// ✅ Simple theme management
+const { theme, setTheme } = useTheme();
+const toggleTheme = () => setTheme(theme === 'light' ? 'dark' : 'light');
+```
+
+### Auth Context
+```javascript
+// ✅ Simple authentication
+const { user, login, logout } = useAuth();
+const isAuthenticated = !!user;
+```
+
+### UI Context
+```javascript
+// ✅ Simple UI state
+const { mobileMenuOpen, setMobileMenuOpen } = useUI();
+```
+
+## Component State (useState)
+
+### Local Component State
+```javascript
+// ✅ Simple component state
+const [isOpen, setIsOpen] = useState(false);
+const [formData, setFormData] = useState({});
+```
+
+## Anti-Patterns to Avoid
+
+### ❌ Complex State Management
+```javascript
+// ❌ DON'T use Zustand or Redux
+const store = useStore();
+const dispatch = useDispatch();
+```
+
+### ❌ WebSocket State
+```javascript
+// ❌ DON'T use WebSocket state
+const [socketConnected, setSocketConnected] = useState(false);
+const [realTimeData, setRealTimeData] = useState([]);
+```
+
+### ❌ Custom Stores
+```javascript
+// ❌ DON'T create custom stores
+const useCustomStore = create((set) => ({
+  // complex state logic
+}));
+```
+
+## State Flow
+
+1. **Server State** → TanStack Query
+2. **Theme State** → ThemeContext
+3. **Auth State** → AuthContext  
+4. **UI State** → UIContext
+5. **Component State** → useState
+
+## Benefits
+
+- **Simple** - Easy to understand and debug
+- **Predictable** - Clear data flow
+- **Maintainable** - Easy to modify
+- **Testable** - Simple to test
+- **Performance** - Optimized caching

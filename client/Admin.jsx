@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import authService from './services/authService.js';
-import adminAuthService from './services/adminAuthService.js';
 import { AdminLayout } from './components/admin/AdminLayout.jsx';
+import ErrorBoundary from './components/ErrorBoundary.jsx';
+import { usePageTitle } from './hooks/index.js';
 
 // Import all admin components
 import AdminDashboard from './components/admin/AdminDashboard.jsx';
 import AdminParticipants from './components/admin/AdminParticipants';
+import TeamsAdmin from './components/admin/TeamsAdmin.jsx';
 import AdminRounds from './components/admin/AdminRounds';
 import AdminNews from './components/admin/AdminNews';
 import AdminNewsCreate from './components/admin/AdminNewsCreate.jsx';
@@ -16,12 +18,11 @@ import AdminInfoPages from './components/admin/AdminInfoPages';
 import AdminLinks from './components/admin/AdminLinks';
 import AdminSchnellzugriff from './components/admin/AdminSchnellzugriff.jsx';
 import AdminCountdown from './components/admin/AdminCountdown';
-import AdminPerformance from './components/admin/AdminPerformance.jsx';
-import AdminSecurity from './components/admin/AdminSecurity.jsx';
-import AdminAnalytics from './components/admin/AdminAnalytics.jsx';
-import AdminCache from './components/admin/AdminCache.jsx';
+// AdminPerformance and AdminSecurity removed as part of simplification
+// AdminAnalytics, AdminCache, and OperationLogViewer removed as part of simplification
 
 function AdminLogin({ onLogin }) {
+  usePageTitle('Admin Login');
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -36,8 +37,7 @@ function AdminLogin({ onLogin }) {
 
     try {
       // Use the unified authService for all environments
-      const auth = authService;
-      const result = await auth.login(email, password, rememberMe);
+      const result = await authService.login(email, password, rememberMe);
       
       if (result.success) {
         setLoginAttempts(0);
@@ -176,6 +176,7 @@ function AdminPanel() {
         
         {/* Competition */}
         <Route path="/participants" element={<AdminParticipants />} />
+        <Route path="/teams" element={<TeamsAdmin />} />
         <Route path="/rounds" element={<AdminRounds />} />
         <Route path="/timetable" element={<AdminTimetable />} />
         
@@ -190,11 +191,7 @@ function AdminPanel() {
         <Route path="/schnellzugriff" element={<AdminSchnellzugriff />} />
         <Route path="/countdown" element={<AdminCountdown />} />
         
-        {/* System */}
-        <Route path="/analytics" element={<AdminAnalytics />} />
-        <Route path="/performance" element={<AdminPerformance />} />
-        <Route path="/security" element={<AdminSecurity />} />
-        <Route path="/cache" element={<AdminCache />} />
+        {/* System routes removed as part of simplification */}
         
         {/* Redirect unknown routes to dashboard */}
         <Route path="*" element={<Navigate to="/admin" replace />} />
@@ -206,6 +203,7 @@ function AdminPanel() {
 
 
 export default function Admin() {
+  usePageTitle('Admin Dashboard');
   const [authed, setAuthed] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -213,7 +211,7 @@ export default function Admin() {
   useEffect(() => {
     const initializeAuth = async () => {
       try {
-        console.log('Initializing admin authentication with cookies...');
+        if (import.meta.env.DEV) console.log('Initializing admin authentication with cookies...');
         
         // Prefer adminAuthService if available (test/mocked env)
         let adminAuthed = false;
@@ -228,7 +226,7 @@ export default function Admin() {
         } catch {}
 
         if (adminAuthed) {
-          console.log('AdminAuthService indicates authenticated state');
+          if (import.meta.env.DEV) console.log('AdminAuthService indicates authenticated state');
           setAuthed(true);
         } else {
           // Initialize the authService and fallback check (only if not already initializing)
@@ -238,15 +236,15 @@ export default function Admin() {
             }
           }
           if (typeof authService.isLoggedIn === 'function' && authService.isLoggedIn()) {
-            console.log('Authentication successful via service:', authService.getCurrentUserSync?.());
+            if (import.meta.env.DEV) console.log('Authentication successful via service:', authService.getCurrentUserSync?.());
             setAuthed(true);
           } else {
-            console.log('No valid authentication found');
+            if (import.meta.env.DEV) console.log('No valid authentication found');
             setAuthed(false);
           }
         }
       } catch (error) {
-        console.error('Authentication initialization failed:', error);
+        if (import.meta.env.DEV) console.error('Authentication initialization failed:', error);
         setAuthed(false);
       } finally {
         setLoading(false);
@@ -263,11 +261,11 @@ export default function Admin() {
         try {
           // Use authService to check authentication
           if (!authService.isLoggedIn()) {
-            console.log('Authentication expired, logging out');
+            if (import.meta.env.DEV) console.log('Authentication expired, logging out');
             setAuthed(false);
           }
         } catch (error) {
-          console.error('Authentication check failed:', error);
+          if (import.meta.env.DEV) console.error('Authentication check failed:', error);
           setAuthed(false);
         }
       }, 60000); // Check every minute
@@ -291,7 +289,11 @@ export default function Admin() {
     return <AdminLogin onLogin={() => setAuthed(true)} />;
   }
 
-  return <AdminPanel />;
+  return (
+    <ErrorBoundary name="AdminPanel" showDetails>
+      <AdminPanel />
+    </ErrorBoundary>
+  );
 }
 
 export const __testExports = { AdminLogin };

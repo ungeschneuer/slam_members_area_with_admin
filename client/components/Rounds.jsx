@@ -1,184 +1,306 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { useRounds, useParticipants } from '../hooks/index.js';
-import { getParticipantId } from '../utils/participantUtils.js';
+import { useRounds, useParticipants, usePageTitle } from '../hooks/index.js';
 import LoadingSpinner from './LoadingSpinner.jsx';
 import { ErrorMessage, SuccessMessage } from './StatusMessages.jsx';
+import { translateRoundStatus, getRoundStatusIcon, getRoundStatusColor } from '../utils/categoryTranslations.js';
+import { hasCrewRole, getCrewRolesFromAssignment } from '../utils/crewRoleUtils.js';
+import { createParticipantLookupMap } from '../utils/participantLookupUtils.js';
+import { getAvailableContentFilterOptions, getAvailableComplexFilterOptions, validateFilterValue } from '../utils/filterUtils.js';
 
 export default function Rounds() {
-  const { data: roundsData, isLoading: roundsLoading, error: roundsError } = useRounds();
-  const { data: participantsData, isLoading: participantsLoading, error: participantsError } = useParticipants();
-  const [rounds, setRounds] = useState([]);
-  const [participants, setParticipants] = useState([]);
+  usePageTitle('Runden');
+  const { data: rounds = [], isLoading: roundsLoading, error: roundsError } = useRounds();
+  const { data: participantsResponse = [], isLoading: participantsLoading, error: participantsError } = useParticipants();
+  const participants = participantsResponse?.data || participantsResponse || [];
   const loading = roundsLoading || participantsLoading;
   const error = roundsError || participantsError;
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [competitionTypeFilter, setCompetitionTypeFilter] = useState('all');
-  const [selectedRound, setSelectedRound] = useState(null);
+  const [dateFilter, setDateFilter] = useState('all');
   const [success, setSuccess] = useState(null);
 
-  // Update local state when useLiveData changes
-  useEffect(() => {
-    if (roundsData) {
-      setRounds(Array.isArray(roundsData) ? roundsData : []);
-    }
-  }, [roundsData]);
+  // Optimized lookup maps for O(1) participant access
+  const participantLookup = useMemo(() => 
+    createParticipantLookupMap(participants), 
+    [participants]
+  );
 
-  useEffect(() => {
-    if (participantsData) {
-      setParticipants(Array.isArray(participantsData) ? participantsData : []);
-    }
-  }, [participantsData]);
+  // Extract matching logic to reusable functions
+  const matchesSearchFilter = (round, search, participantLookup) => {
+    if (!search) return true;
+    const searchLower = search.toLowerCase();
+    
+    const basicSearch = (round.title || '').toLowerCase().includes(searchLower) ||
+                       (round.location || '').toLowerCase().includes(searchLower);
+    
+    // Optimize participant search - only search if basic search fails
+    if (basicSearch) return true;
+    
+    // Early return if no assignments to avoid expensive search
+    if (!round.assignments || round.assignments.length === 0) return false;
+    
+    const participantSearch = round.assignments.some(assignment => {
+      const participant = participantLookup[assignment.participant_id];
+      return participant && participant.name.toLowerCase().includes(searchLower);
+    });
+    
+    return participantSearch;
+  };
 
-  // Handle anchor links from dashboard
-  useEffect(() => {
-    const handleHashChange = () => {
-      const hash = window.location.hash;
-      if (hash && hash.startsWith('#round-')) {
-        const roundId = parseInt(hash.replace('#round-', ''));
-        const round = rounds.find(r => r.id === roundId);
-        if (round) {
-          setSelectedRound(round);
-          // Scroll to the round after a short delay to ensure rendering
-          setTimeout(() => {
-            const element = document.getElementById(`round-${roundId}`);
-            if (element) {
-              element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
-          }, 100);
-        }
+  const matchesStatusFilter = (round, statusFilter) => {
+    return statusFilter === 'all' || (round.calculatedStatus || round.status) === statusFilter;
+  };
+
+  const matchesCompetitionTypeFilter = (round, competitionTypeFilter) => {
+    return competitionTypeFilter === 'all' || round.competition_type === competitionTypeFilter;
+  };
+
+  const matchesDateFilter = (round, dateFilter) => {
+    return dateFilter === 'all' || round.date === dateFilter;
+  };
+
+  // Predefined filter options
+  const predefinedStatusOptions = [
+    { id: 'all', name: 'Alle Status' },
+    { id: 'upcoming', name: 'Anstehend' },
+    { id: 'active', name: 'Aktiv' },
+    { id: 'completed', name: 'Abgeschlossen' }
+  ];
+
+  const predefinedCompetitionTypeOptions = [
+    { id: 'all', name: 'Alle Typen' },
+    { id: 'Einzelwettbewerb', name: 'Einzel' },
+    { id: 'Teamwettbewerb', name: 'Team' },
+    { id: 'U20-Wettbewerb', name: 'U20' }
+  ];
+
+  // Single-pass cascading filter options and results
+  const { statusOptions, competitionTypeOptions, dateOptions, filteredRounds } = useMemo(() => {
+    try {
+      // Handle empty or invalid datasets
+      if (!Array.isArray(rounds) || rounds.length === 0) {
+        return {
+          statusOptions: predefinedStatusOptions,
+          competitionTypeOptions: predefinedCompetitionTypeOptions,
+          dateOptions: [{ id: 'all', name: 'Alle Daten' }],
+          filteredRounds: []
+        };
       }
-    };
-
-    // Handle initial hash
-    handleHashChange();
-
-    // Listen for hash changes
-    window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
-  }, [rounds]);
-
-
-  const getParticipantName = (participantId) => {
-    const id = getParticipantId(participantId);
-    const participant = participants.find(p => p.id === id);
-    return participant ? participant.name : `Teilnehmer*in ${participantId}`;
-  };
-
-  const calculateTotalScore = (scores) => {
-    if (!scores || scores.length === 0) return 0;
-    const sortedScores = [...scores].sort((a, b) => a - b);
-    // Remove highest and lowest scores
-    const trimmedScores = sortedScores.slice(1, -1);
-    return trimmedScores.reduce((sum, score) => sum + score, 0);
-  };
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'upcoming': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
-      case 'active': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
-      case 'completed': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200';
-    }
-  };
-
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case 'upcoming': return '⏳';
-      case 'active': return '🎭';
-      case 'completed': return '✅';
-      default: return '📋';
-    }
-  };
-
-  const selectRound = (round) => {
-    setSelectedRound(round);
-  };
-
-  const isRoundSelected = (roundId) => {
-    return selectedRound && selectedRound.id === roundId;
-  };
-
-  const isParticipantWinner = (round, participantId) => {
-    if (!round.groups || round.groups.length === 0) return false;
-    return round.groups.some(group => group.winners && group.winners.includes(participantId));
-  };
-
-  const getParticipantMatches = (round) => {
-    if (!searchTerm || searchTerm.trim() === '') return [];
     
-    const matches = [];
-    const searchLower = searchTerm.toLowerCase();
+    const afterSearch = rounds.filter(round => {
+      if (!round || typeof round !== 'object') return false;
+      return matchesSearchFilter(round, searchTerm, participantLookup);
+    });
     
-    // Check tournament participants
-    if (round.tournamentParticipants) {
-      round.tournamentParticipants.forEach(participantId => {
-        const id = getParticipantId(participantId);
-        const participant = participants.find(p => p.id === id);
-        if (participant && participant.name.toLowerCase().includes(searchLower)) {
-          matches.push({ id, name: participant.name, type: 'Teilnehmer*in' });
-        }
-      });
-    }
+    const statuses = new Set();
+    const competitionTypes = new Set();
+    const dates = new Set();
+    const filtered = [];
     
-    // Check crew members
-    if (round.crew) {
-      round.crew.forEach(crewMember => {
-        const id = getParticipantId(crewMember);
-        const participant = participants.find(p => p.id === id);
-        if (participant && participant.name.toLowerCase().includes(searchLower)) {
-          matches.push({ id, name: participant.name, type: crewMember.role });
-        }
-      });
-    }
+    afterSearch.forEach(round => {
+      const passesStatus = matchesStatusFilter(round, statusFilter);
+      const passesCompType = matchesCompetitionTypeFilter(round, competitionTypeFilter);
+      const passesDate = matchesDateFilter(round, dateFilter);
+      
+      // Final filtered results
+      if (passesStatus && passesCompType && passesDate) {
+        filtered.push(round);
+      }
+      
+      // For status options: match competition type + date (but NOT status filter)
+      if (passesCompType && passesDate) {
+        statuses.add(round.calculatedStatus || round.status);
+      }
+      
+      // For competition type options: match status + date (but NOT competition type filter)
+      if (passesStatus && passesDate && round.competition_type) {
+        competitionTypes.add(round.competition_type);
+      }
+      
+      // For date options: match status + competition type (but NOT date filter)
+      if (passesStatus && passesCompType && round.date) {
+        dates.add(round.date);
+      }
+    });
     
-    // Check feature artists
-    if (round.featureArtists) {
-      round.featureArtists.forEach(feature => {
-        const id = getParticipantId(feature);
-        const participant = participants.find(p => p.id === id);
-        if (participant && participant.name.toLowerCase().includes(searchLower)) {
-          matches.push({ id, name: participant.name, type: 'Feature Artist' });
-        }
-      });
-    }
+    // Build options arrays
+    const statusOpts = [
+      predefinedStatusOptions[0], // "Alle Status"
+      ...Array.from(statuses).map(status => 
+        predefinedStatusOptions.find(opt => opt.id === status) || { id: status, name: status }
+      )
+    ].filter(Boolean);
     
-    return matches;
-  };
-
-  const filteredRounds = rounds.filter(round => {
-    // Basic search in title and location
-    const basicSearch = (round.title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                       (round.location || '').toLowerCase().includes(searchTerm.toLowerCase());
+    const compTypeOpts = [
+      predefinedCompetitionTypeOptions[0], // "Alle Typen"
+      ...Array.from(competitionTypes).map(type => 
+        predefinedCompetitionTypeOptions.find(opt => opt.id === type) || { id: type, name: type }
+      )
+    ].filter(Boolean);
     
-    // Search in participants
-    const participantSearch = searchTerm.toLowerCase() !== '' && (
-      // Search in tournament participants
-      (round.tournamentParticipants && round.tournamentParticipants.some(participant => {
-        const participantName = participant.name || '';
-        return participantName.toLowerCase().includes(searchTerm.toLowerCase());
-      })) ||
-      // Search in crew members
-      (round.crew && round.crew.some(crewMember => {
-        const id = getParticipantId(crewMember);
-        const participant = participants.find(p => p.id === id);
-        return participant && participant.name.toLowerCase().includes(searchTerm.toLowerCase());
-      })) ||
-      // Search in feature artists
-      (round.featureArtists && round.featureArtists.some(feature => {
-        const id = getParticipantId(feature);
-        const participant = participants.find(p => p.id === id);
-        return participant && participant.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const dateOpts = [
+      { id: 'all', name: 'Alle Daten' },
+      ...Array.from(dates).sort((a, b) => new Date(a) - new Date(b)).map(date => ({
+        id: date,
+        name: new Date(date).toLocaleDateString('de-DE', { 
+          weekday: 'short', 
+          day: 'numeric', 
+          month: 'short',
+          timeZone: 'Europe/Berlin'
+        })
       }))
-    );
+    ];
     
-    const matchesSearch = basicSearch || participantSearch;
-    const matchesStatus = statusFilter === 'all' || round.status === statusFilter;
-    const matchesCompetitionType = competitionTypeFilter === 'all' || round.competitionType === competitionTypeFilter;
-    return matchesSearch && matchesStatus && matchesCompetitionType;
+      return {
+        statusOptions: statusOpts,
+        competitionTypeOptions: compTypeOpts,
+        dateOptions: dateOpts,
+        filteredRounds: filtered
+      };
+    } catch (error) {
+      console.error('Error in filter calculation:', error);
+      // Return safe defaults on error
+      return {
+        statusOptions: predefinedStatusOptions,
+        competitionTypeOptions: predefinedCompetitionTypeOptions,
+        dateOptions: [{ id: 'all', name: 'Alle Daten' }],
+        filteredRounds: []
+      };
+    }
+  }, [rounds, searchTerm, participantLookup, statusFilter, competitionTypeFilter, dateFilter]);
+
+  // Auto-reset invalid filters (with loop prevention)
+  const resetInProgress = useRef(false);
+  
+  useEffect(() => {
+    if (resetInProgress.current) return;
+    if (!statusOptions.some(opt => opt.id === statusFilter)) {
+      resetInProgress.current = true;
+      setStatusFilter('all');
+      setTimeout(() => { resetInProgress.current = false; }, 0);
+    }
+  }, [statusOptions, statusFilter]);
+
+  useEffect(() => {
+    if (resetInProgress.current) return;
+    if (!competitionTypeOptions.some(opt => opt.id === competitionTypeFilter)) {
+      resetInProgress.current = true;
+      setCompetitionTypeFilter('all');
+      setTimeout(() => { resetInProgress.current = false; }, 0);
+    }
+  }, [competitionTypeOptions, competitionTypeFilter]);
+
+  useEffect(() => {
+    if (resetInProgress.current) return;
+    if (!dateOptions.some(opt => opt.id === dateFilter)) {
+      resetInProgress.current = true;
+      setDateFilter('all');
+      setTimeout(() => { resetInProgress.current = false; }, 0);
+    }
+  }, [dateOptions, dateFilter]);
+
+  // Use centralized status functions
+  const getStatusColor = (status) => getRoundStatusColor(status);
+  const getStatusIcon = (status) => getRoundStatusIcon(status);
+
+  // Color coding for competition types
+  const getCompetitionTypeColor = (type) => {
+    switch (type) {
+      case 'Einzelwettbewerb':
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
+      case 'Teamwettbewerb':
+        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+      case 'U20-Wettbewerb':
+        return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200';
+      default:
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
+    }
+  };
+
+  // Color indicator for timeline
+  const getCompetitionTypeIndicator = (type) => {
+    switch (type) {
+      case 'Einzelwettbewerb':
+        return 'bg-blue-500';
+      case 'Teamwettbewerb':
+        return 'bg-green-500';
+      case 'U20-Wettbewerb':
+        return 'bg-purple-500';
+      default:
+        return 'bg-gray-500';
+    }
+  };
+
+  // Background color coding for cards
+  const getCompetitionTypeBackground = (type) => {
+    switch (type) {
+      case 'Einzelwettbewerb':
+        return 'bg-blue-50/30 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800 hover:bg-blue-50/50 dark:hover:bg-blue-900/20';
+      case 'Teamwettbewerb':
+        return 'bg-green-50/30 dark:bg-green-900/10 border-green-200 dark:border-green-800 hover:bg-green-50/50 dark:hover:bg-green-900/20';
+      case 'U20-Wettbewerb':
+        return 'bg-purple-50/30 dark:bg-purple-900/10 border-purple-200 dark:border-purple-800 hover:bg-purple-50/50 dark:hover:bg-purple-900/20';
+      default:
+        return 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50';
+    }
+  };
+
+  // ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURNS
+  
+
+  // Sort rounds by date and time
+  const sortedRounds = [...filteredRounds].sort((a, b) => {
+    const dateA = new Date(a.date || '1970-01-01');
+    const dateB = new Date(b.date || '1970-01-01');
+    if (dateA.getTime() !== dateB.getTime()) {
+      return dateA.getTime() - dateB.getTime();
+    }
+    // If same date, sort by start time
+    return (a.start_time || '00:00').localeCompare(b.start_time || '00:00');
   });
 
+  // Group rounds by date
+  const roundsByDate = sortedRounds.reduce((groups, round) => {
+    const date = round.date || 'unknown';
+    if (!groups[date]) {
+      groups[date] = [];
+    }
+    groups[date].push(round);
+    return groups;
+  }, {});
+
+  // Helper functions
+  const formatTime = (time) => {
+    if (!time) return '--:--';
+    // Remove seconds from time display, show only HH:MM
+    if (time.includes(':')) {
+      const parts = time.split(':');
+      if (parts.length >= 2) {
+        return `${parts[0]}:${parts[1]}`;
+      }
+    }
+    return time;
+  };
+
+  const formatDateForDisplay = (date) => {
+    if (!date) return 'Datum unbekannt';
+    try {
+      const dateObj = new Date(date);
+      if (isNaN(dateObj.getTime())) return 'Ungültiges Datum';
+      return dateObj.toLocaleDateString('de-DE', { 
+        weekday: 'short',
+        day: '2-digit', 
+        month: '2-digit',
+        timeZone: 'Europe/Berlin'
+      });
+    } catch (error) {
+      return 'Ungültiges Datum';
+    }
+  };
+
+  // CONDITIONAL RETURNS AFTER ALL HOOKS
   if (loading) return <LoadingSpinner size="xl" text="Runden werden geladen..." />;
   if (error) return <div className="text-red-600">Fehler beim Laden der Runden: {error?.message || error}</div>;
 
@@ -201,509 +323,161 @@ export default function Rounds() {
         />
       )}
 
-      <div className="flex flex-col lg:flex-row gap-6">
-        {/* Left Sidebar - Round Selection */}
-        <div className="lg:w-1/3">
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Runden</h2>
-            
-            {/* Search and Filters */}
-            <div className="space-y-4 mb-6">
+      {/* Header */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Runden</h1>
+          <p className="text-gray-600 dark:text-gray-400">Alle Poetry Slam Runden</p>
+        </div>
+
+        {/* Search and Filters */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <input
                 type="text"
                 placeholder="Runden oder Teilnehmer*innen suchen..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+          className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+          aria-label="Runden oder Teilnehmer suchen"
               />
-              
-              <div className="grid grid-cols-2 gap-2">
                 <select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white text-sm"
+          className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+          aria-label="Status filtern"
                 >
-                  <option value="all">Alle Status</option>
-                  <option value="upcoming">Anstehend</option>
-                  <option value="active">Aktiv</option>
-                  <option value="completed">Abgeschlossen</option>
+                  {statusOptions.map(option => (
+                    <option key={option.id} value={option.id}>
+                      {option.id === 'all' ? option.name : translateRoundStatus(option.id)}
+                    </option>
+                  ))}
                 </select>
                 <select
                   value={competitionTypeFilter}
                   onChange={(e) => setCompetitionTypeFilter(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white text-sm"
+          className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+          aria-label="Wettbewerbstyp filtern"
                 >
-                  <option value="all">Alle Typen</option>
-                  <option value="Einzelwettbewerb">Einzel</option>
-                  <option value="Teamwettbewerb">Team</option>
-                  <option value="U20-Wettbewerb">U20</option>
+                  {competitionTypeOptions.map(option => (
+                    <option key={option.id} value={option.id}>
+                      {option.name}
+                    </option>
+                  ))}
                 </select>
-              </div>
+        <select
+          value={dateFilter}
+          onChange={(e) => setDateFilter(e.target.value)}
+          className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+          aria-label="Datum filtern"
+        >
+          {dateOptions.map(option => (
+            <option key={option.id} value={option.id}>
+              {option.name}
+            </option>
+          ))}
+        </select>
+        </div>
+      </div>
+            
+      {/* Timetable View */}
+      <div className="space-y-8">
+        {Object.entries(roundsByDate).map(([date, rounds]) => (
+          <div key={date} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+            {/* Date Header */}
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                {date === 'unknown' ? 'Datum unbekannt' : formatDateForDisplay(date)}
+              </h2>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                {rounds.length} Runde{rounds.length !== 1 ? 'n' : ''}
+              </p>
             </div>
             
             {/* Rounds List */}
-            <div className="space-y-3 max-h-96 overflow-y-auto">
-              {filteredRounds.map((round) => (
-                <div
-                  key={round.id}
-                  onClick={() => setSelectedRound(round)}
-                  className={`p-4 rounded-lg cursor-pointer transition-all duration-200 ${
-                    selectedRound?.id === round.id
-                      ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800'
-                      : 'bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-600'
-                  }`}
-                >
-                  <div className="space-y-2">
-                    <div className="flex items-start justify-between">
-                      <h3 className="font-semibold text-gray-900 dark:text-white break-words flex-1">{round.title}</h3>
-                      <Link
-                        to={`/rounds/${round.slug || round.id}`}
-                        className="ml-2 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm font-medium"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        Details →
-                      </Link>
-                    </div>
-                    
-                    <div className="space-y-1 text-sm text-gray-600 dark:text-gray-400">
-                      <div className="flex items-center space-x-1">
-                        <span>📅</span>
-                        <span className="break-words">
-                          {round.date ? new Date(round.date).toLocaleDateString('de-DE', { 
-                            day: '2-digit', 
-                            month: '2-digit', 
-                            year: 'numeric',
-                            timeZone: 'Europe/Berlin'
-                          }) : 'Datum nicht gesetzt'}
-                        </span>
-                      </div>
-                      <div className="flex items-center space-x-1">
-                        <span>🕐</span>
-                        <span className="break-words">
-                          {round.startTime || '--:--'} - {round.endTime || '--:--'}
-                        </span>
-                      </div>
-                      <div className="flex items-center space-x-1">
-                        <span>📍</span>
-                        <span className="break-words">{round.location || 'Unbekannter Ort'}</span>
-                      </div>
-                    </div>
-                    
-                    <div className="flex flex-wrap items-center gap-1 mt-2">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        round.status === 'upcoming' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
-                        round.status === 'active' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
-                        'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                      }`}>
-                        {round.status === 'upcoming' ? '⏳ Anstehend' : 
-                         round.status === 'active' ? '🎭 Aktiv' : '✅ Abgeschlossen'}
-                      </span>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200`}>
-                        {round.competitionType || 'Einzelwettbewerb'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            
-            {filteredRounds.length === 0 && (
-              <div className="text-center py-8">
-                <div className="text-2xl mb-2">🎭</div>
-                <p className="text-gray-600 dark:text-gray-400 text-sm">Keine Runden gefunden</p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Right Panel - Round Details */}
-        <div className="lg:w-2/3">
-          {selectedRound ? (
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-              {/* Round Header */}
-              <div className="mb-6">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1">
-                    <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">{selectedRound.title}</h1>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                        selectedRound.status === 'upcoming' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
-                        selectedRound.status === 'active' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
-                        'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                      }`}>
-                        {selectedRound.status === 'upcoming' ? '⏳ Anstehend' : 
-                         selectedRound.status === 'active' ? '🎭 Aktiv' : '✅ Abgeschlossen'}
-                      </span>
-                      <span className="px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
-                        {selectedRound.competitionType || 'Einzelwettbewerb'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="flex flex-col space-y-2 text-sm text-gray-500 dark:text-gray-400 mb-3">
-                  <div className="flex items-center space-x-2">
-                    <span className="text-gray-400">📅</span>
-                    <span className="break-words">
-                      {selectedRound.date ? new Date(selectedRound.date).toLocaleDateString('de-DE', { 
-                        weekday: 'long', 
-                        year: 'numeric', 
-                        month: 'long', 
-                        day: 'numeric',
-                        timeZone: 'Europe/Berlin'
-                      }) : 'Datum nicht gesetzt'}
-                    </span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-gray-400">🕐</span>
-                    <span className="break-words">
-                      {selectedRound.startTime || '--:--'} - {selectedRound.endTime || '--:--'}
-                    </span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-gray-400">📍</span>
-                    <span className="break-words">{selectedRound.location || 'Unbekannter Ort'}</span>
-                  </div>
-                  {selectedRound.address && (
-                    <div className="flex items-center space-x-2">
-                      <span className="text-gray-400">🏠</span>
-                      <span className="break-words">{selectedRound.address}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Description */}
-              {selectedRound.description && (
-                <div className="mb-6">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Beschreibung</h3>
-                  <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                    <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{selectedRound.description}</p>
-                  </div>
-                </div>
-              )}
-
-              {/* Crew */}
-              {selectedRound.crew && selectedRound.crew.length > 0 && (
-                <div className="mb-6">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Crew</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {selectedRound.crew.map((crewMember, index) => {
-                      const participant = participants.find(p => p.id === getParticipantId(crewMember));
-                      const name = participant ? participant.name : crewMember.name || 'Unbekannte*r Teilnehmer*in';
+            <div className="divide-y divide-gray-200 dark:divide-gray-700">
+              {rounds.map((round) => (
+                <Link to={`/rounds/${round.slug}`} key={round.id}>
+                  <div className={`p-4 sm:p-6 transition-all duration-200 group rounded-xl shadow-sm hover:shadow-md border-l-4 ${getCompetitionTypeBackground(round.competition_type || 'Einzelwettbewerb')}`}>
+                    {/* Single Row Layout - Three Columns */}
+                    <div className="flex items-start gap-4">
                       
-                      return (
-                        <div key={index}>
-                          {participant ? (
-                            <Link
-                              to={`/participants/${getParticipantId(crewMember)}`}
-                              className="block flex items-center space-x-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors duration-200 group"
-                            >
-                              <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-blue-600 rounded-full flex items-center justify-center text-white text-sm font-bold group-hover:scale-105 transition-transform duration-200">
-                                {name.charAt(0).toUpperCase()}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="font-medium text-gray-900 dark:text-white break-words group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200">{name}</p>
-                                <p className="text-sm text-gray-500 dark:text-gray-400 break-words">{crewMember.roles ? crewMember.roles.join(', ') : crewMember.role}</p>
-                              </div>
-                              <svg className="w-4 h-4 text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                              </svg>
-                            </Link>
-                          ) : (
-                            <div className="flex items-center space-x-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                              <div className="w-8 h-8 bg-gradient-to-br from-gray-400 to-gray-600 rounded-full flex items-center justify-center text-white text-sm font-bold">
-                                {name.charAt(0).toUpperCase()}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="font-medium text-gray-900 dark:text-white break-words">{name}</p>
-                                <p className="text-sm text-gray-500 dark:text-gray-400 break-words">{crewMember.roles ? crewMember.roles.join(', ') : crewMember.role}</p>
-                              </div>
-                            </div>
-                          )}
+                      {/* Column 1: Time */}
+                      <div className="text-center flex-shrink-0">
+                        <div className="text-lg font-bold text-gray-900 dark:text-white">
+                          {formatTime(round.start_time)}
                         </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Moderation */}
-              {selectedRound.moderation && selectedRound.moderation.length > 0 && (
-                <div className="mb-6">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Moderation</h3>
-                  <div className="space-y-3">
-                    {selectedRound.moderation.map((moderator, index) => {
-                      const participant = participants.find(p => p.id === getParticipantId(moderator));
-                      const name = participant ? participant.name : moderator.name || 'Unbekannte*r Moderator*in';
-                      
-                      return (
-                        <div key={index}>
-                          {participant ? (
-                            <Link
-                              to={`/participants/${getParticipantId(moderator)}`}
-                              className="block flex items-start space-x-3 p-4 bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20 rounded-lg hover:from-orange-100 to-red-100 dark:hover:from-orange-900/30 dark:hover:to-red-900/30 transition-colors duration-200 group"
-                            >
-                              <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-600 rounded-full flex items-center justify-center text-white text-lg font-bold flex-shrink-0 group-hover:scale-105 transition-transform duration-200">
-                                {name.charAt(0).toUpperCase()}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="font-medium text-gray-900 dark:text-white break-words group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors duration-200">{name}</p>
-                                <p className="text-gray-500 dark:text-gray-400 text-sm mt-1 break-words">{moderator.description}</p>
-                              </div>
-                              <svg className="w-4 h-4 text-gray-400 group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors duration-200 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                              </svg>
-                            </Link>
-                          ) : (
-                            <div className="flex items-start space-x-3 p-4 bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20 rounded-lg">
-                              <div className="w-10 h-10 bg-gradient-to-br from-gray-400 to-gray-600 rounded-full flex items-center justify-center text-white text-lg font-bold flex-shrink-0">
-                                {name.charAt(0).toUpperCase()}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="font-medium text-gray-900 dark:text-white break-words">{name}</p>
-                                <p className="text-gray-500 dark:text-gray-400 text-sm mt-1 break-words">{moderator.description}</p>
-                              </div>
-                            </div>
-                          )}
+                        <div className="text-sm text-gray-500 dark:text-gray-400">
+                          {formatTime(round.end_time)}
                         </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
+                      </div>
 
-              {/* Feature Artists */}
-              {selectedRound.featureArtists && selectedRound.featureArtists.length > 0 && (
-                <div className="mb-6">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Feature Artists</h3>
-                  <div className="space-y-3">
-                    {selectedRound.featureArtists.map((feature, index) => {
-                      const participant = participants.find(p => p.id === getParticipantId(feature));
-                      const name = participant ? participant.name : feature.name || 'Unbekannter Feature Artist';
-                      
-                      return (
-                        <div key={index}>
-                          {participant ? (
-                            <Link
-                              to={`/participants/${getParticipantId(feature)}`}
-                              className="block flex items-start space-x-3 p-4 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-lg hover:from-purple-100 to-pink-100 dark:hover:from-purple-900/30 dark:hover:to-pink-900/30 transition-colors duration-200 group"
-                            >
-                              <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center text-white text-lg font-bold flex-shrink-0 group-hover:scale-105 transition-transform duration-200">
-                                {name.charAt(0).toUpperCase()}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="font-medium text-gray-900 dark:text-white break-words group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors duration-200">{name}</p>
-                                <p className="text-gray-500 dark:text-gray-400 text-sm mt-1 break-words">{feature.description}</p>
-                              </div>
-                              <svg className="w-4 h-4 text-gray-400 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors duration-200 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                              </svg>
-                            </Link>
-                          ) : (
-                            <div className="flex items-start space-x-3 p-4 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-lg">
-                              <div className="w-10 h-10 bg-gradient-to-br from-gray-400 to-gray-600 rounded-full flex items-center justify-center text-white text-lg font-bold flex-shrink-0">
-                                {name.charAt(0).toUpperCase()}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="font-medium text-gray-900 dark:text-white break-words">{name}</p>
-                                <p className="text-gray-500 dark:text-gray-400 text-sm mt-1 break-words">{feature.description}</p>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
+                      {/* Column 2: Colored Indicator Line */}
+                      <div className={`w-1 h-12 rounded-full ${getCompetitionTypeIndicator(round.competition_type || 'Einzelwettbewerb')}`}></div>
 
-              {/* Groups and Results */}
-              {selectedRound.groups && selectedRound.groups.length > 0 && (
-                <div className="mb-6">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Gruppen & Ergebnisse</h3>
-                  <div className="space-y-6">
-                    {selectedRound.groups.map((group, groupIndex) => (
-                      <div key={groupIndex} className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                        <h4 className="font-semibold text-gray-900 dark:text-white mb-3">Gruppe {groupIndex + 1}</h4>
-                        <div className="space-y-3">
-                          {group.participants && group.participants.map((participant, participantIndex) => {
-                            const participantData = participants.find(p => p.id === getParticipantId(participant));
-                            const scores = participant.juryScores || [];
-                            const totalScore = calculateTotalScore(scores);
-                            const isWinner = participant.isWinner;
+                      {/* Column 3: Everything Else */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1 min-w-0">
+                            <h3 className="text-lg font-bold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors leading-tight mb-1">
+                              {round.title}
+                            </h3>
+                            <span className="text-sm text-gray-500 dark:text-gray-400 mb-2 block">
+                              {round.competition_type || 'Einzelwettbewerb'}
+                            </span>
                             
-                            return (
-                              <div key={participantIndex} className={`p-4 rounded-lg border ${
-                                isWinner 
-                                  ? 'bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 border-yellow-200 dark:border-yellow-800' 
-                                  : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600'
-                              }`}>
-                                <div className="flex items-center space-x-3 min-w-0 flex-1">
-                                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 ${
-                                    isWinner 
-                                      ? 'bg-gradient-to-br from-yellow-500 to-orange-600 text-white' 
-                                      : 'bg-gradient-to-br from-blue-500 to-purple-600 text-white'
-                                  }`}>
-                                    {participant.order || participantIndex + 1}
-                                  </div>
-                                  <div className="min-w-0 flex-1">
-                                    {participantData ? (
-                                      <Link
-                                        to={`/participants/${getParticipantId(participant)}`}
-                                        className={`block font-semibold text-base sm:text-lg break-words hover:underline transition-colors duration-200 ${
-                                          isWinner ? 'text-yellow-800 dark:text-yellow-200 hover:text-yellow-600 dark:hover:text-yellow-400' : 'text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400'
-                                        }`}
-                                      >
-                                        {participantData.name}
-                                        {isWinner && <span className="ml-2">👑</span>}
-                                      </Link>
-                                    ) : (
-                                      <p className={`font-semibold text-base sm:text-lg break-words ${
-                                        isWinner ? 'text-yellow-800 dark:text-yellow-200' : 'text-gray-900 dark:text-white'
-                                      }`}>
-                                        Teilnehmer*innen {getParticipantId(participant)}
-                                        {isWinner && <span className="ml-2">👑</span>}
-                                      </p>
-                                    )}
-                                    {participantData && (
-                                      <p className="text-sm text-gray-500 dark:text-gray-400 break-words">
-                                        {participantData.role} • {participantData.region}
-                                      </p>
-                                    )}
-                                  </div>
-                                  <div className="text-right flex-shrink-0">
-                                    <p className={`font-bold text-lg ${
-                                      isWinner ? 'text-yellow-800 dark:text-yellow-200' : 'text-gray-900 dark:text-white'
-                                    }`}>
-                                      {totalScore.toFixed(1)}
-                                    </p>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                                      Gesamtpunktzahl
-                                    </p>
-                                  </div>
+                            {/* Location */}
+                            <div className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+                              <span className="truncate">{round.location || 'Unbekannter Ort'}</span>
+                            </div>
+                            
+                            {/* Participants - Own Line */}
+                            {round.assignments && round.assignments.filter(a => a.roles.includes('participant')).length > 0 && (
+                              <div className="flex items-center text-sm text-gray-600 dark:text-gray-400 mt-2">
+                                <div className="flex flex-wrap gap-1">
+                                  {round.assignments
+                                    .filter(a => a.roles.includes('participant'))
+                                    .map((assignment, index) => {
+                                      // Handle both participants and teams
+                                      const participantName = assignment.participant_name || assignment.team_name || `ID: ${assignment.participant_id || assignment.team_id}`;
+                                      return (
+                                        <span 
+                                          key={assignment.participant_id || assignment.team_id}
+                                          className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md text-xs"
+                                        >
+                                          {participantName}
+                                        </span>
+                                      );
+                                    })}
                                 </div>
-                                
-                                {/* Jury Scores */}
-                                {scores.length > 0 && (
-                                  <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
-                                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                      Jury-Bewertungen:
-                                    </p>
-                                    <div className="flex flex-wrap gap-2">
-                                      {scores.map((score, scoreIndex) => {
-                                        const isHighest = score === Math.max(...scores);
-                                        const isLowest = score === Math.min(...scores);
-                                        const isDuplicate = scores.filter(s => s === score).length > 1;
-                                        const shouldStrike = (isHighest && isDuplicate) || (isLowest && isDuplicate);
-                                        
-                                        return (
-                                          <span
-                                            key={scoreIndex}
-                                            className={`px-2 py-1 rounded text-sm font-medium ${
-                                              shouldStrike 
-                                                ? 'line-through text-gray-400 dark:text-gray-500' 
-                                                : 'text-gray-700 dark:text-gray-300'
-                                            }`}
-                                          >
-                                            {score.toFixed(1)}
-                                          </span>
-                                        );
-                                      })}
-                                      <span className="text-xs text-gray-500 dark:text-gray-400 self-center">
-                                        (ohne höchste/niedrigste)
-                                      </span>
-                                    </div>
-                                  </div>
-                                )}
                               </div>
-                            );
-                          })}
+                            )}
+                          </div>
+                          
+                          {/* Navigation Arrow */}
+                          <div className="flex items-center text-blue-600 dark:text-blue-400 group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors ml-2 flex-shrink-0">
+                            <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                          </div>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Participants when no groups are set */}
-              {selectedRound.tournamentParticipants && selectedRound.tournamentParticipants.length > 0 && (!selectedRound.groups || selectedRound.groups.length === 0) && (
-                <div className="mb-6">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Teilnehmer*innen</h3>
-                  <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-4">
-                    <div className="flex items-center">
-                      <svg className="w-5 h-5 text-yellow-600 dark:text-yellow-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      <p className="text-yellow-800 dark:text-yellow-200 font-medium">
-                        Dies ist noch nicht die Reihenfolge der Teilnehmer*innen
-                      </p>
                     </div>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {selectedRound.tournamentParticipants.map((participantId, index) => {
-                      const id = getParticipantId(participantId);
-                      const participant = participants.find(p => p.id === id);
-                      const name = participant ? participant.name : 'Unbekannte*r Teilnehmer*in';
-                      const key = typeof participantId === 'object' ? `participant-${id || index}-${index}` : id || `participant-${index}`;
-                      
-                      return (
-                        <div key={key}>
-                          {participant ? (
-                            <Link
-                              to={`/participants/${id}`}
-                              className="block flex items-center space-x-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors duration-200 group"
-                            >
-                              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-bold group-hover:scale-105 transition-transform duration-200">
-                                {name.charAt(0).toUpperCase()}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="font-medium text-gray-900 dark:text-white break-words group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200">{name}</p>
-                                <p className="text-sm text-gray-500 dark:text-gray-400 break-words">{participant.region}</p>
-                              </div>
-                              <svg className="w-4 h-4 text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                              </svg>
-                            </Link>
-                          ) : (
-                            <div className="flex items-center space-x-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                              <div className="w-8 h-8 bg-gradient-to-br from-gray-400 to-gray-600 rounded-full flex items-center justify-center text-white text-sm font-bold">
-                                {name.charAt(0).toUpperCase()}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="font-medium text-gray-900 dark:text-white break-words">{name}</p>
-                                <p className="text-sm text-gray-500 dark:text-gray-400 break-words">{crewMember.roles ? crewMember.roles.join(', ') : crewMember.role}</p>
-                              </div>
+                </Link>
+                                          ))}
+                                        </div>
+                                      </div>
+        ))}
                             </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
 
-              {/* After Play Report */}
-              {selectedRound.afterPlayReport && (
-                <div className="mb-6">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Nachbericht</h3>
-                  <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                    <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{selectedRound.afterPlayReport}</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700 flex items-center justify-center">
-              <div className="text-center">
+      {/* Empty state */}
+      {Object.keys(roundsByDate).length === 0 && (
+        <div className="text-center py-12">
                 <div className="text-4xl mb-4">🎭</div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Runde auswählen</h3>
-                <p className="text-gray-600 dark:text-gray-400">Wählen Sie eine Runde aus der Liste aus, um Details anzuzeigen.</p>
-              </div>
-            </div>
-          )}
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Keine Runden gefunden</h3>
+          <p className="text-gray-600 dark:text-gray-400">Versuchen Sie andere Suchbegriffe oder Filter.</p>
         </div>
-      </div>
+      )}
     </div>
   );
 }

@@ -1,6 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { API_URL } from '../config/api.js';
 import authService from '../services/authService.js';
+import { useEntityData } from './useEntityData.js';
+import { getQueryConfig } from '../config/polling.js';
 
 // Query keys for rounds
 export const roundsKeys = {
@@ -13,10 +15,10 @@ export const roundsKeys = {
 };
 
 // Hook to fetch all rounds
-export function useRounds(filters = {}) {
-  return useQuery({
-    queryKey: roundsKeys.list(filters),
-    queryFn: async () => {
+export function useRounds(filters = {}, isAdmin = false) {
+  return useEntityData(
+    'rounds',
+    async () => {
       const response = await fetch(`${API_URL}/rounds`, {
         credentials: 'include'
       });
@@ -24,11 +26,15 @@ export function useRounds(filters = {}) {
         throw new Error(`Failed to fetch rounds: ${response.statusText}`);
       }
       const result = await response.json();
-      return result?.data || result || [];
+      // Handle both success and error responses, always return an array
+      if (result?.success === false) {
+        console.warn('Rounds API returned error:', result.error);
+        return [];
+      }
+      return Array.isArray(result?.data) ? result.data : (Array.isArray(result) ? result : []);
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
-  });
+    { filters, ...getQueryConfig('rounds', isAdmin), isAdmin }
+  );
 }
 
 // Hook to fetch a single round by ID
@@ -47,8 +53,7 @@ export function useRound(id) {
       return result?.data || result || null;
     },
     enabled: !!id,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
+    ...getQueryConfig('rounds', false),
   });
 }
 
@@ -58,7 +63,7 @@ export function useRoundBySlug(slug) {
     queryKey: roundsKeys.bySlug(slug),
     queryFn: async () => {
       if (!slug) return null;
-      const response = await fetch(`${API_URL}/rounds/slug/${slug}`, {
+      const response = await fetch(`${API_URL}/rounds/${slug}`, {
         credentials: 'include'
       });
       if (!response.ok) {
@@ -68,8 +73,7 @@ export function useRoundBySlug(slug) {
       return result?.data || result || null;
     },
     enabled: !!slug,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
+    ...getQueryConfig('rounds', false),
   });
 }
 
@@ -79,29 +83,44 @@ export function useCreateRound() {
   
   return useMutation({
     mutationFn: async (roundData) => {
-      const response = await authService.authenticatedRequest(
-        `${API_URL}/rounds`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(roundData)
+      try {
+        const response = await authService.authenticatedRequest(
+          `${API_URL}/rounds`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(roundData)
+          }
+        );
+        
+        const result = await response.json();
+        
+        if (!result.success && result.error) {
+          throw new Error(result.error);
         }
-      );
-      const result = await response.json();
-      return result?.data || result;
+        
+        return result?.data || result;
+      } catch (error) {
+        console.error('Create round error:', error);
+        throw error;
+      }
     },
     onSuccess: (data) => {
-      // Invalidate and refetch rounds list
+      // Invalidate all rounds-related queries to ensure admin components update
+      queryClient.invalidateQueries({ queryKey: roundsKeys.all });
       queryClient.invalidateQueries({ queryKey: roundsKeys.lists() });
       
       // If we have the created round data, add it to the cache
-      if (data?.data) {
-        queryClient.setQueryData(roundsKeys.detail(data.data.id), data.data);
-        if (data.data.slug) {
-          queryClient.setQueryData(roundsKeys.bySlug(data.data.slug), data.data);
+      if (data && data.id) {
+        queryClient.setQueryData(roundsKeys.detail(data.id), data);
+        if (data.slug) {
+          queryClient.setQueryData(roundsKeys.bySlug(data.slug), data);
         }
       }
     },
+    onError: (error) => {
+      console.error('Create round mutation error:', error);
+    }
   });
 }
 
@@ -110,30 +129,45 @@ export function useUpdateRound() {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async ({ id, ...roundData }) => {
-      const response = await authService.authenticatedRequest(
-        `${API_URL}/rounds/${id}`,
-        {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(roundData)
+    mutationFn: async ({ id, version, ...roundData }) => {
+      try {
+        const response = await authService.authenticatedRequest(
+          `${API_URL}/rounds/${id}`,
+          {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...roundData, version })
+          }
+        );
+        
+        const result = await response.json();
+        
+        if (!result.success && result.error) {
+          throw new Error(result.error);
         }
-      );
-      const result = await response.json();
-      return result?.data || result;
+        
+        return result?.data || result;
+      } catch (error) {
+        console.error('Update round error:', error);
+        throw error;
+      }
     },
     onSuccess: (data, variables) => {
-      // Invalidate and refetch rounds list
+      // Invalidate all rounds-related queries to ensure admin components update
+      queryClient.invalidateQueries({ queryKey: roundsKeys.all });
       queryClient.invalidateQueries({ queryKey: roundsKeys.lists() });
       
       // Update the specific round in cache
-      if (data?.data) {
-        queryClient.setQueryData(roundsKeys.detail(variables.id), data.data);
-        if (data.data.slug) {
-          queryClient.setQueryData(roundsKeys.bySlug(data.data.slug), data.data);
+      if (data && data.id) {
+        queryClient.setQueryData(roundsKeys.detail(variables.id), data);
+        if (data.slug) {
+          queryClient.setQueryData(roundsKeys.bySlug(data.slug), data);
         }
       }
     },
+    onError: (error) => {
+      console.error('Update round mutation error:', error);
+    }
   });
 }
 
@@ -145,7 +179,7 @@ export function useDeleteRound() {
     mutationFn: async (id) => {
       try {
         // Check if user is authenticated before making the request
-        if (!authService.isAuthenticated) {
+        if (!authService.isLoggedIn()) {
           throw new Error('User not authenticated. Please log in again.');
         }
 
@@ -172,7 +206,8 @@ export function useDeleteRound() {
       // Remove from cache
       queryClient.removeQueries({ queryKey: roundsKeys.detail(id) });
       
-      // Invalidate and refetch rounds list
+      // Invalidate all rounds-related queries to ensure admin components update
+      queryClient.invalidateQueries({ queryKey: roundsKeys.all });
       queryClient.invalidateQueries({ queryKey: roundsKeys.lists() });
     },
     onError: (error) => {

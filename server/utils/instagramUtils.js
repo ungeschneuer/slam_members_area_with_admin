@@ -1,0 +1,58 @@
+/**
+ * Server-side Instagram utility functions
+ */
+
+/**
+ * Normalize various user inputs (URL, @handle, handle) to a canonical Instagram profile URL
+ * @param {string} input - User input (URL, @handle, or username)
+ * @returns {string} - Canonical Instagram URL or empty string if invalid
+ */
+export const normalizeInstagramInput = (input) => {
+  try {
+    if (!input) return '';
+    let value = String(input).trim();
+    
+    // Handle empty string after trim
+    if (!value) return '';
+    
+    // Strip protocol/domain if a full URL was pasted
+    value = value.replace(/^https?:\/\/(www\.)?instagram\.com\//i, '');
+    
+    // Remove multiple leading @ symbols (fix double @@ issue)
+    value = value.replace(/^@+/, '');
+    
+    // Remove trailing slash
+    value = value.replace(/\/$/, '');
+    
+    // Handle empty string after cleaning
+    if (!value) return '';
+    
+    return `https://instagram.com/${value}`;
+  } catch (error) {
+    // Log warning but don't throw - graceful degradation
+    logger.warn('Instagram input normalization failed:', error);
+    return '';
+  }
+};
+
+/**
+ * Extract username from Instagram URL
+ * @param {string} instagramUrl - Full Instagram URL
+ * @returns {string|null} - Username or null if invalid
+ */
+export const extractInstagramUsername = (instagramUrl) => {
+  if (!instagramUrl) return null;
+  
+  const match = instagramUrl.match(/instagram\.com\/([^\/\?]+)/);
+  return match ? match[1] : null;
+};
+
+/**
+ * Validate Instagram URL format
+ * @param {string} url - URL to validate
+ * @returns {boolean} - True if valid Instagram URL
+ */
+export const isValidInstagramUrl = (url) => {
+  if (!url) return false;
+  return /^https:\/\/instagram\.com\/[a-zA-Z0-9._]+$/.test(url);
+};

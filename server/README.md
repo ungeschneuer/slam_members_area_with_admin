@@ -58,7 +58,7 @@ Create a `.env` file with the following variables:
 
 ```bash
 # Server Configuration
-PORT=3001
+PORT=3005
 NODE_ENV=development
 FRONTEND_URL=http://localhost:5173
 
@@ -184,7 +184,7 @@ The server uses the PostgreSQL schema defined in the `database/` directory. Key 
 - `competitions` - Poetry slam competitions
 - `participants` - Competition participants
 - `rounds` - Competition rounds
-- `round_participants` - Participant-round relationships
+- `round_assignments` - Participant-round relationships with roles
 - `content` - News, tips, and announcements
 - `content_versions` - Content version history
 - `events` - Timetable and scheduling
@@ -263,7 +263,7 @@ Set the following environment variables for production:
 
 ```bash
 NODE_ENV=production
-PORT=3001
+PORT=3005
 DB_HOST=your-db-host
 DB_PASSWORD=your-secure-password
 JWT_SECRET=your-secure-jwt-secret
@@ -290,7 +290,7 @@ server {
     server_name your-domain.com;
     
     location / {
-        proxy_pass http://localhost:3001;
+        proxy_pass http://localhost:3005;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';

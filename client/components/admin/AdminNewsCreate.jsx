@@ -1,9 +1,12 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCreateNews } from '../../hooks/index.js';
+import { mapNewsFormToAPI } from '../../utils/formMappers.js';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { getNewsCategoryFormOptions } from '../../utils/newsCategories.js';
+import MarkdownTextarea from '../forms/MarkdownTextarea.jsx';
 
 const schema = z.object({
   title: z.string().min(1, 'Titel ist erforderlich'),
@@ -29,15 +32,13 @@ export default function AdminNewsCreate() {
     }
   });
 
-  const contentTypes = [
-    { value: 'announcement', label: 'Ankündigung' },
-    { value: 'workshops', label: 'Workshops' },
-    { value: 'prizes', label: 'Preise' }
-  ];
+  // Use centralized category definitions
+  const contentTypes = getNewsCategoryFormOptions();
 
   async function onSubmit(data) {
     try {
-      await createNewsMutation.mutateAsync(data);
+      const apiData = mapNewsFormToAPI(data);
+      await createNewsMutation.mutateAsync(apiData);
       reset();
       navigate('/admin/news');
     } catch (err) {
@@ -65,7 +66,7 @@ export default function AdminNewsCreate() {
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Title</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Titel</label>
               <input
                 type="text"
                 aria-invalid={errors.title ? 'true' : 'false'}
@@ -75,7 +76,7 @@ export default function AdminNewsCreate() {
               {errors.title && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.title.message}</p>}
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Content Type</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Inhaltstyp</label>
               <select
                 aria-invalid={errors.category ? 'true' : 'false'}
                 {...register('category', { required: 'Kategorie ist erforderlich' })}
@@ -90,7 +91,7 @@ export default function AdminNewsCreate() {
               {errors.category && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.category.message}</p>}
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Published</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Status</label>
               <select
                 aria-invalid={errors.status ? 'true' : 'false'}
                 {...register('status', { required: 'Status ist erforderlich' })}
@@ -102,7 +103,7 @@ export default function AdminNewsCreate() {
               {errors.status && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.status.message}</p>}
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Date</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Datum</label>
               <input
                 type="date"
                 aria-invalid={errors.date ? 'true' : 'false'}
@@ -113,16 +114,33 @@ export default function AdminNewsCreate() {
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Content</label>
-            <textarea
-              rows={6}
-              aria-invalid={errors.content ? 'true' : 'false'}
-              {...register('content', { required: 'Inhalt ist erforderlich' })}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-              placeholder="Enter news content..."
+            <MarkdownTextarea
+              label="Inhalt"
+              name="content"
+              register={register}
+              rules={{ required: 'Inhalt ist erforderlich' }}
+              errors={errors}
+              rows={8}
+              placeholder="News-Inhalt in Markdown eingeben..."
+              helpText="Verwende Markdown-Syntax für Formatierung. URLs werden automatisch verlinkt."
             />
-            {errors.content && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.content.message}</p>}
           </div>
+          
+          {/* Upload note */}
+          <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+            <div className="flex items-start space-x-3">
+              <span className="text-blue-500 text-xl">💡</span>
+              <div>
+                <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                  Datei-Upload nach der Erstellung
+                </p>
+                <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                  Du kannst nach dem Erstellen der News ein Bild oder PDF hochladen, indem du die News bearbeitest.
+                </p>
+              </div>
+            </div>
+          </div>
+          
           <div className="flex flex-col sm:flex-row gap-3">
             <button
               type="submit"

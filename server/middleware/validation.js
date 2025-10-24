@@ -1,438 +1,459 @@
-// Validation Middleware for SLAM25 Application
+// Enhanced validation middleware for SLAM25 Application
 import { body, param, query, validationResult } from 'express-validator';
 import { executeQuery } from '../config/database.js';
 import xss from 'xss';
 import logger from '../config/logger.js';
+import { validateRound, validateRoundPartial, roundSchema } from '../../shared/schemas/roundSchema.js';
 
 // Generic validation error handler
 const handleValidationErrors = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
+    logger.warn('Validation failed', {
+      errors: errors.array(),
+      body: req.body,
+      ip: req.ip,
+      userAgent: req.get('User-Agent')
+    });
+    
     return res.status(400).json({
+      success: false,
       error: 'Validation failed',
       code: 'VALIDATION_ERROR',
       details: errors.array().map(err => ({
         field: err.path,
         message: err.msg,
-        value: err.value
+        value: err.value,
+        location: err.location
       }))
     });
   }
   next();
 };
 
-// Sanitize input to prevent XSS using proven library
-const sanitizeInput = (req, res, next) => {
-  try {
-    const sanitize = (obj) => {
-      if (typeof obj === 'string') {
-        return xss(obj, {
-          whiteList: {}, // Remove all HTML tags
-          stripIgnoreTag: true,
-          stripIgnoreTagBody: ['script', 'style'],
-          css: false, // Disable CSS
-          allowList: {}, // No allowed tags
-          onTag: function(tag, html, options) {
-            // Log suspicious tags for security monitoring
-            if (['script', 'iframe', 'object', 'embed', 'form'].includes(tag)) {
-              logger.warn('Suspicious HTML tag detected', {
-                tag,
-                ip: req.ip,
-                userAgent: req.get('User-Agent'),
-                url: req.url
-              });
-            }
-            return ''; // Remove all tags
-          }
-        });
-      }
-      if (typeof obj === 'object' && obj !== null) {
-        const sanitized = {};
-        for (const key in obj) {
-          sanitized[key] = sanitize(obj[key]);
-        }
-        return sanitized;
-      }
-      return obj;
-    };
-
-    req.body = sanitize(req.body);
-    req.query = sanitize(req.query);
-    req.params = sanitize(req.params);
-    
-    next();
-  } catch (error) {
-    logger.error('Input sanitization failed', {
-      error: error.message,
-      ip: req.ip,
-      url: req.url
-    });
-    res.status(400).json({
-      error: 'Invalid input detected',
-      code: 'SANITIZATION_ERROR'
-    });
-  }
-};
-
-// Removed custom Map-based rate limiter; use centralized express-rate-limit in security config
-
-// Validation rules for participants
-const validateParticipant = [
-  body('name')
-    .isLength({ min: 2, max: 255 })
-    .withMessage('Name must be between 2 and 255 characters')
-    .matches(/^[a-zA-ZäöüßÄÖÜ\s\-'\.]+$/)
-    .withMessage('Name contains invalid characters'),
-  
-  body('role')
-    .isLength({ min: 2, max: 100 })
-    .withMessage('Role must be between 2 and 100 characters')
-    .isIn(['Teilnehmer*in', 'Jury', 'Organisator', 'Moderator', 'Technik'])
-    .withMessage('Invalid role'),
-  
-  body('region')
-    .isLength({ min: 2, max: 100 })
-    .withMessage('Region must be between 2 and 100 characters')
-    .matches(/^[a-zA-ZäöüßÄÖÜ\s\-]+$/)
-    .withMessage('Region contains invalid characters'),
-  
-  body('pronouns')
-    .optional()
-    .isLength({ max: 50 })
-    .withMessage('Pronouns must be less than 50 characters')
-    .matches(/^[a-zA-ZäöüßÄÖÜ\/\s]+$/)
-    .withMessage('Pronouns contains invalid characters'),
-  
-  body('instagram')
-    .optional()
-    .isLength({ max: 255 })
-    .withMessage('Instagram handle must be less than 255 characters')
-    .matches(/^@?[a-zA-Z0-9._]+$/)
-    .withMessage('Invalid Instagram handle format')
-];
-
-// Validation rules for rounds
-const validateRound = [
+// Enhanced validation for schnellzugriff links
+export const validateSchnellzugriff = [
   body('title')
-    .isLength({ min: 3, max: 255 })
-    .withMessage('Title must be between 3 and 255 characters')
-    .matches(/^[a-zA-ZäöüßÄÖÜ0-9\s\-'\.]+$/)
-    .withMessage('Title contains invalid characters'),
-  
-  body('date')
-    .isISO8601()
-    .withMessage('Date must be a valid ISO 8601 date')
-    .custom((value) => {
-      const date = new Date(value);
-      const now = new Date();
-      if (date < now.setHours(0, 0, 0, 0)) {
-        throw new Error('Date must be today or in the future');
-      }
-      return true;
-    }),
-  
-  body('startTime')
-    .matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/)
-    .withMessage('Start time must be in HH:MM format'),
-  
-  body('endTime')
-    .matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/)
-    .withMessage('End time must be in HH:MM format')
-    .custom((value, { req }) => {
-      if (req.body.startTime && value <= req.body.startTime) {
-        throw new Error('End time must be after start time');
-      }
-      return true;
-    }),
-  
-  body('location')
-    .isLength({ min: 3, max: 255 })
-    .withMessage('Location must be between 3 and 255 characters'),
-  
-  body('address')
-    .optional()
-    .isLength({ max: 500 })
-    .withMessage('Address must be less than 500 characters'),
+    .notEmpty()
+    .withMessage('Title is required')
+    .isLength({ min: 1, max: 255 })
+    .withMessage('Title must be between 1 and 255 characters')
+    .trim()
+    .escape(),
   
   body('description')
     .optional()
-    .isLength({ max: 2000 })
-    .withMessage('Description must be less than 2000 characters'),
+    .isLength({ max: 500 })
+    .withMessage('Description must be less than 500 characters')
+    .trim()
+    .escape(),
   
-  body('competitionType')
+  body('url')
+    .isURL({ protocols: ['http', 'https'] })
+    .withMessage('Valid URL is required')
+    .trim(),
+  
+  body('icon')
     .optional()
-    .isIn(['Einzelwettbewerb', 'Teamwettbewerb', 'Show', 'Workshop'])
-    .withMessage('Invalid competition type'),
+    .isLength({ max: 10 })
+    .withMessage('Icon must be less than 10 characters')
+    .trim(),
   
-  // Status is now calculated automatically based on date and time
-  // No validation needed for status field
+  body('color')
+    .optional()
+    .isIn(['blue', 'purple', 'green', 'red', 'yellow', 'indigo', 'pink', 'orange', 'teal', 'cyan'])
+    .withMessage('Color must be a valid color name')
+    .trim(),
+  
+  body('sortOrder')
+    .optional()
+    .isInt({ min: 0, max: 9999 })
+    .withMessage('Sort order must be between 0 and 9999'),
+  
+  body('isActive')
+    .optional()
+    .isBoolean()
+    .withMessage('isActive must be a boolean'),
+  
+  body('isExternal')
+    .optional()
+    .isBoolean()
+    .withMessage('isExternal must be a boolean'),
+  
+  handleValidationErrors
 ];
 
-// Validation rules for news
-const validateNews = [
+// Enhanced validation for info pages
+export const validateInfoPage = [
   body('title')
-    .isLength({ min: 3, max: 255 })
-    .withMessage('Title must be between 3 and 255 characters')
-    .matches(/^[a-zA-ZäöüßÄÖÜ0-9\s\-'\.!?]+$/)
-    .withMessage('Title contains invalid characters'),
+    .notEmpty()
+    .withMessage('Title is required')
+    .isLength({ min: 1, max: 255 })
+    .withMessage('Title must be between 1 and 255 characters')
+    .trim()
+    .escape(),
+  
+  body('slug')
+    .notEmpty()
+    .withMessage('Slug is required')
+    .matches(/^[a-z0-9-]+$/)
+    .withMessage('Slug must contain only lowercase letters, numbers, and hyphens')
+    .trim(),
+  
+  body('description')
+    .optional()
+    .isLength({ max: 500 })
+    .withMessage('Description must be less than 500 characters')
+    .trim()
+    .escape(),
   
   body('content')
-    .isLength({ min: 10, max: 10000 })
-    .withMessage('Content must be between 10 and 10000 characters'),
+    .notEmpty()
+    .withMessage('Content is required')
+    .isLength({ min: 10 })
+    .withMessage('Content must be at least 10 characters')
+    .trim(),
   
   body('excerpt')
     .optional()
-    .isLength({ max: 500 })
-    .withMessage('Excerpt must be less than 500 characters'),
+    .isLength({ max: 300 })
+    .withMessage('Excerpt must be less than 300 characters')
+    .trim()
+    .escape(),
   
   body('category')
     .optional()
-    .isIn(['announcement', 'news', 'update', 'event', 'rule'])
-    .withMessage('Invalid category'),
+    .isLength({ max: 100 })
+    .withMessage('Category must be less than 100 characters')
+    .trim()
+    .escape(),
   
-  body('priority')
+  body('order')
     .optional()
-    .isIn(['LOW', 'NORMAL', 'HIGH', 'URGENT'])
-    .withMessage('Invalid priority'),
+    .isInt({ min: 0, max: 9999 })
+    .withMessage('Order must be between 0 and 9999'),
   
   body('status')
     .optional()
-    .isIn(['DRAFT', 'PUBLISHED', 'ARCHIVED'])
-    .withMessage('Invalid status'),
+    .isIn(['draft', 'published', 'archived'])
+    .withMessage('Status must be draft, published, or archived'),
+  
+  body('featured_image_url')
+    .optional()
+    .isURL({ protocols: ['http', 'https'] })
+    .withMessage('Featured image URL must be a valid URL')
+    .trim(),
+  
+  body('meta_description')
+    .optional()
+    .isLength({ max: 160 })
+    .withMessage('Meta description must be less than 160 characters')
+    .trim()
+    .escape(),
   
   body('tags')
     .optional()
     .isArray()
-    .withMessage('Tags must be an array')
-    .custom((tags) => {
-      if (tags && tags.length > 10) {
-        throw new Error('Maximum 10 tags allowed');
-      }
-      if (tags) {
-        for (const tag of tags) {
-          if (typeof tag !== 'string' || tag.length > 50) {
-            throw new Error('Each tag must be a string with max 50 characters');
-          }
-        }
-      }
-      return true;
-    })
+    .withMessage('Tags must be an array'),
+  
+  body('is_published')
+    .optional()
+    .isBoolean()
+    .withMessage('is_published must be a boolean'),
+  
+  body('published_at')
+    .optional()
+    .isISO8601()
+    .withMessage('Published date must be a valid ISO 8601 date')
+    .trim(),
+  
+  handleValidationErrors
 ];
 
-// Validation rules for timetable entries
-const validateTimetableEntry = [
+// Enhanced validation for timetable entries
+export const validateTimetableEntry = [
   body('title')
-    .isLength({ min: 3, max: 255 })
-    .withMessage('Title must be between 3 and 255 characters'),
+    .notEmpty()
+    .withMessage('Title is required')
+    .isLength({ min: 1, max: 255 })
+    .withMessage('Title must be between 1 and 255 characters')
+    .trim()
+    .escape(),
+  
+  body('slug')
+    .notEmpty()
+    .withMessage('Slug is required')
+    .matches(/^[a-z0-9-]+$/)
+    .withMessage('Slug must contain only lowercase letters, numbers, and hyphens')
+    .trim(),
   
   body('description')
     .optional()
     .isLength({ max: 1000 })
-    .withMessage('Description must be less than 1000 characters'),
+    .withMessage('Description must be less than 1000 characters')
+    .trim()
+    .escape(),
   
   body('location')
-    .optional()
-    .isLength({ max: 255 })
-    .withMessage('Location must be less than 255 characters'),
+    .notEmpty()
+    .withMessage('Location is required')
+    .isLength({ min: 1, max: 255 })
+    .withMessage('Location must be between 1 and 255 characters')
+    .trim()
+    .escape(),
   
   body('date')
     .isISO8601()
-    .withMessage('Date must be a valid ISO 8601 date'),
+    .withMessage('Date must be a valid ISO 8601 date')
+    .trim(),
   
   body('time')
     .matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/)
-    .withMessage('Time must be in HH:MM format'),
+    .withMessage('Time must be in HH:MM format')
+    .trim(),
+  
+  body('end_time')
+    .optional()
+    .matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/)
+    .withMessage('End time must be in HH:MM format')
+    .trim(),
   
   body('type')
-    .optional()
-    .isIn(['general', 'team-round', 'individual-round', 'workshop', 'fun', 'aftershow'])
-    .withMessage('Invalid event type'),
+    .notEmpty()
+    .withMessage('Type is required')
+    .isIn(['team-round', 'individual-round', 'workshop', 'fun', 'aftershow', 'general', 'technical', 'registration', 'party', 'celebration'])
+    .withMessage('Type must be one of: competition, break, announcement, workshop, social'),
   
   body('status')
     .optional()
-    .isIn(['confirmed', 'tentative', 'cancelled'])
-    .withMessage('Invalid status')
+    .isIn(['confirmed', 'tentative', 'upcoming', 'active', 'completed', 'cancelled'])
+    .withMessage('Status must be one of: scheduled, in_progress, completed, cancelled'),
+  
+  handleValidationErrors
 ];
 
-// Validation rules for city tips
-const validateCityTip = [
+// Enhanced validation for city tips
+export const validateCityTip = [
   body('name')
-    .isLength({ min: 3, max: 255 })
-    .withMessage('Name must be between 3 and 255 characters'),
-  
-  body('category')
-    .isIn(['restaurant', 'cafe', 'bar', 'culture', 'shopping', 'hotel', 'transport'])
-    .withMessage('Invalid category'),
+    .notEmpty()
+    .withMessage('Name is required')
+    .isLength({ min: 1, max: 255 })
+    .withMessage('Name must be between 1 and 255 characters')
+    .trim(),
   
   body('description')
-    .optional()
-    .isLength({ max: 1000 })
-    .withMessage('Description must be less than 1000 characters'),
+    .notEmpty()
+    .withMessage('Description is required')
+    .isLength({ min: 1, max: 1000 })
+    .withMessage('Description must be between 1 and 1000 characters')
+    .trim(),
   
   body('address')
     .optional()
-    .isLength({ max: 500 })
-    .withMessage('Address must be less than 500 characters'),
+    .isLength({ min: 0, max: 255 })
+    .withMessage('Address must be between 0 and 255 characters')
+    .trim(),
+  
+  body('category')
+    .notEmpty()
+    .withMessage('Category is required')
+    .isIn(['culture', 'cafe', 'restaurant', 'bar', 'shopping', 'hotel', 'transport', 'entertainment'])
+    .withMessage('Category must be one of: culture, cafe, restaurant, bar, shopping, hotel, transport, entertainment'),
+  
+  body('slug')
+    .optional()
+    .matches(/^[a-z0-9-]+$/)
+    .withMessage('Slug must contain only lowercase letters, numbers, and hyphens')
+    .trim(),
   
   body('latitude')
     .optional()
-    .isFloat({ min: -90, max: 90 })
+    .custom((value) => {
+      if (value === '' || value === null || value === undefined) {
+        return true; // Allow empty values
+      }
+      const num = parseFloat(value);
+      return !isNaN(num) && num >= -90 && num <= 90;
+    })
     .withMessage('Latitude must be between -90 and 90'),
   
   body('longitude')
     .optional()
-    .isFloat({ min: -180, max: 180 })
+    .custom((value) => {
+      if (value === '' || value === null || value === undefined) {
+        return true; // Allow empty values
+      }
+      const num = parseFloat(value);
+      return !isNaN(num) && num >= -180 && num <= 180;
+    })
     .withMessage('Longitude must be between -180 and 180'),
   
-  
-  
-  body('priceRange')
+  // Add validation for all the fields the form actually sends
+  body('phone')
     .optional()
-    .isIn(['€', '€€', '€€€', '€€€€'])
-    .withMessage('Invalid price range')
+    .isLength({ min: 0, max: 50 })
+    .withMessage('Phone must be between 0 and 50 characters')
+    .trim(),
+  
+  body('website')
+    .optional({ checkFalsy: true })  // CRITICAL: Allow empty strings
+    .custom((value) => {
+      if (!value || value === '') return true;
+      try {
+        new URL(value);
+        return true;
+      } catch {
+        return false;
+      }
+    })
+    .withMessage('Website must be a valid URL')
+    .trim(),
+  
+  body('price_range')
+    .optional()
+    .isLength({ min: 0, max: 10 })
+    .withMessage('Price range must be between 0 and 10 characters')
+    .trim(),
+  
+  // REMOVED: contact_info_email validation - client transforms this to contact_info object
+  
+  body('opening_hours')
+    .optional()
+    .isLength({ min: 0, max: 1000 })
+    .withMessage('Opening hours must be between 0 and 1000 characters')
+    .trim(),
+  
+  body('tips')
+    .optional()
+    .isLength({ min: 0, max: 2000 })
+    .withMessage('Tips must be between 0 and 2000 characters')
+    .trim(),
+  
+  handleValidationErrors
 ];
 
-// Validation rules for search queries
-const validateSearch = [
-  query('q')
-    .isLength({ min: 2, max: 100 })
-    .withMessage('Search query must be between 2 and 100 characters')
-    .matches(/^[a-zA-ZäöüßÄÖÜ0-9\s\-'\.]+$/)
-    .withMessage('Search query contains invalid characters'),
+// Enhanced validation for countdown configuration
+export const validateCountdownConfig = [
+  body('title')
+    .notEmpty()
+    .withMessage('Title is required')
+    .isLength({ min: 1, max: 255 })
+    .withMessage('Title must be between 1 and 255 characters')
+    .trim()
+    .escape(),
   
-  query('limit')
+  body('subtitle')
     .optional()
-    .isInt({ min: 1, max: 100 })
-    .withMessage('Limit must be between 1 and 100'),
+    .isLength({ max: 500 })
+    .withMessage('Subtitle must be less than 500 characters')
+    .trim()
+    .escape(),
   
-  query('offset')
+  body('targetDate')
+    .isISO8601()
+    .withMessage('Target date must be a valid ISO 8601 date')
+    .trim(),
+  
+  body('buttonText')
     .optional()
-    .isInt({ min: 0 })
-    .withMessage('Offset must be a positive integer')
+    .isLength({ max: 100 })
+    .withMessage('Button text must be less than 100 characters')
+    .trim()
+    .escape(),
+  
+  body('buttonEmoji')
+    .optional()
+    .isLength({ max: 10 })
+    .withMessage('Button emoji must be less than 10 characters')
+    .trim(),
+  
+  body('buttonLink')
+    .optional()
+    .matches(/^\/[a-zA-Z0-9\/-]*$/)
+    .withMessage('Button link must be a valid internal path')
+    .trim(),
+  
+  body('isActive')
+    .optional()
+    .isBoolean()
+    .withMessage('isActive must be a boolean'),
+  
+  handleValidationErrors
 ];
 
-// Validation rules for ID parameters
-const validateId = [
+// Sanitization middleware
+export const sanitizeInput = (req, res, next) => {
+  if (req.body) {
+    // Recursively sanitize all string values
+    const sanitizeObject = (obj) => {
+      for (const key in obj) {
+        if (typeof obj[key] === 'string') {
+          obj[key] = xss(obj[key]);
+        } else if (typeof obj[key] === 'object' && obj[key] !== null) {
+          sanitizeObject(obj[key]);
+        }
+      }
+    };
+    
+    sanitizeObject(req.body);
+  }
+  next();
+};
+
+// Rate limiting for admin operations
+export const adminRateLimit = (req, res, next) => {
+  // Simple rate limiting - in production, use redis-based rate limiting
+  const now = Date.now();
+  const windowMs = 15 * 60 * 1000; // 15 minutes
+  const maxRequests = 100; // 100 requests per window
+  
+  if (!req.rateLimit) {
+    req.rateLimit = {
+      requests: [],
+      windowStart: now
+    };
+  }
+  
+  // Clean old requests
+  req.rateLimit.requests = req.rateLimit.requests.filter(
+    timestamp => now - timestamp < windowMs
+  );
+  
+  if (req.rateLimit.requests.length >= maxRequests) {
+    return res.status(429).json({
+      success: false,
+      error: 'Too many requests',
+      code: 'RATE_LIMIT_EXCEEDED',
+      retryAfter: Math.ceil(windowMs / 1000)
+    });
+  }
+  
+  req.rateLimit.requests.push(now);
+  next();
+};
+
+// ID validation middleware
+export const validateSchnellzugriffId = [
   param('id')
     .isInt({ min: 1 })
-    .withMessage('ID must be a positive integer')
+    .withMessage('ID must be a positive integer'),
+  handleValidationErrors
 ];
 
-// Check if resource exists
-const checkResourceExists = (tableName, idParam = 'id') => {
-  return async (req, res, next) => {
-    try {
-      const id = req.params[idParam];
-      const result = await executeQuery(
-        `SELECT id FROM ${tableName} WHERE id = $1`,
-        [id]
-      );
-      
-      if (result.rows.length === 0) {
-        return res.status(404).json({
-          error: `${tableName.slice(0, -1)} not found`,
-          code: 'RESOURCE_NOT_FOUND'
-        });
-      }
-      
-      next();
-    } catch (error) {
-      console.error('Resource existence check failed:', error);
-      res.status(500).json({
-        error: 'Internal server error',
-        code: 'RESOURCE_CHECK_ERROR'
-      });
-    }
-  };
-};
-
-// Validate file uploads
-const validateFileUpload = (allowedTypes, maxSize) => {
-  return (req, res, next) => {
-    if (!req.file) {
-      return res.status(400).json({
-        error: 'No file uploaded',
-        code: 'NO_FILE'
-      });
-    }
-    
-    if (!allowedTypes.includes(req.file.mimetype)) {
-      return res.status(400).json({
-        error: 'Invalid file type',
-        code: 'INVALID_FILE_TYPE',
-        allowedTypes
-      });
-    }
-    
-    if (req.file.size > maxSize) {
-      return res.status(400).json({
-        error: 'File too large',
-        code: 'FILE_TOO_LARGE',
-        maxSize: maxSize
-      });
-    }
-    
-    next();
-  };
-};
-
-// Validate JSON data
-const validateJSON = (req, res, next) => {
-  if (req.body && typeof req.body === 'object') {
-    try {
-      // Check for circular references
-      JSON.stringify(req.body);
-      next();
-    } catch (error) {
-      return res.status(400).json({
-        error: 'Invalid JSON data',
-        code: 'INVALID_JSON'
-      });
-    }
-  } else {
-    next();
-  }
-};
-
-// Validate pagination
-const validatePagination = [
-  query('page')
-    .optional()
+export const validateTimetableEventId = [
+  param('id')
     .isInt({ min: 1 })
-    .withMessage('Page must be a positive integer'),
-  
-  query('limit')
-    .optional()
-    .isInt({ min: 1, max: 100 })
-    .withMessage('Limit must be between 1 and 100')
+    .withMessage('ID must be a positive integer'),
+  handleValidationErrors
 ];
 
-// Validate sort parameters
-const validateSort = (allowedFields) => [
-  query('sort')
-    .optional()
-    .isIn(allowedFields)
-    .withMessage(`Sort field must be one of: ${allowedFields.join(', ')}`),
-  
-  query('order')
-    .optional()
-    .isIn(['asc', 'desc'])
-    .withMessage('Order must be either asc or desc')
+export const validateCityTipId = [
+  param('id')
+    .isInt({ min: 1 })
+    .withMessage('ID must be a positive integer'),
+  handleValidationErrors
 ];
 
-export {
-  handleValidationErrors,
-  sanitizeInput,
-  validateParticipant,
-  validateRound,
-  validateNews,
-  validateTimetableEntry,
-  validateCityTip,
-  validateSearch,
-  validateId,
-  checkResourceExists,
-  validateFileUpload,
-  validateJSON,
-  validatePagination,
-  validateSort
-};
+export const validateTimetableEvent = validateTimetableEntry;
+
+export { handleValidationErrors };

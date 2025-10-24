@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { FadeIn, StaggeredContainer, HoverTransition, OpacityTransition } from './Transitions.jsx';
-import { useLinks } from '../hooks/index.js';
+import { useLinks, usePageTitle } from '../hooks/index.js';
 import './Links.css';
 
 const Links = () => {
+  usePageTitle('Links');
   const { data: linksData, isLoading: loading, error } = useLinks();
   const [links, setLinks] = useState([]);
 
@@ -84,6 +85,15 @@ const Links = () => {
     return gradientMap[color] || gradientMap.blue;
   };
 
+  // Helper function to determine if URL should open in new tab
+  const shouldOpenInNewTab = (url) => {
+    if (!url) return false;
+    
+    // Always open in new tab if it's marked as external in database
+    // OR if it's an absolute URL (starts with http/https)
+    return url.startsWith('http://') || url.startsWith('https://');
+  };
+
   const handleLinkClick = (link, e) => {
     // Check if link is empty or invalid
     if (!link.url || link.url === '#' || link.url === '' || link.url === 'javascript:void(0)') {
@@ -94,9 +104,13 @@ const Links = () => {
       return;
     }
     
-    if (link.isExternal) {
-      // Track external link clicks
-      console.log(`External link clicked: ${link.title} -> ${link.url}`);
+    // Force external links to open in new tab
+    if (shouldOpenInNewTab(link.url)) {
+      e.preventDefault();
+      window.open(link.url, '_blank', 'noopener,noreferrer');
+      
+      // Track external link clicks (dev only)
+      if (import.meta.env.DEV) console.log(`External link clicked: ${link.title} -> ${link.url}`);
     }
   };
 
@@ -170,6 +184,20 @@ const Links = () => {
     );
   }
 
+  // Function to translate category names to German
+  const translateCategory = (category) => {
+    const translations = {
+      'Kommunikation': 'Kommunikation',
+      'Medien': 'Medien', 
+      'Musik': 'Musik',
+      'Navigation': 'Navigation',
+      'Sonstiges': 'Sonstiges',
+      'official': 'Offizielle Links',
+      'social': 'Social Media'
+    };
+    return translations[category] || category;
+  };
+
   // Group links by category - ensure links is an array
   const groupedLinks = (Array.isArray(links) ? links : []).reduce((acc, link) => {
     const category = link.category || 'Sonstiges';
@@ -184,31 +212,24 @@ const Links = () => {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <FadeIn>
-          <div className="text-center mb-16">
-            <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-600 to-purple-600 rounded-2xl mb-6 shadow-lg">
-              <span className="text-3xl">🔗</span>
+          <div className="space-y-8">
+            {/* Header Card */}
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+              <div className="text-center mb-8">
+                <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-600 to-purple-600 rounded-2xl mb-6 shadow-lg">
+                  <span className="text-3xl">🔗</span>
+                </div>
+                <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Wichtige Links</h1>
+                <p className="text-gray-600 dark:text-gray-400">Alle wichtigen Links und Ressourcen für SLAM25 auf einen Blick</p>
+              </div>
             </div>
-            <h1 className="text-4xl md:text-5xl font-bold gradient-text bg-clip-text text-transparent mb-4">
-              Wichtige Links
-            </h1>
-            <p className="text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto leading-relaxed">
-              Alle wichtigen Links und Ressourcen für SLAM25 auf einen Blick
-            </p>
-            <div className="mt-6 flex items-center justify-center space-x-2">
-              <div className="w-2 h-2 bg-blue-500 rounded-full pulse-dot"></div>
-              <div className="w-2 h-2 bg-purple-500 rounded-full pulse-dot"></div>
-              <div className="w-2 h-2 bg-indigo-500 rounded-full pulse-dot"></div>
-            </div>
-          </div>
-
-          <StaggeredContainer>
             {Object.entries(groupedLinks).map(([category, categoryLinks], categoryIndex) => (
-              <div key={category} className="mb-12">
+              <div key={category} className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
                 <div className="mb-8">
                   <div className="flex items-center mb-4">
                     <span className="w-3 h-3 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full mr-3 shadow-sm"></span>
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {category}
+                      {translateCategory(category)}
                     </h2>
                   </div>
                   <div className="h-px bg-gradient-to-r from-gray-300 dark:from-gray-600 to-transparent"></div>
@@ -220,8 +241,8 @@ const Links = () => {
                       <HoverTransition className="links-card">
                         <a
                           href={link.url}
-                          target={link.isExternal ? '_blank' : '_self'}
-                          rel={link.isExternal ? 'noopener noreferrer' : undefined}
+                          target={shouldOpenInNewTab(link.url) ? '_blank' : '_self'}
+                          rel={shouldOpenInNewTab(link.url) ? 'noopener noreferrer' : undefined}
                           onClick={(e) => handleLinkClick(link, e)}
                           className="group relative block p-0 rounded-2xl overflow-hidden focus:outline-none"
                           aria-label={`${link.title} - ${link.description}`}
@@ -274,7 +295,7 @@ const Links = () => {
                 </div>
               </div>
             ))}
-          </StaggeredContainer>
+          </div>
 
           {(!Array.isArray(links) || links.length === 0) && (
             <div className="text-center py-20">

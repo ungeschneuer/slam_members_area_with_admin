@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import CheckboxInput from '../forms/CheckboxInput.jsx';
-import { formatDateInConfiguredTimezone } from '../../services/timezoneService.js';
+import { getTimezoneOffsetFor } from '../../services/timezoneService.js';
 
 export default function AdminCountdown() {
   const navigate = useNavigate();
@@ -88,10 +88,10 @@ export default function AdminCountdown() {
       const rawDate = mapped.targetDate;
       const parsed = rawDate ? new Date(rawDate) : null;
       const isValidDate = parsed && !isNaN(parsed.getTime());
+      
+      // Fix timezone conversion: display the time as entered, not adjusted for timezone
       const localDateTime = isValidDate
-        ? new Date(parsed.getTime() - parsed.getTimezoneOffset() * 60000)
-            .toISOString()
-            .slice(0, 16)
+        ? `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}T${String(parsed.getHours()).padStart(2, '0')}:${String(parsed.getMinutes()).padStart(2, '0')}`
         : '2025-10-28T12:00';
 
       reset({
@@ -111,10 +111,23 @@ export default function AdminCountdown() {
     setSuccess(null);
 
     try {
-      // Convert local datetime to ISO string with timezone
-      const targetDate = new Date(data.targetDate);
-      const berlinTime = new Date(targetDate.getTime() + (2 * 60 * 60 * 1000)); // Add 2 hours for CEST
-      const isoString = berlinTime.toISOString();
+      // Convert the datetime-local input to UTC, treating the input as Berlin time
+      const localInput = new Date(data.targetDate);
+      
+      // Create a date that represents the same time in Berlin timezone
+      // We do this by creating a date in UTC that represents the Berlin time
+      const year = localInput.getFullYear();
+      const month = localInput.getMonth();
+      const day = localInput.getDate();
+      const hour = localInput.getHours();
+      const minute = localInput.getMinutes();
+      
+      // Create a date string in Berlin timezone format
+      const berlinDateString = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`;
+      
+      // Parse this as if it were in Berlin timezone and convert to UTC
+      const berlinDate = new Date(berlinDateString + '+01:00'); // Berlin is UTC+1 in October
+      const isoString = berlinDate.toISOString();
 
       // Use TanStack Query mutation for consistent response handling
       await updateCountdown.mutateAsync({
@@ -132,7 +145,15 @@ export default function AdminCountdown() {
   };
 
   const handleReset = () => {
-    reset();
+    reset({
+      title: 'Countdown zum SLAM25',
+      subtitle: `28. Oktober 2025 • 12:00 Uhr (${timezoneName})`,
+      targetDate: '2025-10-28T12:00',
+      buttonText: 'Zum Zeitplan',
+      buttonEmoji: '📅',
+      buttonLink: '/timetable',
+      isActive: true
+    });
   };
 
   if (loading) {

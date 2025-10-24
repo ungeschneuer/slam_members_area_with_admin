@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { API_URL } from '../config/api.js';
 import authService from '../services/authService.js';
+import { useEntityData } from './useEntityData.js';
 
 // Query keys for timetable
 export const timetableKeys = {
@@ -12,10 +13,10 @@ export const timetableKeys = {
 };
 
 // Hook to fetch all timetable events
-export function useTimetable(filters = {}) {
-  return useQuery({
-    queryKey: timetableKeys.list(filters),
-    queryFn: async () => {
+export function useTimetable(filters = {}, isAdmin = false) {
+  return useEntityData(
+    'timetable',
+    async () => {
       const response = await fetch(`${API_URL}/timetable`, {
         credentials: 'include'
       });
@@ -23,11 +24,12 @@ export function useTimetable(filters = {}) {
         throw new Error(`Failed to fetch timetable: ${response.statusText}`);
       }
       const result = await response.json();
-      return result?.data || result || [];
+      // Handle nested data structure or direct array
+      const data = result?.data?.data?.rows || result?.data?.rows || result?.data || result;
+      return Array.isArray(data) ? data : [];
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
-  });
+    { filters, staleTime: 5 * 60 * 1000, gcTime: 10 * 60 * 1000, isAdmin }
+  );
 }
 
 // Hook to fetch a single timetable event by slug
@@ -36,18 +38,22 @@ export function useTimetableEvent(slug) {
     queryKey: timetableKeys.detail(slug),
     queryFn: async () => {
       if (!slug) return null;
-      const response = await fetch(`${API_URL}/timetable/slug/${slug}`, {
+      const response = await fetch(`${API_URL}/timetable/${slug}`, {
         credentials: 'include'
       });
-      if (!response.ok) {
-        throw new Error(`Failed to fetch timetable event: ${response.statusText}`);
-      }
+      // Gracefully handle not-found without throwing to avoid console 404 noise
+      if (response.status === 404) return null;
+      if (!response.ok) throw new Error(`Failed to fetch timetable event: ${response.statusText}`);
       const result = await response.json();
       return result?.data || result || null;
     },
     enabled: !!slug,
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
+    // Avoid repeated refetches that can spam 404s during navigation or focus
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true
   });
 }
 
@@ -69,7 +75,8 @@ export function useCreateTimetableEvent() {
       return result?.data || result;
     },
     onSuccess: (data) => {
-      // Invalidate and refetch timetable list
+      // Invalidate all timetable-related queries to ensure admin components update
+      queryClient.invalidateQueries({ queryKey: ['timetable'] });
       queryClient.invalidateQueries({ queryKey: timetableKeys.lists() });
       
       // If we have the created event data, add it to the cache
@@ -98,7 +105,8 @@ export function useUpdateTimetableEvent() {
       return result?.data || result;
     },
     onSuccess: (data, variables) => {
-      // Invalidate and refetch timetable list
+      // Invalidate all timetable-related queries to ensure admin components update
+      queryClient.invalidateQueries({ queryKey: ['timetable'] });
       queryClient.invalidateQueries({ queryKey: timetableKeys.lists() });
       
       // Update the specific event in cache
@@ -128,8 +136,34 @@ export function useDeleteTimetableEvent() {
       // Remove from cache
       queryClient.removeQueries({ queryKey: timetableKeys.detail(id) });
       
-      // Invalidate and refetch timetable list
+      // Invalidate all timetable-related queries to ensure admin components update
+      queryClient.invalidateQueries({ queryKey: ['timetable'] });
       queryClient.invalidateQueries({ queryKey: timetableKeys.lists() });
     },
+  });
+}
+
+// Hook to update participant role in timetable entry
+export function useUpdateTimetableParticipantRole() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ entryId, participantId, role }) => {
+      const response = await authService.authenticatedRequest(
+        `${API_URL}/timetable/${entryId}/participants/${participantId}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ role })
+        }
+      );
+      const result = await response.json();
+      return result?.data || result;
+    },
+    onSuccess: () => {
+      // Invalidate all timetable-related queries to ensure participant detail pages show current information
+      queryClient.invalidateQueries({ queryKey: timetableKeys.all });
+      queryClient.invalidateQueries({ queryKey: timetableKeys.lists() });
+    }
   });
 }

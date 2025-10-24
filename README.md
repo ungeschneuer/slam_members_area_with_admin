@@ -6,7 +6,7 @@ A full-stack Poetry Slam application with React frontend and Express.js backend 
 
 - **Member Dashboard** - Competition rounds and participant management
 - **Admin Panel** - Content management and user administration
-- **Real-time Updates** - WebSocket connections for live updates
+- **Live Updates** - Polling-based data refresh for real-time experience
 - **City Tips** - Location recommendations and interactive maps
 - **News & Community** - News feed and community features
 - **PWA Support** - Progressive Web App with offline capabilities
@@ -15,7 +15,7 @@ A full-stack Poetry Slam application with React frontend and Express.js backend 
 
 - **Frontend**: React 19 + Vite + TailwindCSS + React Router v7
 - **Backend**: Express.js + PostgreSQL
-- **Real-time**: Socket.io for WebSocket connections
+- **Real-time**: Polling-based updates for live data
 - **PWA**: Progressive Web App with service workers
 
 ## 📁 Project Structure
@@ -53,16 +53,20 @@ A full-stack Poetry Slam application with React frontend and Express.js backend 
 
 2. **Environment setup:**
    ```bash
-   # Copy environment template
-   cp env.production.example .env
+   # Copy environment template for your environment
+   cp .env.development.template .env.development  # For development
+   cp .env.production.template .env.production    # For production
    
-   # Edit .env with your configuration
+   # Edit .env.development with your configuration
+   # Required environment variables:
    DB_HOST=localhost
    DB_PORT=5432
    DB_NAME=slam25_db
    DB_USER=slam_user
-   DB_PASSWORD=your_secure_password
-   JWT_SECRET=your_super_secure_jwt_secret_key
+   DB_PASSWORD=your_secure_password  # REQUIRED - no fallback
+   JWT_SECRET=your_super_secure_jwt_secret_key  # REQUIRED - no fallback
+   NODE_ENV=development
+   PORT=3000
    ```
 
 3. **Database setup:**
@@ -143,6 +147,9 @@ npm run test:coverage
 - Rate limiting and DDoS protection
 - Security headers with Helmet.js
 - Password hashing with bcrypt
+- **Token revocation mechanism** for immediate logout
+- **Database validation** for admin routes to prevent deleted user access
+- **No hardcoded secrets** - application fails fast if misconfigured
 
 ## 📱 PWA Features
 

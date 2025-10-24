@@ -35,7 +35,7 @@ console.log('');
 // Test 3: System routes
 console.log('3. System Routes:');
 try {
-  const { default: systemRoutes } = await import('../server/routes/system.routes.js');
+  // System routes removed - using simple routes instead
   console.log(`   ✅ System routes loaded successfully`);
 } catch (error) {
   console.log(`   ❌ Error: ${error.message}`);

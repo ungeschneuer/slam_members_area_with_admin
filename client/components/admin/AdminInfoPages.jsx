@@ -1,15 +1,21 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useInfoPages, useCreateInfoPage, useUpdateInfoPage, useDeleteInfoPage } from '../../hooks/index.js';
 import LoadingSpinner from '../LoadingSpinner.jsx';
-import { generateSlug as generateSlugUtil } from '../../utils/slugUtils.js';
-import { useForm } from 'react-hook-form';
+import { useFormManager } from '../../hooks/useFormManager.js';
+import { createValidationSchema, getDefaultValues } from '../../../shared/schemas/validationFactory.js';
+import { mapInfoPageFormToAPI } from '../../utils/formMappers.js';
 import TextInput from '../forms/TextInput.jsx';
 import SelectInput from '../forms/SelectInput.jsx';
 import TextareaInput from '../forms/TextareaInput.jsx';
+import MarkdownTextarea from '../forms/MarkdownTextarea.jsx';
 import CheckboxInput from '../forms/CheckboxInput.jsx';
+import { getAvailableContentFilterOptions, validateFilterValue } from '../../utils/filterUtils.js';
+
+// Use centralized validation schema
+const infoPageSchema = createValidationSchema('infoPage');
 
 const AdminInfoPages = () => {
-  const { data: pagesData, isLoading: loading, error } = useInfoPages();
+  const { data: pagesData, isLoading: loading, error } = useInfoPages({}, true); // isAdmin = true
   const createInfoPage = useCreateInfoPage();
   const updateInfoPage = useUpdateInfoPage();
   const deleteInfoPage = useDeleteInfoPage();
@@ -19,67 +25,52 @@ const AdminInfoPages = () => {
   const [showForm, setShowForm] = useState(false);
   const [uploading, setUploading] = useState(false);
 
-  const { register, handleSubmit, reset, setValue, watch, clearErrors, setError, formState: { errors, isSubmitting } } = useForm({
-    defaultValues: {
-      title: '',
-      slug: '',
-      content: '',
-      excerpt: '',
-      category: 'general',
-      order: 0,
-      status: 'DRAFT',
-      featuredImageUrl: '',
-      metaDescription: '',
-      tags: [],
-      isPublished: false
-    }
+  // Form management with centralized error handling
+  const { 
+    form, 
+    error: componentError, 
+    isSubmitting, 
+    submitForm, 
+    resetForm, 
+    setFormValues,
+    clearError 
+  } = useFormManager(infoPageSchema, { 
+    defaultValues: getDefaultValues('infoPage') 
   });
   
-  // Auto-generate slug when title changes
+  // Auto-generate slug from title
   useEffect(() => {
-    const subscription = watch((value, { name }) => {
-      if (name === 'title') {
-        const next = value?.title || '';
-        setValue('slug', generateSlug(next), { shouldDirty: true });
+    const subscription = form.watch((value, { name }) => {
+      if (name === 'title' && value?.title && !editingPage) {
+        const slug = value.title
+          .toLowerCase()
+          .replace(/[äöü]/g, char => ({ ä: 'ae', ö: 'oe', ü: 'ue' }[char]))
+          .replace(/[^\w\s-]/g, '')
+          .replace(/\s+/g, '-')
+          .substring(0, 200);
+        form.setValue('slug', slug);
       }
     });
     return () => subscription.unsubscribe();
-  }, [watch, setValue]);
-
-  // Live data handled by useLiveData
-
-  // Legacy handler removed - RHF handles input changes automatically
-
-  const generateSlug = (title) => {
-    return generateSlugUtil(title, { maxLength: 45, removeStopwords: true });
-  };
-
-  const handleTitleChange = (e) => {
-    const title = e.target.value;
-    setValue('title', title, { shouldDirty: true });
-    setValue('slug', generateSlug(title), { shouldDirty: true });
-  };
+  }, [form.watch, form.setValue, editingPage]);
 
   const onSubmit = async (data) => {
-    try {
-      clearErrors('root');
-      if (editingPage) {
-        await updateInfoPage.mutateAsync({ id: editingPage.id, ...data });
-      } else {
-        await createInfoPage.mutateAsync(data);
-      }
-      setShowForm(false);
-      setEditingPage(null);
-      reset();
-    } catch (err) {
-      console.error('Error saving page:', err);
-      setError('root', { type: 'server', message: 'Fehler beim Speichern der Seite' });
+    const apiData = mapInfoPageFormToAPI(data);
+    if (editingPage) {
+      await updateInfoPage.mutateAsync({ id: editingPage.id, ...apiData });
+    } else {
+      await createInfoPage.mutateAsync(apiData);
     }
+    
+    // Proper cleanup
+    setShowForm(false);
+    setEditingPage(null);
+    resetForm(); // Reset to defaults
   };
 
   const handleEdit = (page) => {
     setEditingPage(page);
-    reset({
+    setFormValues({
       title: page.title,
       slug: page.slug,
       content: page.content,
@@ -87,10 +78,10 @@ const AdminInfoPages = () => {
       category: page.category,
       order: page.order || 0,
       status: page.status,
-      featuredImageUrl: page.featuredImageUrl || '',
-      metaDescription: page.metaDescription || '',
+      featuredImageUrl: page.featured_image_url || '',
+      metaDescription: page.meta_description || '',
       tags: page.tags || [],
-      isPublished: page.isPublished
+      isPublished: page.is_published
     });
     setShowForm(true);
   };
@@ -128,37 +119,42 @@ const AdminInfoPages = () => {
       }
 
       const result = await response.json();
-      setValue('featuredImageUrl', result.image.filePath, { shouldDirty: true });
+      form.setValue('featuredImageUrl', result.image.filePath, { shouldDirty: true });
     } catch (err) {
       console.error('Error uploading image:', err);
-      setError('root', { type: 'server', message: 'Fehler beim Hochladen des Bildes' });
+      // Error handling is now managed by useFormManager
+      console.error('Error uploading image:', err);
     } finally {
       setUploading(false);
     }
   };
 
-  const resetForm = () => {
-    reset({
-      title: '',
-      slug: '',
-      content: '',
-      excerpt: '',
-      category: 'general',
-      order: 0,
-      status: 'DRAFT',
-      featuredImageUrl: '',
-      metaDescription: '',
-      tags: [],
-      isPublished: false
-    });
+  const handleResetForm = () => {
+    resetForm();
   };
 
-  const categories = [
+  const predefinedCategories = [
     { value: 'general', label: 'Allgemein' },
     { value: 'rules', label: 'Regeln' },
     { value: 'legal', label: 'Rechtliches' },
     { value: 'help', label: 'Hilfe' }
   ];
+
+  // Dynamic categories based on existing content (only published items)
+  const categories = useMemo(() => {
+    // Get categories that have at least one published item
+    const categoriesInUse = new Set(
+      pages
+        .filter(page => page.status === 'PUBLISHED' || page.is_published)
+        .map(page => page.category)
+        .filter(Boolean)
+    );
+    
+    // Return predefined options that have published content or are the "all" option
+    return predefinedCategories.filter(option => 
+      option.value === 'all' || categoriesInUse.has(option.value)
+    );
+  }, [pages]);
 
   const statusOptions = [
     { value: 'DRAFT', label: 'Entwurf' },
@@ -199,14 +195,14 @@ const AdminInfoPages = () => {
             {editingPage ? 'Seite bearbeiten' : 'Neue Seite erstellen'}
           </h3>
           
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            {errors.root && (
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            {form.formState.errors.root && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                <p className="text-red-800 text-sm">{errors.root.message}</p>
+                <p className="text-red-800 text-sm">{form.formState.errors.root.message}</p>
               </div>
             )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <TextInput label="Titel *" name="title" register={register} rules={{ required: 'Titel ist erforderlich' }} errors={errors} />
+              <TextInput label="Titel *" name="title" control={form.control} error={form.formState.errors.title?.message} />
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -214,20 +210,20 @@ const AdminInfoPages = () => {
                 </label>
                 <input
                   type="text"
-                  aria-invalid={errors.slug ? 'true' : 'false'}
-                  {...register('slug', { required: 'Slug ist erforderlich' })}
+                  aria-invalid={form.formState.errors.slug ? 'true' : 'false'}
+                  {...form.register('slug', { required: 'Slug ist erforderlich' })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
-                {errors.slug && (
-                  <p className="mt-1 text-sm text-red-600" role="alert">{errors.slug.message}</p>
+                {form.formState.errors.slug && (
+                  <p className="mt-1 text-sm text-red-600" role="alert">{form.formState.errors.slug.message}</p>
                 )}
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <SelectInput label="Kategorie" name="category" register={register} options={categories.map(c => ({ value: c.value, label: c.label }))} errors={errors} />
+              <SelectInput label="Kategorie" name="category" control={form.control} options={categories.map(c => ({ value: c.value, label: c.label }))} error={form.formState.errors.category?.message} />
               
-              <SelectInput label="Status" name="status" register={register} options={statusOptions.map(s => ({ value: s.value, label: s.label }))} errors={errors} />
+              <SelectInput label="Status" name="status" control={form.control} options={statusOptions.map(s => ({ value: s.value, label: s.label }))} error={form.formState.errors.status?.message} />
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -235,8 +231,8 @@ const AdminInfoPages = () => {
                 </label>
                 <input
                   type="number"
-                  aria-invalid={errors.order ? 'true' : 'false'}
-                  {...register('order', { valueAsNumber: true })}
+                  aria-invalid={form.formState.errors.order ? 'true' : 'false'}
+                  {...form.register('order', { valueAsNumber: true })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
@@ -246,32 +242,32 @@ const AdminInfoPages = () => {
               <TextareaInput
                 label="Kurzbeschreibung"
                 name="excerpt"
-                register={register}
-                errors={errors}
+                control={form.control}
+                error={form.formState.errors}
                 placeholder="Kurze Beschreibung der Seite..."
                 rows={2}
               />
             </div>
 
             <div>
-              <TextareaInput
+              <MarkdownTextarea
                 label="Inhalt (Markdown) *"
                 name="content"
-                register={register}
-                errors={errors}
+                control={form.control}
+                errors={form.formState.errors}
                 placeholder="# Überschrift&#10;&#10;Hier kommt der Inhalt in Markdown-Format..."
-                rows={15}
+                rows={12}
                 rules={{ required: 'Inhalt ist erforderlich' }}
-                className="font-mono text-sm"
+                helpText="Verwende Markdown-Syntax für Formatierung. URLs werden automatisch verlinkt."
               />
             </div>
 
             <div>
               <TextareaInput
                 label="Meta-Beschreibung"
-                name="metaDescription"
-                register={register}
-                errors={errors}
+                name="meta_description"
+                control={form.control}
+                error={form.formState.errors}
                 placeholder="SEO Meta-Beschreibung..."
                 rows={2}
               />
@@ -284,20 +280,70 @@ const AdminInfoPages = () => {
                 </label>
                 <input
                   type="file"
-                  accept="image/*"
+                  accept="image/*,.pdf"
                   onChange={handleImageUpload}
                   disabled={uploading}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 {uploading && <p className="text-sm text-gray-500 mt-1">Wird hochgeladen...</p>}
+                
+                {/* Current file preview */}
+                {editingPage?.featured_image_url && (
+                  <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+                    <p className="text-sm font-medium text-gray-700 mb-2">Aktuelle Datei:</p>
+                    {editingPage.featured_image_url.toLowerCase().includes('.pdf') ? (
+                      <div className="flex items-center space-x-2">
+                        <span className="text-2xl">📄</span>
+                        <span className="text-sm text-gray-600">PDF-Datei</span>
+                        <a 
+                          href={editingPage.featured_image_url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:text-blue-800 text-sm"
+                        >
+                          Anzeigen
+                        </a>
+                      </div>
+                    ) : (
+                      <div className="flex items-center space-x-3">
+                        <img 
+                          src={editingPage.featured_image_url} 
+                          alt="Featured image" 
+                          className="w-16 h-16 object-cover rounded"
+                        />
+                        <div>
+                          <p className="text-sm text-gray-600">Bild</p>
+                          <a 
+                            href={editingPage.featured_image_url} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:text-blue-800 text-sm"
+                          >
+                            Anzeigen
+                          </a>
+                        </div>
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        form.setValue('featuredImageUrl', '');
+                        setEditingPage({...editingPage, featured_image_url: null});
+                      }}
+                      className="mt-2 text-sm text-red-600 hover:text-red-800"
+                    >
+                      Datei entfernen
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 
             <CheckboxInput
               label="Sofort veröffentlichen"
-              name="isPublished"
-              register={register}
-              errors={errors}
+              name="is_published"
+              control={form.control}
+              error={form.formState.errors.is_published?.message}
             />
 
             <div className="flex justify-end space-x-3">
@@ -373,15 +419,15 @@ const AdminInfoPages = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      page.isPublished 
+                      page.is_published 
                         ? 'bg-green-100 text-green-800'
                         : 'bg-yellow-100 text-yellow-800'
                     }`}>
-                      {page.isPublished ? 'Veröffentlicht' : 'Entwurf'}
+                      {page.is_published ? 'Veröffentlicht' : 'Entwurf'}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(page.createdAt).toLocaleDateString('de-DE')}
+                    {new Date(page.created_at).toLocaleDateString('de-DE')}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex justify-end space-x-2">

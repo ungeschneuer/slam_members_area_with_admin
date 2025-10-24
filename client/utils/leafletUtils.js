@@ -18,6 +18,7 @@ try {
   if (L && L.Icon && L.Icon.Default) {
     // some environments may not define prototype pieces
     // eslint-disable-next-line no-unused-expressions
+    // Using logical AND for conditional execution - safe pattern for optional chaining
     L.Icon.Default.prototype && delete L.Icon.Default.prototype._getIconUrl;
     L.Icon.Default.mergeOptions?.({
       iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',

@@ -1,5 +1,5 @@
 import express from 'express';
-import optimizedQueryService from '../services/optimizedQueryService.js';
+// Optimized query service removed - using simple database queries
 import { executeQuery } from '../config/database.js';
 import { 
   startTiming, 
@@ -8,33 +8,42 @@ import {
   sendErrorResponse, 
   sendNotFoundResponse,
   executeCrudOperation,
-  adminMiddleware
-} from '../utils/routeHelpers.js';
+  safeParseInt
+} from '../utils/simpleRouteHelpers.js';
+import { adminMiddleware } from '../middleware/simpleAuth.js';
+// Idempotency and optimistic locking removed - using simple error handling instead
 import logger from '../config/logger.js';
+import { sanitizeEntity } from '../utils/sanitization.js';
+import { 
+  validateSchnellzugriff, 
+  validateSchnellzugriffId 
+} from '../middleware/validation.js';
 
 const router = express.Router();
 
 // Get individual schnellzugriff link by ID
 router.get('/:id', async (req, res) => {
-  const { id } = req.params;
   const startTime = startTiming();
   
   try {
-    const schnellzugriff = await optimizedQueryService.getSchnellzugriffById(parseInt(id));
+    const result = await executeQuery(
+      'SELECT * FROM schnellzugriff_links WHERE id = $1',
+      [safeParseInt(req.params.id)]
+    );
     const duration = endTiming(startTime);
     
-    if (!schnellzugriff) {
-      logger.info('Schnellzugriff link not found', { id, duration: `${Math.round(duration)}ms` });
+    if (result.rows.length === 0) {
+      logger.info('Schnellzugriff link not found', { id: req.params.id, duration: `${Math.round(duration)}ms` });
       return sendNotFoundResponse(res, 'Schnellzugriff link');
     }
     
-    logger.info('Optimized schnellzugriff by ID query completed', {
-      id,
+    logger.info('Schnellzugriff by ID query completed', {
+      id: req.params.id,
       duration: `${Math.round(duration)}ms`,
-      queryType: 'BASIC'
+      queryType: 'DIRECT'
     });
     
-    sendSuccessResponse(res, schnellzugriff, 'GET_SCHNELLZUGRIFF', duration);
+    sendSuccessResponse(res, result.rows[0], 'GET_SCHNELLZUGRIFF', duration);
   } catch (error) {
     sendErrorResponse(res, error, 'Failed to fetch schnellzugriff by ID');
   }
@@ -74,8 +83,10 @@ router.get('/admin/all', ...adminMiddleware(), async (req, res) => {
 });
 
 // Create schnellzugriff link (admin endpoint)
-router.post('/', ...adminMiddleware(), async (req, res) => {
-  const { title, description, url, icon, color, sortOrder, isActive, isExternal } = req.body;
+router.post('/', ...adminMiddleware(), ...validateSchnellzugriff, async (req, res) => { // Idempotency removed
+  // Sanitize input data to prevent XSS
+  const sanitizedData = sanitizeEntity.schnellzugriff(req.body);
+  const { title, description, url, icon, color, sortOrder, isActive, isExternal } = sanitizedData;
   
   await executeCrudOperation(
     'create',
@@ -84,16 +95,20 @@ router.post('/', ...adminMiddleware(), async (req, res) => {
      RETURNING *`,
     [title, description, url, icon || '🔗', color || 'blue', 
      sortOrder || 0, isActive !== false, isExternal !== false],
-    'schnellzugriff link',
+    'schnellzugriff',
     'CREATE_SCHNELLZUGRIFF',
     res
   );
+  
+  // Cache clearing removed - using simple polling instead
 });
 
 // Update schnellzugriff link (admin endpoint)
-router.put('/:id', ...adminMiddleware(), async (req, res) => {
+router.put('/:id', ...adminMiddleware(), ...validateSchnellzugriffId, ...validateSchnellzugriff, async (req, res) => { // Optimistic locking removed
   const { id } = req.params;
-  const { title, description, url, icon, color, sortOrder, isActive, isExternal } = req.body;
+  // Sanitize input data to prevent XSS
+  const sanitizedData = sanitizeEntity.schnellzugriff(req.body);
+  const { title, description, url, icon, color, sortOrder, isActive, isExternal } = sanitizedData;
   
   await executeCrudOperation(
     'update',
@@ -103,24 +118,28 @@ router.put('/:id', ...adminMiddleware(), async (req, res) => {
      WHERE id = $9
      RETURNING *`,
     [title, description, url, icon, color, sortOrder, isActive, isExternal, parseInt(id)],
-    'schnellzugriff link',
+    'schnellzugriff',
     'UPDATE_SCHNELLZUGRIFF',
     res
   );
+  
+  // Cache clearing removed - using simple polling instead
 });
 
 // Delete schnellzugriff link (admin endpoint)
-router.delete('/:id', ...adminMiddleware(), async (req, res) => {
+router.delete('/:id', ...adminMiddleware(), ...validateSchnellzugriffId, async (req, res) => {
   const { id } = req.params;
   
   await executeCrudOperation(
     'delete',
     'DELETE FROM schnellzugriff_links WHERE id = $1 RETURNING *',
     [parseInt(id)],
-    'schnellzugriff link',
+    'schnellzugriff',
     'DELETE_SCHNELLZUGRIFF',
     res
   );
+  
+  // Cache clearing removed - using simple polling instead
 });
 
 export default router;

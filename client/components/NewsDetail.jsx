@@ -1,44 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
-import { useNewsItem } from '../hooks/index.js';
+import { useNewsItem, usePageTitle } from '../hooks/index.js';
 import LoadingSpinner from './LoadingSpinner.jsx';
+import { getNewsCategoryLabel, getNewsCategoryIcon } from '../utils/newsCategories.js';
+import { getContentTypeIcon, getContentTypeGradient } from '../utils/detailViewUtils.js';
+import BackButton from './shared/BackButton.jsx';
+import MarkdownRenderer from './shared/MarkdownRenderer.jsx';
 
 const NewsDetail = () => {
   const { slug } = useParams();
   const navigate = useNavigate();
   const { data: article, isLoading: loading, error } = useNewsItem(slug);
+  
+  // Set dynamic page title
+  usePageTitle(article?.title || 'Laden...');
 
   const getCategoryLabel = (category) => {
-    // Debug: log the category type to see what we're getting
-    if (import.meta.env.DEV) {
-      console.log('NewsDetail - Category type received:', category);
-    }
-    
-    const categories = {
-      'announcement': 'Ankündigungen',
-      'workshops': 'Workshops',
-      'participants': 'Teilnehmer*innen',
-      'prizes': 'Preise',
-      'general': 'Allgemein',
-      'news': 'Nachrichten',
-      'update': 'Updates',
-      'info': 'Informationen'
-    };
-    return categories[category] || category;
+    return getNewsCategoryLabel(category);
   };
 
-  const getCategoryIcon = (category) => {
-    const icons = {
-      'announcement': '📢',
-      'workshops': '🎓',
-      'participants': '👥',
-      'prizes': '🏆',
-      'general': '📰',
-      'news': '📰',
-      'update': '🔄',
-      'info': 'ℹ️'
-    };
-    return icons[category] || '📰';
+  const getCategoryIconLocal = (category) => {
+    return getNewsCategoryIcon(category);
   };
 
   const formatDate = (dateString) => {
@@ -111,19 +93,15 @@ const NewsDetail = () => {
 
         {/* Article Header */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-8 mb-8">
-          <div className="flex items-start space-x-6 mb-6">
-            <div className="flex-shrink-0">
-              <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
-                <span className="text-blue-600 dark:text-blue-400 text-2xl">
-                  {getCategoryIcon(article.category)}
-                </span>
-              </div>
+          <div className="flex items-start space-x-4">
+            <div className={`w-16 h-16 bg-gradient-to-br ${getContentTypeGradient('news')} rounded-full flex items-center justify-center text-white text-2xl font-bold`}>
+              {getContentTypeIcon('news')}
             </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center space-x-3 mb-4">
-                <h1 className="text-4xl font-bold text-gray-900 dark:text-white leading-tight">
-                  {article.title}
-                </h1>
+            <div className="flex-1">
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+                {article.title}
+              </h1>
+              <div className="flex items-center space-x-3 mb-3">
                 <span className="px-4 py-2 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-sm font-medium rounded-full">
                   {getCategoryLabel(article.category)}
                 </span>
@@ -131,11 +109,11 @@ const NewsDetail = () => {
               <div className="flex items-center text-base text-gray-500 dark:text-gray-400 space-x-4">
                 <span>Von SLAM25 Team</span>
                 <span>•</span>
-                <span>{formatDate(article.created_at)}</span>
-                {article.publishedAt && (
+                <span>{formatDate(article.published_at || article.created_at)}</span>
+                {article.published_at && article.published_at !== article.created_at && (
                   <>
                     <span>•</span>
-                    <span>Veröffentlicht: {formatDate(article.publishedAt)}</span>
+                    <span>Erstellt: {formatDate(article.created_at)}</span>
                   </>
                 )}
               </div>
@@ -143,23 +121,51 @@ const NewsDetail = () => {
           </div>
         </div>
 
+        {/* Featured Image */}
+        {article.featured_image_url && (
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-8 mb-6">
+            {article.featured_image_url.toLowerCase().includes('.pdf') ? (
+              <div className="flex items-center space-x-4 p-6 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <span className="text-4xl">📄</span>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">PDF-Dokument</h3>
+                  <p className="text-gray-600 dark:text-gray-400 mb-4">Zugehöriges PDF-Dokument zu diesem Artikel</p>
+                  <a 
+                    href={article.featured_image_url} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    <span className="mr-2">📄</span>
+                    PDF öffnen
+                  </a>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Bild</h3>
+                <img 
+                  src={article.featured_image_url} 
+                  alt={article.title}
+                  className="w-full max-w-2xl mx-auto rounded-lg shadow-md"
+                />
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Article Content */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-8">
           <div className="prose prose-lg max-w-none dark:prose-invert">
-            <div className="text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap text-base">
-              {article.content}
-            </div>
+            <MarkdownRenderer content={article.content} />
           </div>
         </div>
 
         {/* Back Button */}
         <div className="mt-6">
-          <button
-            onClick={() => navigate('/news')}
-            className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800"
-          >
-            ← Zurück zu News & Updates
-          </button>
+          <BackButton onClick={() => navigate('/news')}>
+            Zurück zu News & Updates
+          </BackButton>
         </div>
       </div>
     </div>

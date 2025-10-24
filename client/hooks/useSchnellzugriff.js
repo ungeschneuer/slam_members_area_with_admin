@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { API_URL } from '../config/api.js';
 import authService from '../services/authService.js';
+import { useEntityData } from './useEntityData.js';
 
 // Query keys for schnellzugriff
 export const schnellzugriffKeys = {
@@ -12,11 +13,12 @@ export const schnellzugriffKeys = {
 };
 
 // Hook to fetch all schnellzugriff links
-export function useSchnellzugriff(filters = {}) {
+export function useSchnellzugriff(filters = {}, isAdmin = false) {
   return useQuery({
     queryKey: schnellzugriffKeys.list(filters),
     queryFn: async () => {
-      const response = await fetch(`${API_URL}/links`, {
+      const endpoint = isAdmin ? '/schnellzugriff/admin/all' : '/schnellzugriff';
+      const response = await fetch(`${API_URL}${endpoint}`, {
         credentials: 'include'
       });
       if (!response.ok) {
@@ -25,6 +27,7 @@ export function useSchnellzugriff(filters = {}) {
       const result = await response.json();
       return result?.data || result || [];
     },
+    enabled: true
   });
 }
 
@@ -63,6 +66,8 @@ export function useCreateSchnellzugriff() {
       return result?.data || result;
     },
     onSuccess: () => {
+      // Invalidate all schnellzugriff-related queries to ensure admin components update
+      queryClient.invalidateQueries({ queryKey: ['schnellzugriff'] });
       queryClient.invalidateQueries({ queryKey: schnellzugriffKeys.all });
     },
   });
@@ -85,6 +90,8 @@ export function useUpdateSchnellzugriff() {
       return result?.data || result;
     },
     onSuccess: () => {
+      // Invalidate all schnellzugriff-related queries to ensure admin components update
+      queryClient.invalidateQueries({ queryKey: ['schnellzugriff'] });
       queryClient.invalidateQueries({ queryKey: schnellzugriffKeys.all });
     },
   });
@@ -105,6 +112,8 @@ export function useDeleteSchnellzugriff() {
       return result?.data || result;
     },
     onSuccess: () => {
+      // Invalidate all schnellzugriff-related queries to ensure admin components update
+      queryClient.invalidateQueries({ queryKey: ['schnellzugriff'] });
       queryClient.invalidateQueries({ queryKey: schnellzugriffKeys.all });
     },
   });

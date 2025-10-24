@@ -13,7 +13,8 @@ export default function TextareaInput({
   control,
   defaultValue,
   required = false,
-  rows = 4
+  rows = 4,
+  ariaLabel
 }) {
   const hasError = errors && errors[name];
   
@@ -39,6 +40,7 @@ export default function TextareaInput({
               rows={rows}
               placeholder={placeholder}
               disabled={disabled}
+              aria-label={ariaLabel || label}
               aria-invalid={hasError ? 'true' : 'false'}
               className={`w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white resize-vertical ${hasError ? 'border-red-500 focus:ring-red-500' : ''} ${className}`}
             />
@@ -66,6 +68,7 @@ export default function TextareaInput({
         rows={rows}
         placeholder={placeholder}
         disabled={disabled}
+        aria-label={ariaLabel || label}
         aria-invalid={hasError ? 'true' : 'false'}
         {...(register ? register(name, rules) : {})}
         className={`w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white resize-vertical ${hasError ? 'border-red-500 focus:ring-red-500' : ''} ${className}`}

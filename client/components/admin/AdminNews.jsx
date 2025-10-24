@@ -1,29 +1,35 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useNews, useBreakingNews, useUpdateNews, useDeleteNews } from '../../hooks/index.js';
 import authService from '../../services/authService.js';
+import { mapNewsFormToAPI } from '../../utils/formMappers.js';
 import LoadingSpinner from '../LoadingSpinner';
 import { useForm } from 'react-hook-form';
 import TextInput from '../forms/TextInput.jsx';
 import SelectInput from '../forms/SelectInput.jsx';
+import MarkdownTextarea from '../forms/MarkdownTextarea.jsx';
 import SearchFilters from '../forms/SearchFilters.jsx';
 import BreakingNewsCountdown from '../shared/BreakingNewsCountdown.jsx';
-import { generateSlug } from '../../utils/slugUtils.js';
+// useSlugAutoGeneration hook removed as part of simplification
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { getAvailableContentFilterOptions, validateFilterValue } from '../../utils/filterUtils.js';
+import { getNewsCategoryAdminOptions } from '../../utils/newsCategories.js';
+import { mapNewsAPIToForm } from '../../utils/formMappers.js';
 
 
 export default function AdminNews() {
   const navigate = useNavigate();
-  const { data: newsData, isLoading: loading, error } = useNews();
+  const { data: newsData, isLoading: loading, error } = useNews({}, true); // isAdmin = true
   const { data: breakingNewsData, isLoading: breakingNewsLoading, error: breakingNewsQueryError } = useBreakingNews();
   const updateNews = useUpdateNews();
   const deleteNews = useDeleteNews();
   const news = Array.isArray(newsData) ? newsData : [];
   const [editingNews, setEditingNews] = useState(null);
+  const [uploading, setUploading] = useState(false);
   const editSchema = z.object({
-    title: z.string().min(1, 'Title is required'),
-    slug: z.string().min(1, 'Slug is required'),
+    title: z.string().min(1, 'Titel ist erforderlich'),
+    slug: z.string().min(1, 'Slug ist erforderlich'),
     category: z.enum(['announcement','workshops','prizes']),
     status: z.enum(['PUBLISHED','DRAFT']),
     date: z.string().min(1, 'Datum ist erforderlich'),
@@ -42,22 +48,12 @@ export default function AdminNews() {
     }
   });
 
-  // Auto-generate slug when title changes
-  useEffect(() => {
-    const subscription = watch((value, { name }) => {
-      if (name === 'title' && value?.title) {
-        const slug = generateSlug(value.title);
-        setValue('slug', slug, { shouldDirty: true });
-      }
-    });
-    return () => subscription.unsubscribe();
-  }, [watch, setValue]);
+  // Auto-generate slug functionality removed as part of simplification
   // Inline add form removed in favor of dedicated page
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   
   // Breaking news state
-  const [breakingNews, setBreakingNews] = useState(breakingNewsData);
   const [breakingNewsSuccess, setBreakingNewsSuccess] = useState(null);
   const [breakingNewsError, setBreakingNewsError] = useState(null);
   
@@ -78,20 +74,32 @@ export default function AdminNews() {
 
   // Removed newNews inline state; creation handled on /admin/news/new
 
-  const contentTypes = [
-    { value: 'announcement', label: 'Ankündigung', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' },
-    { value: 'workshops', label: 'Workshops', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' },
-    { value: 'prizes', label: 'Preise', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' }
-  ];
+  // Use centralized category definitions
+  const predefinedContentTypes = getNewsCategoryAdminOptions();
 
-  // Update breaking news state when useLiveData changes
+  // Dynamic content types based on existing content (only published items)
+  const contentTypes = useMemo(() => {
+    // Get categories that have at least one published item
+    const categoriesInUse = new Set(
+      news
+        .filter(item => item.status === 'PUBLISHED' || item.is_published)
+        .map(item => item.category)
+        .filter(Boolean)
+    );
+    
+    // Return predefined options that have published content or are the "all" option
+    return predefinedContentTypes.filter(option => 
+      option.value === 'all' || categoriesInUse.has(option.value)
+    );
+  }, [news]);
+
+  // Auto-reset selected category if it no longer exists
   useEffect(() => {
-    if (breakingNewsData) {
-      setBreakingNews(breakingNewsData);
-    } else {
-      setBreakingNews(null);
+    const validCategory = validateFilterValue(selectedCategory, contentTypes);
+    if (validCategory !== selectedCategory) {
+      setSelectedCategory(validCategory);
     }
-  }, [breakingNewsData]);
+  }, [contentTypes]); // Only depend on contentTypes to prevent loops
 
   const filteredNews = news.filter(item => {
     const matchesSearch = item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -104,20 +112,23 @@ export default function AdminNews() {
 
   const handleEditOpen = (newsItem) => {
     setEditingNews(newsItem);
+    // Map API data to form format
+    const formData = mapNewsAPIToForm(newsItem);
     reset({
-      title: newsItem.title,
-      slug: newsItem.slug || '',
-      category: newsItem.category,
-      status: newsItem.status || 'PUBLISHED',
-      date: newsItem.date,
-      content: newsItem.content
+      title: formData.title,
+      slug: formData.slug || '',
+      category: formData.category,
+      status: formData.status || 'PUBLISHED',
+      date: formData.date,
+      content: formData.content
     });
   };
 
   const onUpdateSubmit = async (data) => {
     if (!editingNews) return;
     try {
-      await updateNews.mutateAsync({ id: editingNews.id, ...data });
+      const apiData = mapNewsFormToAPI(data);
+      await updateNews.mutateAsync({ id: editingNews.id, ...apiData });
       setEditingNews(null);
     } catch (error) {
       console.error('Error updating news:', error);
@@ -131,6 +142,36 @@ export default function AdminNews() {
       } catch (error) {
         console.error('Error deleting news:', error);
       }
+    }
+  };
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    try {
+      setUploading(true);
+      const formData = new FormData();
+      formData.append('image', file);
+
+      const response = await fetch(`/api/news/${editingNews.id}/upload-image`, {
+        method: 'POST',
+        body: formData,
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        throw new Error('Upload failed');
+      }
+
+      const result = await response.json();
+      // Update the editing news object with the new file path
+      setEditingNews({...editingNews, featured_image_url: result.image.filePath});
+    } catch (err) {
+      console.error('Error uploading file:', err);
+      alert('Fehler beim Hochladen der Datei');
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -154,7 +195,6 @@ export default function AdminNews() {
                            data.breakingNewsDuration === 168 ? '1 Woche' :
                            `${data.breakingNewsDuration} Stunden`;
         setBreakingNewsSuccess(`Breaking News erfolgreich gesetzt für ${durationText}`);
-        setBreakingNews(responseData.data);
         breakingNewsForm.reset();
       } else {
         setBreakingNewsError(responseData.error || 'Fehler beim Setzen der Breaking News');
@@ -177,7 +217,6 @@ export default function AdminNews() {
       
       if (data.success) {
         setBreakingNewsSuccess('Breaking News erfolgreich entfernt');
-        setBreakingNews(null);
       } else {
         setBreakingNewsError(data.error || 'Fehler beim Entfernen der Breaking News');
       }
@@ -246,26 +285,26 @@ export default function AdminNews() {
         )}
 
         {/* Current Breaking News */}
-        {breakingNews && (
+        {breakingNewsData && (
           <div className="mb-6 p-4 bg-gradient-to-r from-red-50 to-orange-50 dark:from-red-900/20 dark:to-orange-900/20 border border-red-200 dark:border-red-800 rounded-lg">
             <h3 className="text-lg font-semibold text-red-900 dark:text-red-100 mb-2">
               Aktuelle Breaking News
             </h3>
             <div className="space-y-2">
-              <p className="text-red-800 dark:text-red-200 font-medium">{breakingNews.title}</p>
+              <p className="text-red-800 dark:text-red-200 font-medium">{breakingNewsData.title}</p>
               <p className="text-sm text-red-600 dark:text-red-400">
-                Kategorie: {contentTypes.find(c => c.value === breakingNews.category)?.label || breakingNews.category}
+                Kategorie: {contentTypes.find(c => c.value === breakingNewsData.category)?.label || breakingNewsData.category}
               </p>
               <p className="text-sm text-red-600 dark:text-red-400">
-                Erstellt: {formatDate(breakingNews.created_at)}
+                Erstellt: {formatDate(breakingNewsData.created_at)}
               </p>
-              {breakingNews.breakingNewsUntil && (
+              {breakingNewsData.breaking_news_until && (
                 <div className="space-y-1">
                   <p className="text-sm text-red-600 dark:text-red-400">
-                    Läuft bis: {formatDate(breakingNews.breakingNewsUntil)}
+                    Läuft bis: {formatDate(breakingNewsData.breaking_news_until)}
                   </p>
                   <BreakingNewsCountdown 
-                    breakingNewsUntil={breakingNews.breakingNewsUntil} 
+                    breakingNewsUntil={breakingNewsData.breaking_news_until} 
                     variant="admin"
                   />
                 </div>
@@ -387,14 +426,14 @@ export default function AdminNews() {
                     }`}>
                       {(newsItem.status === 'PUBLISHED') ? 'Veröffentlicht' : 'Entwurf'}
                     </span>
-                    {breakingNews && breakingNews.id === newsItem.id && (
+                    {breakingNewsData && breakingNewsData.id === newsItem.id && (
                       <span className="px-2 py-1 bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 text-xs font-medium rounded-full">
                         🚨 Breaking News
                       </span>
                     )}
                   </div>
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                    {formatDate(newsItem.date)}
+                    {formatDate(newsItem.published_at)}
                   </p>
                   <p className="text-gray-700 dark:text-gray-300">{newsItem.content}</p>
                 </div>
@@ -441,13 +480,80 @@ export default function AdminNews() {
                 <TextInput label="Datum" name="date" type="date" register={register} rules={{ required: 'Datum ist erforderlich' }} errors={errors} />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Inhalt</label>
-                <textarea
-                  {...register('content', { required: 'Inhalt ist erforderlich' })}
-                  rows={4}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                <MarkdownTextarea
+                  label="Inhalt"
+                  name="content"
+                  register={register}
+                  rules={{ required: 'Inhalt ist erforderlich' }}
+                  errors={errors}
+                  rows={8}
+                  placeholder="News-Inhalt in Markdown eingeben..."
+                  helpText="Verwende Markdown-Syntax für Formatierung. URLs werden automatisch verlinkt."
                 />
-                {errors.content && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.content.message}</p>}
+              </div>
+              
+              {/* File Upload Section */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Bild/PDF hochladen
+                </label>
+                <input
+                  type="file"
+                  accept="image/*,.pdf"
+                  onChange={handleFileUpload}
+                  disabled={uploading}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                />
+                {uploading && <p className="text-sm text-gray-500 mt-1">Wird hochgeladen...</p>}
+                
+                {/* Current file preview */}
+                {editingNews?.featured_image_url && (
+                  <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Aktuelle Datei:</p>
+                    {editingNews.featured_image_url.toLowerCase().includes('.pdf') ? (
+                      <div className="flex items-center space-x-2">
+                        <span className="text-2xl">📄</span>
+                        <span className="text-sm text-gray-600 dark:text-gray-400">PDF-Datei</span>
+                        <a 
+                          href={editingNews.featured_image_url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:text-blue-800 text-sm"
+                        >
+                          Anzeigen
+                        </a>
+                      </div>
+                    ) : (
+                      <div className="flex items-center space-x-3">
+                        <img 
+                          src={editingNews.featured_image_url} 
+                          alt="Featured image" 
+                          className="w-16 h-16 object-cover rounded"
+                        />
+                        <div>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">Bild</p>
+                          <a 
+                            href={editingNews.featured_image_url} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:text-blue-800 text-sm"
+                          >
+                            Anzeigen
+                          </a>
+                        </div>
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingNews({...editingNews, featured_image_url: null});
+                      }}
+                      className="mt-2 text-sm text-red-600 hover:text-red-800"
+                    >
+                      Datei entfernen
+                    </button>
+                  </div>
+                )}
               </div>
               <div className="flex space-x-3">
                 <button

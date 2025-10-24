@@ -24,7 +24,7 @@ export const createQueryWrapper = (options = {}) => {
 };
 
 /**
- * Mock databaseService with common methods
+ * Database operations now handled directly in hooks
  */
 export const mockDatabaseService = {
   getData: vi.fn(),
@@ -50,21 +50,8 @@ export const mockCookieAuthService = {
 };
 
 /**
- * Mock websocketService with common methods
+ * PollingService removed - React Query handles refetching with refetchInterval
  */
-export const mockWebsocketService = {
-  subscribe: vi.fn(() => () => {}), // Returns unsubscribe function
-  getConnectionStatus: vi.fn(() => ({
-    isConnected: false,
-    isConnecting: false,
-    offlineMode: false,
-    reconnectAttempts: 0
-  })),
-  connect: vi.fn(),
-  disconnect: vi.fn(),
-  emit: vi.fn(),
-  setSocket: vi.fn()
-};
 
 /**
  * Mock pwaService with common methods
@@ -96,7 +83,7 @@ export const mockResponseHandler = {
 };
 
 /**
- * Mock errorReportingService with common methods
+ * Mock console for error reporting
  */
 export const mockErrorReportingService = {
   logError: vi.fn(),
@@ -109,7 +96,7 @@ export const mockErrorReportingService = {
 };
 
 /**
- * Mock cacheInvalidationService with common methods
+ * Mock console for error reporting
  */
 export const mockCacheInvalidationService = {
   invalidateEntity: vi.fn(),
@@ -120,7 +107,7 @@ export const mockCacheInvalidationService = {
 };
 
 /**
- * Mock junctionTableService with common methods
+ * Junction table service removed - using simple database queries
  */
 export const mockJunctionTableService = {
   getJunctionData: vi.fn(),
@@ -165,17 +152,13 @@ export const mockData = {
  * Setup common mocks for client tests
  */
 export const setupClientMocks = () => {
-  vi.mock('./services/databaseService.js', () => ({
-    default: mockDatabaseService
-  }));
+  // Database service removed - operations handled directly in hooks
 
   vi.mock('./services/authService.js', () => ({
     default: mockCookieAuthService
   }));
 
-  vi.mock('./services/websocketService.js', () => ({
-    default: mockWebsocketService
-  }));
+  // PollingService removed - React Query handles refetching
 
   vi.mock('./services/pwaService.js', () => ({
     default: mockPwaService
@@ -190,7 +173,7 @@ export const setupClientMocks = () => {
     default: mockResponseHandler
   }));
 
-  vi.mock('./services/errorReportingService.js', () => ({
+  vi.mock('./services/console.js', () => ({
     default: {
       logError: vi.fn(),
       reportToExternalService: vi.fn(),
@@ -202,13 +185,9 @@ export const setupClientMocks = () => {
     }
   }));
 
-  vi.mock('./services/cacheInvalidationService.js', () => ({
-    default: mockCacheInvalidationService
-  }));
+  // WebSocket hooks removed - using simple polling instead
 
-  vi.mock('./services/junctionTableService.js', () => ({
-    default: mockJunctionTableService
-  }));
+  // Junction table service removed - using simple database queries
 
   vi.mock('./services/adminAuthService.js', () => ({
     default: mockAdminAuthService
@@ -243,7 +222,7 @@ export const clearAllMocks = () => {
 export const resetAllMocks = () => {
   Object.values(mockDatabaseService).forEach(mock => mock.mockReset());
   Object.values(mockCookieAuthService).forEach(mock => mock.mockReset());
-  Object.values(mockWebsocketService).forEach(mock => mock.mockReset());
+  // PollingService removed - no mocks to reset
   Object.values(mockPwaService).forEach(mock => mock.mockReset());
   Object.values(mockImageService).forEach(mock => mock.mockReset());
   Object.values(mockResponseHandler).forEach(mock => mock.mockReset());

@@ -355,3 +355,12 @@ dump.rdb
 # Temporary files
 tmp/
 temp/
+
+# Security - prevent credential leaks
+cookies.txt
+
+# Uploaded files (keep directory structure)
+public/uploads/**/*
+!public/uploads/news/
+!public/uploads/info-pages/
+!public/uploads/**/.gitkeep

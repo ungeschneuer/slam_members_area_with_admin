@@ -1,237 +1,131 @@
 ---
-globs: server/routes/*.js,server/services/*.js,server/config/*.js
-description: Database query patterns and optimization guidelines
+alwaysApply: true
+description: Simplified database patterns with consolidated schema
 ---
 
-# Database Query Patterns
+# Database Patterns - Simplified
 
-## Query Execution Standards
+## Consolidated Schema
 
-### Always Use Helper Functions
-Use the established helper functions from [server/routes/optimizedRoutes.js](mdc:server/routes/optimizedRoutes.js):
+This project uses a **simplified database schema** with consolidated junction tables.
 
-- `executeCrudOperation()` for standard CRUD operations
-- `executeRoundCrudOperation()` for rounds with slug generation
-- `executeQuery()` for direct database queries
+## Core Tables
 
-### Performance Timing
-Always measure query performance:
-
-```javascript
-const startTime = startTiming();
-const result = await executeQuery(query, params);
-const duration = endTiming(startTime);
-
-logger.info('Query completed', {
-  duration: `${Math.round(duration)}ms`,
-  queryType: 'OPERATION_TYPE'
-});
+### Main Entities
+```sql
+-- Core entities
+participants (id, name, region, instagram, ...)
+rounds (id, title, date, location, ...)
+news (id, title, content, published_at, ...)
+city_tips (id, title, description, location, ...)
 ```
 
-## Query Optimization Patterns
-
-### JOIN Queries for Performance
-Use optimized service methods for complex queries:
-
-```javascript
-// GOOD - Use optimized service methods
-const participants = await optimizedQueryService.getParticipantsWithStats();
-const rounds = await optimizedQueryService.getRoundsWithDetails();
-const news = await optimizedQueryService.getNewsWithAuthorAndStats();
-```
-
-### Parameterized Queries
-Always use parameterized queries to prevent SQL injection:
-
-```javascript
-// GOOD
-const result = await executeQuery(
-  'SELECT * FROM users WHERE id = $1 AND status = $2',
-  [userId, status]
-);
-
-// BAD - Never use string concatenation
-const result = await executeQuery(
-  `SELECT * FROM users WHERE id = ${userId}`
+### Consolidated Junction Table
+```sql
+-- Single junction table for all round relationships
+round_assignments (
+  id SERIAL PRIMARY KEY,
+  round_id INTEGER REFERENCES rounds(id),
+  participant_id INTEGER REFERENCES participants(id),
+  roles JSONB DEFAULT '[]', -- ["participant", "jury", "moderator", "crew", "feature_artist"]
+  metadata JSONB DEFAULT '{}', -- {display_order: 0, description: "text"}
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(round_id, participant_id)
 );
 ```
 
-## Error Handling Patterns
+## Query Patterns
 
-### Database Error Handling
+### Simple Queries
 ```javascript
-try {
-  const result = await executeQuery(query, params);
-  
-  if (result.rows.length === 0) {
-    return sendNotFoundResponse(res, 'Entity');
-  }
-  
-  sendSuccessResponse(res, result.rows[0], 'QUERY_TYPE', duration);
-} catch (error) {
-  sendErrorResponse(res, error, 'Failed to execute query');
-}
-```
+// ✅ Direct SQL queries
+const participants = await executeQuery(
+  'SELECT * FROM participants ORDER BY name',
+  []
+);
 
-### Connection Health Checks
-Use `checkDatabaseHealth()` for health endpoints:
-
-```javascript
-router.get('/health', async (req, res) => {
-  try {
-    const dbHealth = await checkDatabaseHealth();
-    res.json({ 
-      status: 'OK', 
-      database: dbHealth.status,
-      pool: dbHealth.pool
-    });
-  } catch (error) {
-    res.status(500).json({ status: 'ERROR' });
-  }
-});
-```
-
-## Cache Management
-
-### Cache Invalidation
-Always clear cache after data modifications:
-
-```javascript
-// After successful CRUD operations
-notifyDataUpdate(entityType); // This handles cache clearing and WebSocket updates
-```
-
-### Cache Statistics
-Use `optimizedQueryService.getCacheStats()` for monitoring:
-
-```javascript
-const stats = optimizedQueryService.getCacheStats();
-```
-
-## Data Validation Patterns
-
-### Input Validation
-Always validate input parameters:
-
-```javascript
-// Validate required fields
-if (!title || !content) {
-  return sendErrorResponse(res, new Error('Missing required fields'), 'Title and content are required', 400);
-}
-
-// Validate data types
-if (typeof id !== 'string' || isNaN(parseInt(id))) {
-  return sendErrorResponse(res, new Error('Invalid ID'), 'Invalid ID format', 400);
-}
-```
-
-### Data Normalization
-Use schema-based normalization for complex data:
-
-```javascript
-const normalizedData = normalizeData(req.body, {
-  tags: { type: 'json', fallback: [] },
-  metadata: { type: 'json', fallback: {} },
-  status: { type: 'string', fallback: 'DRAFT' },
-  order: { type: 'int', fallback: 0 }
-});
-```
-
-## Specialized Query Patterns
-
-### Slug Generation for Rounds
-Use the specialized round CRUD operation for automatic slug generation:
-
-```javascript
-await executeRoundCrudOperation(
-  'create',
-  'INSERT INTO rounds (title, slug, ...) VALUES ($1, $2, ...) RETURNING *',
-  [title, slug, ...],
-  'round',
-  'CREATE_ROUND',
-  res,
-  { title, slug } // Enables automatic slug generation
+const round = await executeQuery(
+  'SELECT * FROM rounds WHERE id = $1',
+  [roundId]
 );
 ```
 
-### Instagram URL Normalization
-Use the helper function for Instagram URLs:
-
+### Junction Table Queries
 ```javascript
-const instagramUrl = normalizeInstagram(req.body.instagram);
-// Handles: @username, username, https://instagram.com/username
-// Returns: https://instagram.com/username
+// ✅ Single query for all round assignments
+const assignments = await executeQuery(`
+  SELECT ra.*, p.name, p.region, p.instagram
+  FROM round_assignments ra
+  JOIN participants p ON ra.participant_id = p.id
+  WHERE ra.round_id = $1
+`, [roundId]);
+
+// Parse roles in JavaScript
+const participants = assignments.filter(a => a.roles.includes('participant'));
+const crew = assignments.filter(a => a.roles.some(r => ['crew', 'moderator'].includes(r)));
 ```
 
-## Query Performance Monitoring
-
-### Timing and Logging
+### Assignment Management
 ```javascript
-const startTime = startTiming();
-const result = await executeQuery(query, params);
-const duration = endTiming(startTime);
-
-logger.info('Database operation completed', {
-  operation: 'CREATE_ENTITY',
-  duration: `${Math.round(duration)}ms`,
-  recordCount: result.rows.length
-});
-```
-
-### Performance Comparison
-Use the performance comparison endpoint for optimization:
-
-```javascript
-// GET /api/performance/compare?endpoint=participants
-// Compares traditional vs optimized query approaches
+// ✅ Simple assignment creation
+await executeQuery(`
+  INSERT INTO round_assignments (round_id, participant_id, roles, metadata)
+  VALUES ($1, $2, $3, $4)
+  ON CONFLICT (round_id, participant_id)
+  DO UPDATE SET roles = round_assignments.roles || EXCLUDED.roles
+`, [roundId, participantId, JSON.stringify(roles), JSON.stringify(metadata)]);
 ```
 
 ## Anti-Patterns to Avoid
 
-❌ **Don't use raw database connections:**
-```javascript
-// BAD
-const client = await pool.connect();
-const result = await client.query(query);
-
-// GOOD
-const result = await executeQuery(query, params);
+### ❌ Complex Junction Tables
+```sql
+-- ❌ DON'T use multiple junction tables
+round_participants (round_id, participant_id, role)
+round_crew (round_id, participant_id, role)
+round_feature_artists (round_id, participant_id, display_order)
+round_moderation (round_id, participant_id, display_order)
 ```
 
-❌ **Don't ignore query performance:**
+### ❌ Complex ORM Queries
 ```javascript
-// BAD
-const result = await executeQuery(query, params);
-res.json(result.rows);
-
-// GOOD
-const startTime = startTiming();
-const result = await executeQuery(query, params);
-const duration = endTiming(startTime);
-sendSuccessResponse(res, result.rows, 'QUERY_TYPE', duration);
+// ❌ DON'T use complex ORM patterns
+const result = await prisma.round.findMany({
+  include: {
+    participants: {
+      include: {
+        user: true
+      }
+    },
+    crew: {
+      include: {
+        user: true
+      }
+    }
+  }
+});
 ```
 
-❌ **Don't use string concatenation for queries:**
-```javascript
-// BAD - SQL injection risk
-const query = `SELECT * FROM users WHERE name = '${name}'`;
+## Benefits
 
-// GOOD - Parameterized query
-const query = 'SELECT * FROM users WHERE name = $1';
-const result = await executeQuery(query, [name]);
+- **Single table** - One junction table for all relationships
+- **JSONB roles** - Flexible role management
+- **Simple queries** - Direct SQL without complex JOINs
+- **Easy maintenance** - Simple to understand and modify
+- **Performance** - Optimized with proper indexes
+
+## Indexes
+
+```sql
+-- Essential indexes for performance
+CREATE INDEX idx_round_assignments_round ON round_assignments(round_id);
+CREATE INDEX idx_round_assignments_participant ON round_assignments(participant_id);
+CREATE INDEX idx_round_assignments_roles ON round_assignments USING GIN(roles);
 ```
 
-❌ **Don't forget error handling:**
-```javascript
-// BAD
-const result = await executeQuery(query, params);
-res.json(result.rows);
+## Migration Strategy
 
-// GOOD
-try {
-  const result = await executeQuery(query, params);
-  sendSuccessResponse(res, result.rows, 'QUERY_TYPE', duration);
-} catch (error) {
-  sendErrorResponse(res, error, 'Database operation failed');
-}
-```
+1. **Create new table** - `round_assignments`
+2. **Migrate data** - From old junction tables
+3. **Update queries** - Use new consolidated table
+4. **Drop old tables** - Remove complex junction tables

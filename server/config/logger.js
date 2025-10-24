@@ -73,7 +73,10 @@ const logger = winston.createLogger({
         winston.format.json()
       )
     })
-  ]
+  ],
+  
+  // Prevent Winston from exiting the process
+  exitOnError: false
 });
 
 // Security logger for sensitive operations
@@ -142,6 +145,29 @@ const logsDir = path.join(process.cwd(), 'logs');
 if (!fs.existsSync(logsDir)) {
   fs.mkdirSync(logsDir, { recursive: true });
 }
+
+// Handle process termination gracefully
+process.on('SIGINT', () => {
+  logger.info('Received SIGINT, closing logger gracefully');
+  logger.end();
+});
+
+process.on('SIGTERM', () => {
+  logger.info('Received SIGTERM, closing logger gracefully');
+  logger.end();
+});
+
+// Handle unhandled promise rejections without Winston interference
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  // Don't let Winston handle this to prevent process.exit
+});
+
+// Handle uncaught exceptions without Winston interference
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  // Don't let Winston handle this to prevent process.exit
+});
 
 export default logger;
 export { securityLogger, performanceLogger, auditLogger };

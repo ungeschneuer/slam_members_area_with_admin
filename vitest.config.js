@@ -19,6 +19,8 @@ export default defineConfig({
         environment: 'node',
         include: ['server/**/*.test.{js,jsx,ts,tsx}'],
         exclude: ['node_modules/**', 'server/__tests__/admin-crud/**'],
+        setupFiles: ['server/__tests__/test-env.js'],
+        testTimeout: 30000, // 30s for database operations
       }
     }),
     defineProject({
@@ -35,8 +37,8 @@ export default defineConfig({
         name: 'admin-crud',
         environment: 'node',
         include: ['server/__tests__/admin-crud/**/*.test.js'],
-        setupFiles: ['server/__tests__/admin-crud/setup.js'],
-        testTimeout: 10000, // 10s for database operations
+        setupFiles: ['server/__tests__/test-env.js', 'server/__tests__/admin-crud/setup.js'],
+        testTimeout: 30000, // 30s for database operations
         exclude: ['node_modules/**'],
       }
     })

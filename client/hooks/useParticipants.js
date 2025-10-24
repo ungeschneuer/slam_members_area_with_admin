@@ -1,8 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { API_URL } from '../config/api.js';
 import authService from '../services/authService.js';
+import { useEntityData } from './useEntityData.js';
+import { getQueryConfig } from '../config/polling.js';
 
 // Participants hooks for data management
+// STANDARDIZED: All data fetching hooks use consistent patterns:
+// - Direct fetch() calls with credentials: 'include'
+// - Standardized response unwrapping: result?.data || result || []
+// - Consistent error handling and caching strategies
 
 // Query keys for participants
 export const participantsKeys = {
@@ -14,22 +20,59 @@ export const participantsKeys = {
 };
 
 // Hook to fetch all participants
-export function useParticipants(filters = {}) {
-  return useQuery({
-    queryKey: participantsKeys.list(filters),
-    queryFn: async () => {
-      const response = await fetch(`${API_URL}/participants`, {
+export function useParticipants(filters = {}, isAdmin = false) {
+  return useEntityData(
+    'participants',
+    async (passedFilters = {}) => {
+      // Support pagination via query params; only include when provided
+      const effectiveLimit = Number.isFinite(passedFilters.limit) ? passedFilters.limit : undefined;
+      const effectiveOffset = Number.isFinite(passedFilters.offset) ? passedFilters.offset : undefined;
+      const params = new URLSearchParams();
+      if (Number.isFinite(effectiveLimit)) params.set('limit', String(effectiveLimit));
+      if (Number.isFinite(effectiveOffset) && effectiveOffset > 0) params.set('offset', String(effectiveOffset));
+      const url = params.toString()
+        ? `${API_URL}/participants?${params.toString()}`
+        : `${API_URL}/participants`;
+
+      const response = await fetch(url, {
         credentials: 'include'
       });
       if (!response.ok) {
         throw new Error(`Failed to fetch participants: ${response.statusText}`);
       }
       const result = await response.json();
-      return result?.data || result || [];
+      
+      // Handle both success and error responses, always return an array
+      if (result?.success === false) {
+        console.warn('Participants API returned error:', result.error);
+        return { data: [], totalCount: 0, limit: effectiveLimit || 50, offset: effectiveOffset || 0 };
+      }
+      
+      // Extract data from the response structure
+      // The server now returns: { success: true, data: { data: [...], meta: {...} }, meta: {...} }
+      const responseData = result?.data;
+      const items = Array.isArray(responseData?.data) ? responseData.data : [];
+      const meta = responseData?.meta || {};
+      
+      // Return pagination metadata along with data
+      return {
+        data: items,
+        totalCount: meta.totalCount || items.length,
+        limit: meta.limit || effectiveLimit || 50,
+        offset: meta.offset || effectiveOffset || 0,
+        currentPage: meta.currentPage || Math.floor((effectiveOffset || 0) / (effectiveLimit || 50)) + 1,
+        totalPages: meta.totalPages || Math.ceil((meta.totalCount || items.length) / (effectiveLimit || 50))
+      };
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
-  });
+    (() => {
+      // Derive query config and turn off polling when requesting very large lists
+      const cfg = { ...getQueryConfig('participants', isAdmin) };
+      if (Number.isFinite(filters?.limit) && filters.limit >= 1000) {
+        cfg.refetchInterval = false;
+      }
+      return { filters, ...cfg, isAdmin };
+    })()
+  );
 }
 
 // Hook to fetch a single participant
@@ -92,12 +135,13 @@ export function useCreateParticipant() {
       }
     },
     onSuccess: (data) => {
-      // Invalidate and refetch participants list
+      // Invalidate all participants-related queries to ensure admin components update
+      queryClient.invalidateQueries({ queryKey: participantsKeys.all });
       queryClient.invalidateQueries({ queryKey: participantsKeys.lists() });
       
       // If we have the created participant data, add it to the cache
-      if (data?.data) {
-        queryClient.setQueryData(participantsKeys.detail(data.data.id), data.data);
+      if (data && data.id) {
+        queryClient.setQueryData(participantsKeys.detail(data.id), data);
       }
     },
   });
@@ -157,12 +201,13 @@ export function useUpdateParticipant() {
       }
     },
     onSuccess: (data, variables) => {
-      // Invalidate and refetch participants list
+      // Invalidate all participants-related queries to ensure admin components update
+      queryClient.invalidateQueries({ queryKey: participantsKeys.all });
       queryClient.invalidateQueries({ queryKey: participantsKeys.lists() });
       
       // Update the specific participant in cache
-      if (data?.data) {
-        queryClient.setQueryData(participantsKeys.detail(variables.id), data.data);
+      if (data && data.id) {
+        queryClient.setQueryData(participantsKeys.detail(variables.id), data);
       }
     },
   });
@@ -213,8 +258,40 @@ export function useDeleteParticipant() {
       }
     },
     onSuccess: (data, id) => {
-      // Invalidate and refetch participants list
+      // Invalidate all participants-related queries to ensure admin components update
+      queryClient.invalidateQueries({ queryKey: participantsKeys.all });
       queryClient.invalidateQueries({ queryKey: participantsKeys.lists() });
     },
+  });
+}
+
+// Hook to bulk import participants
+export function useBulkImportParticipants() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (participants) => {
+      const response = await authService.authenticatedRequest(
+        `${API_URL}/participants/bulk-import`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ participants })
+        }
+      );
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Bulk import failed');
+      }
+      
+      return await response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: participantsKeys.lists() });
+    },
+    onError: (error) => {
+      console.error('Bulk import failed:', error);
+    }
   });
 }

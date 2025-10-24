@@ -3,7 +3,7 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { useParticipants, useParticipant, useCreateParticipant, useUpdateParticipant, useDeleteParticipant } from './useParticipants.js';
-import { createQueryWrapper, setupClientMocks, clearAllMocks } from '../test-utils.jsx';
+import { createQueryWrapper, setupClientMocks, clearAllMocks } from '../test-utils.js';
 
 // Setup common mocks
 setupClientMocks();

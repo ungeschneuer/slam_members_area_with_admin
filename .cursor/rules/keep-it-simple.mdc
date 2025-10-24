@@ -1,0 +1,182 @@
+---
+alwaysApply: true
+description: Anti-over-engineering principles
+---
+
+# Keep It Simple - Anti-Over-Engineering
+
+## Core Principle: Simplicity First
+
+This project prioritizes **simplicity over complexity**. Avoid over-engineering at all costs.
+
+## What We DON'T Use
+
+### ❌ Complex State Management
+```javascript
+// ❌ DON'T use Zustand, Redux, or complex stores
+const store = useStore();
+const dispatch = useDispatch();
+const complexState = useComplexState();
+```
+
+### ❌ WebSocket Infrastructure
+```javascript
+// ❌ DON'T use WebSockets
+const socket = io('ws://localhost:3000');
+socket.on('update', handleUpdate);
+socket.emit('subscribe', 'participants');
+```
+
+### ❌ Complex Middleware
+```javascript
+// ❌ DON'T use complex middleware chains
+app.use(rateLimit());
+app.use(validation());
+app.use(sanitization());
+app.use(auditLog());
+app.use(cacheMiddleware());
+```
+
+### ❌ Custom Abstractions
+```javascript
+// ❌ DON'T create custom abstractions
+class CustomDatabaseWrapper {}
+const customAuthService = new CustomAuthService();
+const customCacheManager = new CacheManager();
+```
+
+### ❌ Over-Engineered Components
+```javascript
+// ❌ DON'T create complex component hierarchies
+<AdvancedDataTable
+  columns={complexColumns}
+  filters={complexFilters}
+  sorting={complexSorting}
+  pagination={complexPagination}
+  virtualization={true}
+  infiniteScroll={true}
+/>
+```
+
+## What We DO Use
+
+### ✅ Simple Patterns
+```javascript
+// ✅ Simple state management
+const { data } = useQuery(['participants'], fetchParticipants);
+const [theme, setTheme] = useState('light');
+
+// ✅ Simple polling
+const { data } = useQuery({
+  queryKey: ['participants'],
+  queryFn: fetchParticipants,
+  refetchInterval: 30000
+});
+
+// ✅ Simple database queries
+const result = await executeQuery('SELECT * FROM participants', []);
+```
+
+### ✅ Established Libraries
+```javascript
+// ✅ Use proven libraries
+import { useQuery } from '@tanstack/react-query';
+import { createContext, useContext } from 'react';
+import express from 'express';
+import jwt from 'jsonwebtoken';
+```
+
+### ✅ Simple Components
+```javascript
+// ✅ Simple, focused components
+function ParticipantCard({ participant }) {
+  return (
+    <div>
+      <h3>{participant.name}</h3>
+      <p>{participant.region}</p>
+    </div>
+  );
+}
+```
+
+## Red Flags - Stop Over-Engineering
+
+### 🚨 Complex File Structure
+```
+❌ BAD: 50+ files in components/admin/
+✅ GOOD: 3 consolidated components
+```
+
+### 🚨 Complex Dependencies
+```
+❌ BAD: 100+ dependencies
+✅ GOOD: 20-30 essential dependencies
+```
+
+### 🚨 Complex Configuration
+```
+❌ BAD: 500+ lines of config
+✅ GOOD: 50-100 lines of simple config
+```
+
+### 🚨 Complex Documentation
+```
+❌ BAD: 20+ documentation files
+✅ GOOD: 3-5 essential guides
+```
+
+## Simple Architecture Checklist
+
+### ✅ State Management
+- [ ] React Query for server state
+- [ ] React Context for local state
+- [ ] useState for component state
+- [ ] No complex stores
+
+### ✅ Data Fetching
+- [ ] Simple API calls
+- [ ] 30-second polling
+- [ ] No WebSockets
+- [ ] No complex caching
+
+### ✅ Database
+- [ ] Raw SQL queries
+- [ ] Simple schema
+- [ ] Consolidated tables
+- [ ] No complex ORM
+
+### ✅ Components
+- [ ] 3 core admin components
+- [ ] Simple, focused components
+- [ ] No complex hierarchies
+- [ ] Easy to understand
+
+### ✅ API Routes
+- [ ] 12 focused route files
+- [ ] Simple middleware
+- [ ] Basic error handling
+- [ ] No complex abstractions
+
+## Benefits of Simplicity
+
+- **Easy to understand** - New developers can contribute quickly
+- **Easy to debug** - Problems are obvious and fixable
+- **Easy to maintain** - Changes are straightforward
+- **Easy to test** - Simple code is easy to test
+- **Easy to extend** - New features fit naturally
+
+## When to Add Complexity
+
+Only add complexity when:
+1. **Simple solution doesn't work** - After trying simple approaches
+2. **Performance is critical** - And simple solution is too slow
+3. **Requirements demand it** - And there's no simpler alternative
+4. **Team consensus** - Everyone agrees it's necessary
+
+## Remember
+
+> "Perfection is achieved, not when there is nothing more to add, but when there is nothing left to take away." - Antoine de Saint-Exupéry
+
+**Simple is better than complex.**
+**Complex is better than complicated.**
+**Readability counts.**

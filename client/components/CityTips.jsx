@@ -1,13 +1,15 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import InteractiveMap from './InteractiveMap';
-import { useCityTips } from '../hooks/index.js';
+import { useCityTips, usePageTitle } from '../hooks/index.js';
 import LoadingSpinner from './LoadingSpinner';
 import { ErrorMessage } from './StatusMessages.jsx';
+import { translateCategory, getCategoryIcon, getCategoryColor } from '../utils/categoryTranslations.js';
+import { getAvailableContentFilterOptions, validateFilterValue } from '../utils/filterUtils.js';
 
 export default function CityTips() {
-  const { data: cityTipsData, isLoading: loading, error } = useCityTips();
+  usePageTitle('Stadt-Tipps');
+  const { data: cityTipsData = [], isLoading: loading, error } = useCityTips();
   // State variables for city tips functionality
-  const [locations, setLocations] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
   
@@ -18,8 +20,29 @@ export default function CityTips() {
   const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(12);
+
+  // Extract matching logic to reusable functions
+  const matchesSearchFilter = (location, search) => {
+    if (!search) return true;
+    const searchLower = search.toLowerCase();
+    
+    // Early returns for performance
+    if (location.name.toLowerCase().includes(searchLower)) return true;
+    if (location.address.toLowerCase().includes(searchLower)) return true;
+    if (location.description.toLowerCase().includes(searchLower)) return true;
+    
+    return false;
+  };
+
+  const matchesCategoryFilter = (location, categoryFilter) => {
+    return categoryFilter === 'all' || location.category === categoryFilter;
+  };
+
+  const matchesPriceFilter = (location, priceFilter) => {
+    return priceFilter === 'all' || location.priceRange === priceFilter;
+  };
   
-  const categories = [
+  const predefinedCategories = [
     { id: 'all', name: 'Alle Kategorien', icon: '🗺️', color: 'bg-gray-500' },
     { id: 'restaurant', name: 'Restaurants', icon: '🍽️', color: 'bg-red-500' },
     { id: 'cafe', name: 'Cafés', icon: '☕', color: 'bg-yellow-500' },
@@ -34,7 +57,7 @@ export default function CityTips() {
     { id: 'sports', name: 'Sport', icon: '⚽', color: 'bg-orange-600' }
   ];
 
-  const priceRanges = [
+  const predefinedPriceRanges = [
     { id: 'all', name: 'Alle Preise', icon: '💰' },
     { id: '€', name: 'Günstig', icon: '€' },
     { id: '€€', name: 'Mittel', icon: '€€' },
@@ -42,62 +65,134 @@ export default function CityTips() {
     { id: '€€€€', name: 'Luxus', icon: '€€€€' }
   ];
 
-  // Load city tips data
-  // Update local state when useLiveData changes
-  useEffect(() => {
-    if (cityTipsData && cityTipsData.length > 0) {
-      // Transform database data to match component structure
-      const transformedData = cityTipsData.map(item => ({
-        id: item.id,
-        name: item.name,
-        category: item.category,
-        description: item.description,
-        address: item.address,
-        coordinates: { lat: parseFloat(item.latitude), lng: parseFloat(item.longitude) },
-        phone: item.contact_info?.phone || null,
-        website: item.website,
-        priceRange: item.price_range,
-        
-        tips: item.tips || item.description,
-        featured: item.is_featured || false,
-        slug: item.slug,
-        images: item.images || [],
-        openingHours: item.opening_hours,
-        contactInfo: item.contact_info
-      }));
-      setLocations(transformedData);
-    } else {
-      setLocations([]);
-    }
+  // Transform database data to match component structure using useMemo
+  const locations = useMemo(() => {
+    if (!cityTipsData || cityTipsData.length === 0) return [];
+    
+    return cityTipsData.map(item => ({
+      id: item.id,
+      name: item.name,
+      category: item.category,
+      description: item.description,
+      address: item.address,
+      coordinates: { lat: parseFloat(item.latitude), lng: parseFloat(item.longitude) },
+      phone: item.contact_info?.phone || null,
+      website: item.website,
+      priceRange: item.price_range,
+      
+      tips: item.tips || item.description,
+      featured: item.is_featured || false,
+      slug: item.slug,
+      images: item.images || [],
+      openingHours: item.opening_hours,
+      contactInfo: item.contact_info
+    }));
   }, [cityTipsData]);
 
-  // Memoized filtered and sorted locations
-  const filteredAndSortedLocations = useMemo(() => {
-    let filtered = locations.filter(location => {
-      const matchesCategory = categoryFilter === 'all' || location.category === categoryFilter;
-      const matchesSearch = location.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           location.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           location.address.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesPrice = priceFilter === 'all' || location.priceRange === priceFilter;
-      return matchesCategory && matchesSearch && matchesPrice;
+  // Single-pass cascading filter options and results
+  const { categories, priceRanges, filteredAndSortedLocations } = useMemo(() => {
+    try {
+      // Handle empty or invalid datasets
+      if (!Array.isArray(locations) || locations.length === 0) {
+        return {
+          categories: predefinedCategories,
+          priceRanges: predefinedPriceRanges,
+          filteredAndSortedLocations: []
+        };
+      }
+    
+    const afterSearch = locations.filter(location => {
+      if (!location || typeof location !== 'object') return false;
+      return matchesSearchFilter(location, searchTerm);
     });
-
-    // Sort locations
-    filtered.sort((a, b) => {
-      switch (sortBy) {
-        case 'name':
-          return a.name.localeCompare(b.name);
-        case 'category':
-          return a.category.localeCompare(b.category);
-        case 'featured':
-          return (b.featured ? 1 : 0) - (a.featured ? 1 : 0);
-        default:
-          return 0;
+    
+    const cats = new Set();
+    const prices = new Set();
+    const filtered = [];
+    
+    afterSearch.forEach(location => {
+      const passesCategory = matchesCategoryFilter(location, categoryFilter);
+      const passesPrice = matchesPriceFilter(location, priceFilter);
+      
+      if (passesCategory && passesPrice) {
+        filtered.push(location);
+      }
+      
+      // For category options: match price (but NOT category filter)
+      if (passesPrice && location.category) {
+        cats.add(location.category);
+      }
+      
+      // For price options: match category (but NOT price filter)
+      if (passesCategory && location.priceRange) {
+        prices.add(location.priceRange);
       }
     });
+    
+    const categoryOpts = [
+      predefinedCategories[0], // "Alle Kategorien"
+      ...Array.from(cats).map(cat => 
+        predefinedCategories.find(opt => opt.id === cat) || { id: cat, name: cat }
+      )
+    ].filter(Boolean);
+    
+    const priceOpts = [
+      predefinedPriceRanges[0], // "Alle Preise"
+      ...Array.from(prices).map(price => 
+        predefinedPriceRanges.find(opt => opt.id === price) || { id: price, name: price }
+      )
+    ].filter(Boolean);
+    
+    // Sort
+    filtered.sort((a, b) => {
+      switch (sortBy) {
+        case 'name': return a.name.localeCompare(b.name);
+        case 'category': return a.category.localeCompare(b.category);
+        default: return 0;
+      }
+    });
+    
+      return {
+        categories: categoryOpts,
+        priceRanges: priceOpts,
+        filteredAndSortedLocations: filtered
+      };
+    } catch (error) {
+      console.error('Error in filter calculation:', error);
+      // Return safe defaults on error
+      return {
+        categories: predefinedCategories,
+        priceRanges: predefinedPriceRanges,
+        filteredAndSortedLocations: []
+      };
+    }
+  }, [locations, searchTerm, categoryFilter, priceFilter, sortBy]);
 
-    return filtered;
-  }, [locations, categoryFilter, searchTerm, priceFilter, sortBy]);
+  // Available category chips (limited to first 8)
+  const availableCategoryChips = useMemo(() => {
+    return categories.slice(0, 8);
+  }, [categories]);
+
+  // Auto-reset logic (with loop prevention)
+  const resetInProgress = useRef(false);
+  
+  useEffect(() => {
+    if (resetInProgress.current) return;
+    if (!categories.some(opt => opt.id === categoryFilter)) {
+      resetInProgress.current = true;
+      setCategoryFilter('all');
+      setTimeout(() => { resetInProgress.current = false; }, 0);
+    }
+  }, [categories, categoryFilter]);
+
+  useEffect(() => {
+    if (resetInProgress.current) return;
+    if (!priceRanges.some(opt => opt.id === priceFilter)) {
+      resetInProgress.current = true;
+      setPriceFilter('all');
+      setTimeout(() => { resetInProgress.current = false; }, 0);
+    }
+  }, [priceRanges, priceFilter]);
 
   // Pagination
   const totalPages = Math.ceil(filteredAndSortedLocations.length / itemsPerPage);
@@ -109,31 +204,16 @@ export default function CityTips() {
     setCurrentPage(1);
   }, [categoryFilter, searchTerm, priceFilter, sortBy]);
 
-  const getCategoryColor = (category) => {
-    const categoryObj = categories.find(cat => cat.id === category);
-    return categoryObj?.color || 'bg-gray-500';
+  const getCategoryColorLocal = (category) => {
+    return getCategoryColor(category, 'cityTips');
   };
 
-  const getCategoryIcon = (category) => {
-    const categoryObj = categories.find(cat => cat.id === category);
-    return categoryObj?.icon || '📍';
+  const getCategoryIconLocal = (category) => {
+    return getCategoryIcon(category, 'cityTips');
   };
 
-  const getCategoryLabel = (category) => {
-    const labels = {
-      restaurant: 'Restaurant',
-      cafe: 'Café',
-      bar: 'Bar',
-      culture: 'Kultur',
-      shopping: 'Shopping',
-      hotel: 'Hotel',
-      transport: 'Transport',
-      landmark: 'Sehenswürdigkeit',
-      nature: 'Natur',
-      leisure: 'Freizeit',
-      sports: 'Sport'
-    };
-    return labels[category] || 'Stadt-Tipp';
+  const getCategoryLabelLocal = (category) => {
+    return translateCategory(category, 'cityTips');
   };
 
   const handleLocationClick = (location) => {
@@ -226,7 +306,7 @@ export default function CityTips() {
               <option value="all">Alle Kategorien</option>
               {categories.slice(1).map(category => (
                 <option key={category.id} value={category.id}>
-                  {category.icon} {category.name}
+                  {getCategoryIcon(category.id, 'cityTips')} {translateCategory(category.id, 'cityTips')}
                 </option>
               ))}
             </select>
@@ -246,21 +326,11 @@ export default function CityTips() {
               ))}
             </select>
 
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className="px-4 py-3 text-base border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-            >
-              <option value="name">Sortieren nach Name</option>
-              
-              
-              <option value="featured">Empfohlene zuerst</option>
-            </select>
           </div>
 
           {/* Quick Filter Chips */}
           <div className="flex flex-wrap gap-2">
-            {categories.slice(0, 8).map((category) => (
+            {availableCategoryChips.map((category) => (
               <button
                 key={category.id}
                 onClick={() => setCategoryFilter(category.id)}
@@ -270,8 +340,8 @@ export default function CityTips() {
                     : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
                 }`}
               >
-                <span className="mr-2">{category.icon}</span>
-                {category.name}
+                <span className="mr-2">{getCategoryIcon(category.id, 'cityTips')}</span>
+                {translateCategory(category.id, 'cityTips')}
               </button>
             ))}
           </div>
@@ -343,24 +413,24 @@ export default function CityTips() {
                   <div className="flex items-start justify-between">
                     <div className="flex items-start space-x-3 flex-1">
                       <div className="flex-shrink-0">
-                        <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white text-lg font-bold shadow-md ${getCategoryColor(location.category)}`}>
-                          {getCategoryIcon(location.category)}
+                        <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white text-lg font-bold shadow-md ${getCategoryColorLocal(location.category)}`}>
+                          {getCategoryIconLocal(location.category)}
                         </div>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-gray-900 dark:text-white mb-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate" title={location.name}>
+                        <h3 className="font-semibold text-gray-900 dark:text-white mb-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors text-sm leading-tight" title={location.name}>
                           {location.name}
                         </h3>
                         <p className="text-sm text-gray-600 dark:text-gray-400 mb-2 overflow-hidden" style={{
                           display: '-webkit-box',
-                          WebkitLineClamp: 2,
+                          WebkitLineClamp: 3,
                           WebkitBoxOrient: 'vertical',
-                          lineHeight: '1.4',
-                          maxHeight: '2.8em'
+                          lineHeight: '1.3',
+                          maxHeight: '3.9em'
                         }}>
                           {location.description}
                         </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-500 truncate" title={location.address}>
+                        <p className="text-xs text-gray-500 dark:text-gray-500 leading-tight" title={location.address}>
                           📍 {location.address}
                         </p>
                       </div>
@@ -370,8 +440,8 @@ export default function CityTips() {
                   
                   {/* Metadata */}
                   <div className="flex flex-wrap items-center gap-2 text-xs">
-                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getCategoryColor(location.category)} text-white`}>
-                      {getCategoryIcon(location.category)} {getCategoryLabel(location.category)}
+                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getCategoryColorLocal(location.category)} text-white`}>
+                      {getCategoryIconLocal(location.category)} {getCategoryLabelLocal(location.category)}
                     </span>
                     
                     {location.priceRange && (
@@ -407,13 +477,13 @@ export default function CityTips() {
                 // List View
                 <div className="flex items-center space-x-4 w-full">
                   <div className="flex-shrink-0">
-                    <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white text-lg font-bold shadow-md ${getCategoryColor(location.category)}`}>
-                      {getCategoryIcon(location.category)}
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white text-lg font-bold shadow-md ${getCategoryColorLocal(location.category)}`}>
+                      {getCategoryIconLocal(location.category)}
                     </div>
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
-                      <h3 className="font-semibold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate" title={location.name}>
+                      <h3 className="font-semibold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors text-sm leading-tight" title={location.name}>
                         {location.name}
                       </h3>
                       <div className="flex items-center space-x-2">
@@ -426,14 +496,14 @@ export default function CityTips() {
                     </div>
                     <p className="text-sm text-gray-600 dark:text-gray-400 mb-1 overflow-hidden" style={{
                       display: '-webkit-box',
-                      WebkitLineClamp: 2,
+                      WebkitLineClamp: 3,
                       WebkitBoxOrient: 'vertical',
-                      lineHeight: '1.4',
-                      maxHeight: '2.8em'
+                      lineHeight: '1.3',
+                      maxHeight: '3.9em'
                     }}>
                       {location.description}
                     </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-500 truncate" title={location.address}>
+                    <p className="text-xs text-gray-500 dark:text-gray-500 leading-tight" title={location.address}>
                       📍 {location.address}
                     </p>
                   </div>

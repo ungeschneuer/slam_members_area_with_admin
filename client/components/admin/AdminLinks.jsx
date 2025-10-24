@@ -10,7 +10,7 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 
 const AdminLinks = () => {
-  const { data: linksData, isLoading: loading, error } = useLinks();
+  const { data: linksData, isLoading: loading, error } = useLinks({}, true); // isAdmin = true
   const createLink = useCreateLink();
   const updateLink = useUpdateLink();
   const deleteLink = useDeleteLink();
@@ -24,7 +24,11 @@ const AdminLinks = () => {
     url: z.string().url('Gültige URL ist erforderlich'),
     description: z.string().optional(),
     category: z.string().optional(),
-    icon: z.string().optional(),
+    icon: z.string()
+      .min(1, 'Icon ist erforderlich')
+      .max(10, 'Icon ist zu lang')
+      .regex(/^[\p{Emoji}\u200d\ufe0f]+$/u, 'Bitte gib ein gültiges Emoji ein')
+      .optional(),
     color: z.string().optional(),
     sortOrder: z.number().optional(),
     isExternal: z.boolean().optional(),
@@ -45,7 +49,6 @@ const AdminLinks = () => {
       isActive: true
     }
   });
-  const currentIcon = watch('icon');
   const currentColor = watch('color');
 
   const colorOptions = [
@@ -61,9 +64,6 @@ const AdminLinks = () => {
     'Medien', 'Musik', 'Kommunikation', 'Dokumente', 'Tools', 'Sonstiges'
   ];
 
-  const iconOptions = [
-    '🔗', '📸', '📱', '🎵', '💬', '📄', '🛠️', '📊', '🎯', '⭐', '🔥', '💡'
-  ];
 
   // Live data handled by useLiveData
 
@@ -187,28 +187,31 @@ const AdminLinks = () => {
                 <SelectInput label="Kategorie" name="category" register={register} options={categoryOptions.map(c => ({ value: c, label: c }))} errors={errors} />
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Icon
+                  <label htmlFor="icon" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Icon (Emoji)
                   </label>
-                  <div className="flex flex-wrap gap-2">
-                    {iconOptions.map(icon => (
-                      <button
-                        key={icon}
-                        type="button"
-                        onClick={() => setValue('icon', icon)}
-                        className={`p-2 rounded-lg border-2 ${
-                          currentIcon === icon 
-                            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' 
-                            : 'border-gray-300 dark:border-gray-600 hover:border-gray-400'
-                        }`}
-                      >
-                        {icon}
-                      </button>
-                    ))}
+                  <div className="flex items-center gap-3">
+                    <input
+                      id="icon"
+                      type="text"
+                      {...register('icon')}
+                      placeholder="🔗"
+                      className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                      maxLength="10"
+                    />
+                    <div className="flex-shrink-0 w-12 h-12 flex items-center justify-center text-3xl border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700">
+                      {watch('icon') || '🔗'}
+                    </div>
                   </div>
+                  {errors.icon && (
+                    <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.icon.message}</p>
+                  )}
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    Tipp: Kopiere ein Emoji von deinem System-Emoji-Picker (Windows: Win + . | Mac: Cmd + Ctrl + Space)
+                  </p>
                 </div>
 
-                <div>
+                <div className="col-span-2">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Farbe
                   </label>
@@ -238,7 +241,11 @@ const AdminLinks = () => {
                     type="number"
                     {...register('sortOrder', { valueAsNumber: true })}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                    placeholder="0"
                   />
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    Niedrigere Zahlen erscheinen zuerst. Links werden nach Kategorie, dann nach Sortierung, dann nach Titel sortiert.
+                  </p>
                 </div>
 
                 <div className="flex items-center space-x-4">
@@ -297,6 +304,9 @@ const AdminLinks = () => {
                       </span>
                       <span className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-2 py-1 rounded">
                         {link.color}
+                      </span>
+                      <span className="text-xs bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 px-2 py-1 rounded">
+                        Sortierung: {link.sortOrder || 0}
                       </span>
                       {link.isExternal && (
                         <span className="text-xs bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 px-2 py-1 rounded">

@@ -1,0 +1,357 @@
+---
+alwaysApply: true
+description: Code quality standards and best practices for SLAM25 project
+---
+
+# Code Quality Standards - SLAM25 Project
+
+## Core Quality Principles
+
+This Poetry Slam members area follows **simplified code quality standards** that prioritize readability, maintainability, and consistency.
+
+## Code Style Standards
+
+### ✅ JavaScript/React Conventions
+```javascript
+// ✅ Use const/let, avoid var
+const participants = await fetchParticipants();
+let isLoading = false;
+
+// ✅ Use arrow functions for callbacks
+const handleClick = () => {
+  setIsOpen(!isOpen);
+};
+
+// ✅ Use template literals
+const message = `Welcome ${user.name}!`;
+
+// ✅ Use destructuring
+const { data, isLoading, error } = useQuery(['participants'], fetchParticipants);
+```
+
+### ✅ Component Naming
+```javascript
+// ✅ PascalCase for components
+function ParticipantCard({ participant }) {
+  return <div>{participant.name}</div>;
+}
+
+// ✅ camelCase for functions
+function fetchParticipants() {
+  return api.get('/participants');
+}
+
+// ✅ UPPER_CASE for constants
+const API_BASE_URL = 'http://localhost:3005/api';
+const POLLING_INTERVAL = 30000;
+```
+
+### ✅ File Naming
+```
+// ✅ kebab-case for files
+participant-card.jsx
+admin-dashboard.jsx
+error-message.jsx
+
+// ✅ camelCase for hooks
+useParticipants.js
+useError.js
+useFormManager.js
+
+// ✅ camelCase for services
+authService.js
+errorService.js
+roundsService.js
+```
+
+## Code Organization
+
+### ✅ Import Order
+```javascript
+// ✅ React imports first
+import React, { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+
+// ✅ Third-party imports
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+
+// ✅ Internal imports (alphabetical)
+import { useAuth } from '../contexts/AuthContext.jsx';
+import { useError } from '../hooks/useError.js';
+import { fetchParticipants } from '../services/participantsService.js';
+```
+
+### ✅ Component Structure
+```javascript
+// ✅ Standard component structure
+function ComponentName({ prop1, prop2 }) {
+  // 1. Hooks
+  const { data, isLoading } = useQuery(['key'], fetchFunction);
+  const [localState, setLocalState] = useState(null);
+  
+  // 2. Event handlers
+  const handleClick = () => {
+    // Handle click
+  };
+  
+  // 3. Effects
+  useEffect(() => {
+    // Side effects
+  }, [dependency]);
+  
+  // 4. Early returns
+  if (isLoading) return <LoadingSpinner />;
+  if (error) return <ErrorMessage error={error} />;
+  
+  // 5. Render
+  return (
+    <div className="component-wrapper">
+      {/* Component content */}
+    </div>
+  );
+}
+```
+
+## Error Handling Standards
+
+### ✅ Error Boundaries
+```javascript
+// ✅ Error boundary component
+function ErrorBoundary({ children, fallback }) {
+  const [hasError, setHasError] = useState(false);
+  
+  if (hasError) {
+    return fallback || <ErrorMessage error="Something went wrong" />;
+  }
+  
+  return children;
+}
+```
+
+### ✅ Try-Catch Patterns
+```javascript
+// ✅ Async function error handling
+const handleSubmit = async (data) => {
+  try {
+    const result = await submitData(data);
+    setSuccessMessage('Data saved successfully');
+  } catch (error) {
+    handleError(error, { context: 'form_submission' });
+  }
+};
+```
+
+### ✅ Error Messages
+```javascript
+// ✅ User-friendly error messages
+const getErrorMessage = (error) => {
+  switch (error.code) {
+    case 'VALIDATION_ERROR':
+      return 'Please check your input and try again';
+    case 'NETWORK_ERROR':
+      return 'Network connection failed. Please try again';
+    default:
+      return 'An unexpected error occurred';
+  }
+};
+```
+
+## Performance Standards
+
+### ✅ React Query Optimization
+```javascript
+// ✅ Optimized queries
+const { data } = useQuery({
+  queryKey: ['participants'],
+  queryFn: fetchParticipants,
+  staleTime: 5 * 60 * 1000, // 5 minutes
+  cacheTime: 10 * 60 * 1000, // 10 minutes
+  refetchInterval: 30000, // 30 seconds
+  refetchOnWindowFocus: false
+});
+```
+
+### ✅ Component Optimization
+```javascript
+// ✅ Memoization for expensive calculations
+const expensiveValue = useMemo(() => {
+  return participants.reduce((sum, p) => sum + p.score, 0);
+}, [participants]);
+
+// ✅ Callback memoization
+const handleClick = useCallback(() => {
+  setIsOpen(!isOpen);
+}, [isOpen]);
+```
+
+### ✅ Lazy Loading
+```javascript
+// ✅ Lazy component loading
+const AdminDashboard = lazy(() => import('./AdminDashboard.jsx'));
+
+// ✅ Lazy route loading
+const AdminRoutes = lazy(() => import('./AdminRoutes.jsx'));
+```
+
+## Database Standards
+
+### ✅ Query Optimization
+```javascript
+// ✅ Use indexes
+const participants = await executeQuery(
+  'SELECT * FROM participants WHERE region = $1 ORDER BY name',
+  [region]
+);
+
+// ✅ Limit results
+const recentNews = await executeQuery(
+  'SELECT * FROM news ORDER BY created_at DESC LIMIT 10',
+  []
+);
+```
+
+### ✅ Transaction Handling
+```javascript
+// ✅ Use transactions for related operations
+const client = await pool.connect();
+try {
+  await client.query('BEGIN');
+  
+  const participant = await client.query(
+    'INSERT INTO participants (name, region) VALUES ($1, $2) RETURNING *',
+    [name, region]
+  );
+  
+  await client.query(
+    'INSERT INTO round_assignments (round_id, participant_id) VALUES ($1, $2)',
+    [roundId, participant.rows[0].id]
+  );
+  
+  await client.query('COMMIT');
+} catch (error) {
+  await client.query('ROLLBACK');
+  throw error;
+} finally {
+  client.release();
+}
+```
+
+## Testing Standards
+
+### ✅ Test Structure
+```javascript
+// ✅ Describe blocks for organization
+describe('ParticipantCard', () => {
+  describe('when participant data is provided', () => {
+    it('displays participant name', () => {
+      // Test implementation
+    });
+    
+    it('displays participant region', () => {
+      // Test implementation
+    });
+  });
+  
+  describe('when participant data is missing', () => {
+    it('displays error message', () => {
+      // Test implementation
+    });
+  });
+});
+```
+
+### ✅ Test Naming
+```javascript
+// ✅ Descriptive test names
+it('should display participant name when data is provided', () => {
+  // Test implementation
+});
+
+it('should show loading spinner when data is being fetched', () => {
+  // Test implementation
+});
+
+it('should display error message when fetch fails', () => {
+  // Test implementation
+});
+```
+
+## Documentation Standards
+
+### ✅ Component Documentation
+```javascript
+/**
+ * ParticipantCard displays participant information
+ * @param {Object} participant - Participant data
+ * @param {string} participant.name - Participant name
+ * @param {string} participant.region - Participant region
+ * @param {Function} onEdit - Edit handler function
+ */
+function ParticipantCard({ participant, onEdit }) {
+  // Component implementation
+}
+```
+
+### ✅ Function Documentation
+```javascript
+/**
+ * Fetches participants from the API
+ * @param {Object} filters - Optional filters
+ * @param {string} filters.region - Filter by region
+ * @returns {Promise<Array>} Array of participants
+ */
+async function fetchParticipants(filters = {}) {
+  // Function implementation
+}
+```
+
+## Code Review Standards
+
+### ✅ Review Checklist
+- [ ] **Functionality** - Code works as expected
+- [ ] **Performance** - No unnecessary re-renders or queries
+- [ ] **Error Handling** - Proper error boundaries and try-catch
+- [ ] **Accessibility** - Proper ARIA labels and keyboard navigation
+- [ ] **Testing** - Adequate test coverage
+- [ ] **Documentation** - Clear comments and documentation
+- [ ] **Consistency** - Follows project conventions
+
+### ✅ Common Issues to Avoid
+```javascript
+// ❌ DON'T use var
+var participants = [];
+
+// ❌ DON'T use function declarations in components
+function ComponentName() {
+  function handleClick() { // ❌ This creates a new function on every render
+    // Handle click
+  }
+}
+
+// ❌ DON'T mutate props
+function Component({ data }) {
+  data.name = 'New Name'; // ❌ Mutating props
+}
+
+// ❌ DON'T use array index as key
+{participants.map((participant, index) => (
+  <ParticipantCard key={index} participant={participant} />
+))}
+```
+
+## Benefits
+
+- **Consistent** - Uniform code style across the project
+- **Readable** - Easy to understand and maintain
+- **Performant** - Optimized for speed and efficiency
+- **Testable** - Simple to test and debug
+- **Scalable** - Easy to extend and modify
+
+## Remember
+
+> "Code is read far more often than it is written." - Guido van Rossum
+
+**Write code for humans, not machines.**
+**Consistency is more important than perfection.**
+**Simple code is better than clever code.**

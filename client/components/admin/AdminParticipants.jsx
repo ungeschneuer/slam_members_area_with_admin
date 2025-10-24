@@ -1,24 +1,36 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { useParticipants, useCreateParticipant, useUpdateParticipant, useDeleteParticipant } from '../../hooks/index.js';
-import { useBulkImportParticipants } from '../../hooks/useBulkImportParticipants.js';
-import websocketService from '../../services/websocketService.js';
+import { useParticipants, useCreateParticipant, useUpdateParticipant, useDeleteParticipant, useBulkImportParticipants } from '../../hooks/index.js';
+// WebSocket hooks removed - using simple polling instead
+// WebSocket service removed - using simple polling instead
 import LoadingSpinner from '../LoadingSpinner';
 import { ErrorMessage, SuccessMessage } from '../StatusMessages.jsx';
+import PaginationControls from '../PaginationControls.jsx';
 import { useForm } from 'react-hook-form';
 import TextInput from '../forms/TextInput.jsx';
 import SelectInput from '../forms/SelectInput.jsx';
 import SearchFilters from '../forms/SearchFilters.jsx';
-import { formatInstagramUrl, normalizeInstagramInput } from '../../utils/instagramUtils.js';
-import { generateSlug } from '../../utils/slugUtils.js';
-import { downloadParticipantTemplate } from '../../services/excelService.js';
+import { formatInstagramUrl, normalizeInstagramInput, extractInstagramUsername } from '../../utils/instagramUtils.js';
+import { generateSlug, generateUniqueSlug } from '../../utils/slugUtils.js';
+import { getRegionFlag } from '../../utils/detailViewUtils.js';
+import { downloadParticipantTemplate, downloadParticipantTemplateCSV, parseParticipantFile, checkForDuplicates } from '../../services/excelService.js';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { ADMIN_PARTICIPANTS_LIMIT } from '../../config/api.js';
 
 export default function AdminParticipants() {
-  const { data: participantsData, isLoading: loading, error } = useParticipants();
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(24);
+  
+  // Load all participants for search (no pagination on API call)
+  const { data: allParticipantsResponse, isLoading: loading, error } = useParticipants({ limit: ADMIN_PARTICIPANTS_LIMIT, offset: 0 }, true); // isAdmin = true
   const createParticipant = useCreateParticipant();
   const updateParticipant = useUpdateParticipant();
   const deleteParticipant = useDeleteParticipant();
+  const bulkImport = useBulkImportParticipants();
+  
+  // Initialize WebSocket integration for real-time updates
+  // WebSocket hooks removed - using simple polling instead
   const [editingParticipant, setEditingParticipant] = useState(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [showBulkImport, setShowBulkImport] = useState(false);
@@ -27,23 +39,24 @@ export default function AdminParticipants() {
   const [regionFilter, setRegionFilter] = useState('all');
   const [success, setSuccess] = useState(null);
   const [importError, setImportError] = useState(null);
+  const [formError, setFormError] = useState(null);
   const fileInputRef = useRef(null);
   
+  // Import state management
+  const [importState, setImportState] = useState({
+    parsedData: null,
+    validationResults: null,
+    importResults: null,
+    isProcessing: false,
+    step: 'upload' // 'upload' | 'validation' | 'importing' | 'results'
+  });
+  
   // Bulk import functionality
-  const {
-    importState,
-    isProcessing,
-    validationResults,
-    importResults,
-    performBulkImport,
-    resetImport,
-    getImportStatus
-  } = useBulkImportParticipants();
+  // Bulk import functionality removed as part of simplification
 
   const schema = z.object({
     name: z.string().min(1, 'Name ist erforderlich'),
-    slug: z.string().min(1, 'Slug ist erforderlich'),
-    region: z.string().min(1, 'Region ist erforderlich'),
+    region: z.string().optional(),
     role: z.string().min(1, 'Rolle ist erforderlich'),
     pronouns: z.string().optional(),
     instagram: z.string().optional()
@@ -53,7 +66,6 @@ export default function AdminParticipants() {
     resolver: zodResolver(schema),
     defaultValues: {
       name: '',
-      slug: '',
       region: '',
       role: 'Teilnehmer*in',
       pronouns: '',
@@ -61,16 +73,6 @@ export default function AdminParticipants() {
     }
   });
 
-  // Auto-generate slug when name changes
-  useEffect(() => {
-    const subscription = watch((value, { name }) => {
-      if (name === 'name' && value?.name) {
-        const slug = generateSlug(value.name);
-        setValue('slug', slug, { shouldDirty: true });
-      }
-    });
-    return () => subscription.unsubscribe();
-  }, [watch, setValue]);
 
   // RHF for edit modal
   const editForm = useForm({
@@ -87,11 +89,32 @@ export default function AdminParticipants() {
   const { register: registerEdit, handleSubmit: handleEditSubmit, reset: resetEdit, formState: { errors: editErrors, isSubmitting: isEditSubmitting } } = editForm;
 
   const bundeslaender = [
-    'Baden-Württemberg', 'Bayern', 'Berlin', 'Brandenburg', 'Bremen',
-    'Hamburg', 'Hessen', 'Mecklenburg-Vorpommern', 'Niedersachsen',
-    'Nordrhein-Westfalen', 'Rheinland-Pfalz', 'Saarland', 'Sachsen',
-    'Sachsen-Anhalt', 'Schleswig-Holstein', 'Thüringen',
-    'Österreich', 'Schweiz', 'Belgien', 'Luxemburg', 'Südtirol'
+    'Bayern',
+    'Baden-Württemberg',
+    'Berlin-Brandenburg',
+    'Hamburg',
+    'Hessen',
+    'Mecklenburg-Vorpommern',
+    'Niedersachsen/Bremen',
+    'Nordrhein-Westfalen',
+    'Rheinland-Pfalz',
+    'Saarland',
+    'Sachsen',
+    'Sachsen-Anhalt',
+    'Schleswig-Holstein',
+    'Thüringen',
+    'Liechtenstein',
+    'Luxemburg',
+    'Österreich',
+    'Ostbelgien',
+    'Schweiz',
+    'Südtirol',
+    'Slam Alphas',
+    'BiPOC/Migra',
+    'i,Slam',
+    'TINte',
+    'U20',
+    'Chemnitz'
   ];
 
   const roles = ['Teilnehmer*in', 'Supporter*in', 'Crew', 'SLAM-MC'];
@@ -102,10 +125,7 @@ export default function AdminParticipants() {
   useEffect(() => {
     const ensureAdminRoom = async () => {
       try {
-        if (!websocketService.isConnected) {
-          await websocketService.connect();
-        }
-        websocketService.joinAdminRoom();
+        // WebSocket service removed - using simple polling instead
       } catch (e) {
         console.warn('AdminParticipants: WebSocket admin room join failed:', e);
       }
@@ -113,33 +133,77 @@ export default function AdminParticipants() {
     ensureAdminRoom();
   }, []);
 
-  const participants = useMemo(() => Array.isArray(participantsData) ? participantsData : [], [participantsData]);
+  // Extract all participants data
+  const allParticipants = useMemo(() => {
+    if (allParticipantsResponse?.data) {
+      return Array.isArray(allParticipantsResponse.data) ? allParticipantsResponse.data : [];
+    }
+    return Array.isArray(allParticipantsResponse) ? allParticipantsResponse : [];
+  }, [allParticipantsResponse]);
 
-  const filteredParticipants = participants.filter(participant => {
-    const matchesSearchTerm = (participant.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                               (participant.region || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                               (participant.role || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                               (participant.pronouns || '').toLowerCase().includes(searchTerm.toLowerCase());
+  // Filter all participants based on search and filters
+  const filteredParticipants = useMemo(() => {
+    return allParticipants.filter(participant => {
+      const matchesSearchTerm = (participant.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                 (participant.region || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                 (participant.role || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                 (participant.pronouns || '').toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesRoleFilter = roleFilter === 'all' || participant.role === roleFilter;
-    const matchesRegionFilter = regionFilter === 'all' || participant.region === regionFilter;
+      const matchesRoleFilter = roleFilter === 'all' || participant.role === roleFilter;
+      const matchesRegionFilter = regionFilter === 'all' || (regionFilter === 'none' ? !participant.region : participant.region === regionFilter);
 
-    return matchesSearchTerm && matchesRoleFilter && matchesRegionFilter;
-  });
+      return matchesSearchTerm && matchesRoleFilter && matchesRegionFilter;
+    });
+  }, [allParticipants, searchTerm, roleFilter, regionFilter]);
+
+  // Paginate the filtered results
+  const paginatedParticipants = useMemo(() => {
+    if (pageSize === 'all') {
+      return filteredParticipants;
+    }
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    return filteredParticipants.slice(startIndex, endIndex);
+  }, [filteredParticipants, currentPage, pageSize]);
+
+  // Pagination info based on filtered results
+  const paginationInfo = useMemo(() => {
+    const totalItems = filteredParticipants.length;
+    const totalPages = pageSize === 'all' ? 1 : Math.ceil(totalItems / pageSize);
+    
+    return {
+      totalItems,
+      totalPages,
+      currentPage
+    };
+  }, [filteredParticipants.length, pageSize, currentPage]);
 
   const onAddSubmit = async (data) => {
     try {
+      // Get existing slugs for uniqueness check
+      const existingSlugs = allParticipants.map(p => p.slug);
+      
       const payload = {
         ...data,
-        instagram: normalizeInstagramInput(data.instagram)
+        slug: generateUniqueSlug(data.name, existingSlugs), // UNIQUE SLUG
+        instagram: data.instagram ? (() => {
+          try {
+            const normalized = normalizeInstagramInput(data.instagram);
+            return extractInstagramUsername(normalized) || data.instagram.replace(/^@/, '');
+          } catch (error) {
+            console.warn('Instagram normalization failed:', error);
+            return data.instagram.replace(/^@/, '');
+          }
+        })() : ''
       };
+      
       await createParticipant.mutateAsync(payload);
       reset();
       setShowAddForm(false);
       setSuccess('Teilnehmer*innen erfolgreich hinzugefügt!');
       setTimeout(() => setSuccess(null), 3000);
     } catch (error) {
-      setError(error.message);
+      setFormError(error.message);
       console.error('Error adding participant:', error);
     }
   };
@@ -148,6 +212,7 @@ export default function AdminParticipants() {
     if (editingParticipant) {
       resetEdit({
         name: editingParticipant.name || '',
+        slug: editingParticipant.slug || '',
         region: editingParticipant.region || '',
         role: editingParticipant.role || 'Teilnehmer*in',
         pronouns: editingParticipant.pronouns || '',
@@ -161,14 +226,22 @@ export default function AdminParticipants() {
       const payload = {
         ...editingParticipant,
         ...data,
-        instagram: normalizeInstagramInput(data.instagram)
+        instagram: data.instagram ? (() => {
+          try {
+            const normalized = normalizeInstagramInput(data.instagram);
+            return extractInstagramUsername(normalized) || data.instagram.replace(/^@/, '');
+          } catch (error) {
+            console.warn('Instagram normalization failed:', error);
+            return data.instagram.replace(/^@/, '');
+          }
+        })() : ''
       };
       await updateParticipant.mutateAsync({ id: editingParticipant.id, ...payload });
       setEditingParticipant(null);
       setSuccess('Teilnehmer*innen erfolgreich aktualisiert!');
       setTimeout(() => setSuccess(null), 3000);
     } catch (error) {
-      setError(error.message);
+      setFormError(error.message);
       console.error('Error updating participant:', error);
     }
   };
@@ -185,11 +258,11 @@ export default function AdminParticipants() {
         // If backend returned 404 (already deleted), refresh silently and inform user
         const message = (error && error.message) ? String(error.message) : '';
         if (message.includes('404')) {
-          await refresh();
+          window.location.reload();
           setSuccess('Eintrag war bereits entfernt. Liste wurde aktualisiert.');
           setTimeout(() => setSuccess(null), 3000);
         } else {
-          setError(error.message);
+          setFormError(error.message);
         }
         console.error('Error deleting participant:', error);
       }
@@ -201,44 +274,129 @@ export default function AdminParticipants() {
     downloadParticipantTemplate();
   };
 
+  const handleDownloadTemplateCSV = () => {
+    downloadParticipantTemplateCSV();
+  };
+
   const handleFileSelect = (event) => {
     const file = event.target.files[0];
-    if (file) {
-      // Validate file size (10MB limit)
-      const maxSize = 10 * 1024 * 1024; // 10MB
-      if (file.size > maxSize) {
-        setImportError(`Datei ist zu groß. Maximum: ${maxSize / (1024 * 1024)}MB`);
-        setTimeout(() => setImportError(null), 5000);
-        return;
+    if (!file) return;
+    
+    // Prevent multiple file selections
+    if (importState.isProcessing) {
+      setImportError('Bitte warten Sie, bis der aktuelle Vorgang abgeschlossen ist');
+      setTimeout(() => setImportError(null), 3000);
+      return;
+    }
+    
+    // Validate file size (10MB limit)
+    const maxSize = 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+      setImportError(`Datei ist zu groß. Maximum: ${maxSize / (1024 * 1024)}MB`);
+      setTimeout(() => setImportError(null), 5000);
+      return;
+    }
+    
+    // Validate file type
+    const fileName = file.name.toLowerCase();
+    const isExcel = fileName.endsWith('.xlsx') || fileName.endsWith('.xls');
+    const isCSV = fileName.endsWith('.csv');
+    
+    if (!isExcel && !isCSV) {
+      setImportError('Nur Excel (.xlsx, .xls) und CSV (.csv) Dateien sind erlaubt');
+      setTimeout(() => setImportError(null), 5000);
+      return;
+    }
+    
+    handleFileValidation(file);
+  };
+
+  const handleFileValidation = async (file) => {
+    try {
+      setImportState(prev => ({ ...prev, isProcessing: true, step: 'validation' }));
+      
+      // Parse file
+      const parsed = await parseParticipantFile(file);
+      
+      // Check duplicates client-side (for preview only)
+      const { uniqueParticipants, duplicates } = checkForDuplicates(
+        parsed.validRows,
+        allParticipants
+      );
+      
+      setImportState(prev => ({
+        ...prev,
+        isProcessing: false,
+        step: 'validation',
+        parsedData: parsed,
+        validationResults: {
+          totalRows: parsed.totalRows,
+          validRows: uniqueParticipants.length,
+          errorCount: parsed.errors.length,
+          duplicateCount: duplicates.length,
+          errors: parsed.errors,
+          duplicates: duplicates
+        }
+      }));
+      
+      if (uniqueParticipants.length === 0) {
+        setImportError('Keine gültigen Zeilen zum Importieren gefunden');
       }
       
-      // Validate file type
-      const allowedTypes = [
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
-        'application/vnd.ms-excel', // .xls
-        'application/vnd.ms-excel.sheet.macroEnabled.12' // .xlsm
-      ];
-      
-      if (!allowedTypes.includes(file.type) && !file.name.match(/\.(xlsx|xls)$/i)) {
-        setImportError('Nur Excel-Dateien (.xlsx, .xls) sind erlaubt');
-        setTimeout(() => setImportError(null), 5000);
-        return;
-      }
-      
-      handleBulkImport(file);
+    } catch (error) {
+      console.error('File validation error:', error);
+      setImportError(`Validierung fehlgeschlagen: ${error.message}`);
+      setImportState(prev => ({ ...prev, isProcessing: false, step: 'upload' }));
     }
   };
 
-  const handleBulkImport = async (file) => {
+  const handleConfirmImport = async () => {
     try {
-      await performBulkImport(file, participants);
-      setSuccess('Bulk-Import erfolgreich abgeschlossen!');
-      setTimeout(() => setSuccess(null), 5000);
+      setImportState(prev => ({ ...prev, isProcessing: true, step: 'importing' }));
+      
+      // Get unique participants from validation
+      const { uniqueParticipants } = checkForDuplicates(
+        importState.parsedData.validRows,
+        allParticipants
+      );
+      
+      // Import to server
+      const result = await bulkImport.mutateAsync(uniqueParticipants);
+      
+      setImportState(prev => ({
+        ...prev,
+        isProcessing: false,
+        step: 'results',
+        importResults: {
+          importedCount: result.data.importedCount,
+          duplicateCount: result.data.duplicateCount,
+          errorCount: result.data.errorCount,
+          duplicates: result.data.duplicates,
+          errors: result.data.errors
+        }
+      }));
+      
+      if (result.data.importedCount > 0) {
+        setSuccess(`${result.data.importedCount} Teilnehmer erfolgreich importiert!`);
+        setTimeout(() => setSuccess(null), 5000);
+      }
+      
     } catch (error) {
-      console.error('Bulk import error:', error);
-      setImportError(`Bulk-Import fehlgeschlagen: ${error.message || 'Unbekannter Fehler'}`);
-      setTimeout(() => setImportError(null), 5000);
+      console.error('Import error:', error);
+      setImportError(`Import fehlgeschlagen: ${error.message}`);
+      setImportState(prev => ({ ...prev, isProcessing: false, step: 'validation' }));
     }
+  };
+
+  const resetImport = () => {
+    setImportState({
+      parsedData: null,
+      validationResults: null,
+      importResults: null,
+      isProcessing: false,
+      step: 'upload'
+    });
+    setImportError(null);
   };
 
   const handleCloseBulkImport = () => {
@@ -258,32 +416,21 @@ export default function AdminParticipants() {
     }
   };
 
-  const getRegionFlag = (region) => {
-    switch (region) {
-      case 'Baden-Württemberg': return '🇩🇪';
-      case 'Bayern': return '🇩🇪';
-      case 'Berlin': return '🇩🇪';
-      case 'Brandenburg': return '🇩🇪';
-      case 'Bremen': return '🇩🇪';
-      case 'Hamburg': return '🇩🇪';
-      case 'Hessen': return '🇩🇪';
-      case 'Mecklenburg-Vorpommern': return '🇩🇪';
-      case 'Niedersachsen': return '🇩🇪';
-      case 'Nordrhein-Westfalen': return '🇩🇪';
-      case 'Rheinland-Pfalz': return '🇩🇪';
-      case 'Saarland': return '🇩🇪';
-      case 'Sachsen': return '🇩🇪';
-      case 'Sachsen-Anhalt': return '🇩🇪';
-      case 'Schleswig-Holstein': return '🇩🇪';
-      case 'Thüringen': return '🇩🇪';
-      case 'Österreich': return '🇦🇹';
-      case 'Schweiz': return '🇨🇭';
-      case 'Belgien': return '🇧🇪';
-      case 'Luxemburg': return '🇱🇺';
-      case 'Südtirol': return '🇮🇹';
-      default: return '🌎';
-    }
+  // Pagination handlers
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
   };
+
+  const handlePageSizeChange = (newPageSize) => {
+    setPageSize(newPageSize);
+    setCurrentPage(1); // Reset to first page when changing page size
+  };
+
+  // Reset to first page when search or filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, roleFilter, regionFilter]);
+
 
   if (loading) {
     return <LoadingSpinner size="xl" text="Teilnehmer*innen werden geladen..." />;
@@ -302,10 +449,10 @@ export default function AdminParticipants() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
       {/* Error and Success Messages */}
-      {error && (
+      {formError && (
         <ErrorMessage 
-          error={error} 
-          onRetry={() => window.location.reload()} 
+          error={formError} 
+          onRetry={() => setFormError(null)} 
           className="max-w-4xl mx-auto"
         />
       )}
@@ -335,16 +482,10 @@ export default function AdminParticipants() {
           </div>
           <div className="flex flex-col sm:flex-row gap-3">
             <button
-              onClick={handleDownloadTemplate}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
-            >
-              Vorlage herunterladen
-            </button>
-            <button
               onClick={() => setShowBulkImport(true)}
               className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2"
             >
-              Excel importieren
+              Datei importieren
             </button>
             <button
               onClick={() => setShowAddForm(!showAddForm)}
@@ -360,13 +501,12 @@ export default function AdminParticipants() {
           <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6 mb-6">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Neuen Teilnehmer*innen hinzufügen</h3>
             <form onSubmit={handleSubmit(onAddSubmit)} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4">
                 <TextInput label="" name="name" register={register} rules={{ required: 'Name ist erforderlich' }} errors={errors} placeholder="Name" />
-                <TextInput label="" name="slug" register={register} rules={{ required: 'Slug ist erforderlich' }} errors={errors} placeholder="Slug" />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <SelectInput label="" name="role" register={register} rules={{ required: 'Rolle ist erforderlich' }} errors={errors} options={[{ value: '', label: 'Rolle auswählen' }, ...roles.map(r => ({ value: r, label: r }))]} />
-                <SelectInput label="" name="region" register={register} rules={{ required: 'Region ist erforderlich' }} errors={errors} options={[{ value: '', label: 'Bundesland/Region auswählen' }, ...bundeslaender.map(b => ({ value: b, label: b }))]} />
+                <SelectInput label="" name="region" register={register} errors={errors} options={[{ value: '', label: 'Bundesland/Region auswählen' }, ...bundeslaender.map(b => ({ value: b, label: b }))]} />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <TextInput label="" name="pronouns" register={register} errors={errors} placeholder="Pronomen (z.B. er/ihm, sie/ihr, they/them)" />
@@ -407,7 +547,10 @@ export default function AdminParticipants() {
             {
               value: regionFilter,
               onChange: (e) => setRegionFilter(e.target.value),
-              options: bundeslaender.map(bundesland => ({ value: bundesland, label: bundesland })),
+              options: [
+                { value: 'none', label: 'Keine Region' },
+                ...bundeslaender.map(bundesland => ({ value: bundesland, label: bundesland }))
+              ],
               placeholder: 'Alle Regionen'
             }
           ]}
@@ -428,13 +571,10 @@ export default function AdminParticipants() {
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-              {filteredParticipants.map((participant) => (
+              {paginatedParticipants.map((participant) => (
                 <tr key={participant.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
-                      <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-bold mr-3">
-                        {participant.name ? participant.name.charAt(0).toUpperCase() : '?'}
-                      </div>
                       <div className="text-sm font-medium text-gray-900 dark:text-white">{participant.name}</div>
                     </div>
                   </td>
@@ -444,10 +584,14 @@ export default function AdminParticipants() {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                    <div className="flex items-center space-x-2">
-                      <span>{getRegionFlag(participant.region)}</span>
-                      <span>{participant.region}</span>
-                    </div>
+                    {participant.region ? (
+                      <div className="flex items-center space-x-2">
+                        <span>{getRegionFlag(participant.region)}</span>
+                        <span>{participant.region}</span>
+                      </div>
+                    ) : (
+                      <span className="text-gray-400">-</span>
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                     {participant.pronouns || '-'}
@@ -486,7 +630,7 @@ export default function AdminParticipants() {
           </table>
         </div>
 
-        {filteredParticipants.length === 0 && (
+        {paginatedParticipants.length === 0 && (
           <div className="text-center py-12">
             <div className="text-4xl mb-4">👥</div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
@@ -495,6 +639,22 @@ export default function AdminParticipants() {
             <p className="text-gray-600 dark:text-gray-400">
               Versuchen Sie andere Suchkriterien oder fügen Sie einen neuen Teilnehmer*innen hinzu.
             </p>
+          </div>
+        )}
+
+        {/* Pagination Controls */}
+        {paginatedParticipants.length > 0 && (
+          <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+            <PaginationControls
+              currentPage={paginationInfo.currentPage}
+              totalPages={paginationInfo.totalPages}
+              pageSize={pageSize}
+              totalItems={paginationInfo.totalItems}
+              onPageChange={handlePageChange}
+              onPageSizeChange={handlePageSizeChange}
+              pageSizeOptions={[12, 24, 48, 96, 240]}
+              showAllOption={true}
+            />
           </div>
         )}
       </div>
@@ -547,7 +707,7 @@ export default function AdminParticipants() {
               <div>
                 <select
                   aria-invalid={editErrors.region ? 'true' : 'false'}
-                  {...registerEdit('region', { required: 'Region ist erforderlich' })}
+                  {...registerEdit('region')}
                   className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
                 >
                   <option value="">Bundesland/Region auswählen</option>
@@ -596,8 +756,11 @@ export default function AdminParticipants() {
       {showBulkImport && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            {/* Header */}
             <div className="flex justify-between items-center mb-6">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Excel-Import für Teilnehmer*innen</h3>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Teilnehmer importieren
+              </h3>
               <button
                 onClick={handleCloseBulkImport}
                 className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
@@ -608,155 +771,220 @@ export default function AdminParticipants() {
               </button>
             </div>
 
-            {/* File Upload Area */}
-            {!importState.parsedData && (
-              <div className="mb-6">
-                <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8 text-center">
-                  <div className="mb-4">
-                    <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+            {/* Upload State */}
+            {importState.step === 'upload' && (
+              <div>
+                {/* Template Download Buttons */}
+                <div className="mb-6">
+                  <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-3">
+                    1. Vorlage herunterladen
+                  </h4>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={handleDownloadTemplate}
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                    >
+                      Excel Vorlage (.xlsx)
+                    </button>
+                    <button
+                      onClick={handleDownloadTemplateCSV}
+                      className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
+                    >
+                      CSV Vorlage (.csv)
+                    </button>
+                  </div>
+                </div>
+
+                {/* File Upload */}
+                <div>
+                  <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-3">
+                    2. Ausgefüllte Datei hochladen
+                  </h4>
+                  <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8 text-center">
+                    <svg className="mx-auto h-12 w-12 text-gray-400 mb-4" stroke="currentColor" fill="none" viewBox="0 0 48 48">
                       <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                      Excel- oder CSV-Datei auswählen
+                    </p>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".xlsx,.xls,.csv"
+                      onChange={handleFileSelect}
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        fileInputRef.current?.click();
+                      }}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                    >
+                      Datei auswählen
+                    </button>
                   </div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                    Ziehen Sie eine Excel-Datei hierher oder klicken Sie zum Auswählen
-                  </p>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".xlsx,.xls"
-                    onChange={handleFileSelect}
-                    className="hidden"
-                  />
+                </div>
+              </div>
+            )}
+
+            {/* Validation State */}
+            {importState.step === 'validation' && importState.validationResults && (
+              <div>
+                <h4 className="text-md font-semibold text-gray-900 dark:text-white mb-4">
+                  Validierungsergebnisse
+                </h4>
+                
+                {/* Stats */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+                  <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 text-center">
+                    <div className="text-2xl font-bold text-blue-600">
+                      {importState.validationResults.totalRows}
+                    </div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">Zeilen gesamt</div>
+                  </div>
+                  <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 text-center">
+                    <div className="text-2xl font-bold text-green-600">
+                      {importState.validationResults.validRows}
+                    </div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">Gültig</div>
+                  </div>
+                  <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 text-center">
+                    <div className="text-2xl font-bold text-yellow-600">
+                      {importState.validationResults.duplicateCount}
+                    </div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">Duplikate</div>
+                  </div>
+                  <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 text-center">
+                    <div className="text-2xl font-bold text-red-600">
+                      {importState.validationResults.errorCount}
+                    </div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">Fehler</div>
+                  </div>
+                </div>
+
+                {/* Errors */}
+                {importState.validationResults.errors.length > 0 && (
+                  <div className="mb-4">
+                    <h5 className="font-semibold text-red-600 mb-2">Validierungsfehler:</h5>
+                    <div className="max-h-40 overflow-y-auto bg-red-50 dark:bg-red-900/20 rounded p-3">
+                      {importState.validationResults.errors.map((error, index) => (
+                        <div key={index} className="text-sm text-red-600 dark:text-red-400 mb-1">
+                          Zeile {error.row}: {error.field} - {error.message}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Duplicates */}
+                {importState.validationResults.duplicates.length > 0 && (
+                  <div className="mb-4">
+                    <h5 className="font-semibold text-yellow-600 mb-2">
+                      Duplikate (werden übersprungen):
+                    </h5>
+                    <div className="max-h-40 overflow-y-auto bg-yellow-50 dark:bg-yellow-900/20 rounded p-3">
+                      {importState.validationResults.duplicates.map((dup, index) => (
+                        <div key={index} className="text-sm text-yellow-600 dark:text-yellow-400 mb-1">
+                          {dup.name} ({dup.region})
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="flex justify-end space-x-3 mt-6">
                   <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    onClick={resetImport}
+                    className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
                   >
-                    Datei auswählen
+                    Abbrechen
+                  </button>
+                  {importState.validationResults.validRows > 0 && (
+                    <button
+                      onClick={handleConfirmImport}
+                      disabled={bulkImport.isPending}
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                    >
+                      {importState.validationResults.validRows} Teilnehmer importieren
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Importing State */}
+            {importState.step === 'importing' && (
+              <div className="text-center py-8">
+                <LoadingSpinner size="lg" />
+                <p className="text-gray-600 dark:text-gray-400 mt-4">
+                  Teilnehmer werden importiert...
+                </p>
+              </div>
+            )}
+
+            {/* Results State */}
+            {importState.step === 'results' && importState.importResults && (
+              <div>
+                <h4 className="text-md font-semibold text-gray-900 dark:text-white mb-4">
+                  Import abgeschlossen
+                </h4>
+                
+                {/* Stats */}
+                <div className="grid grid-cols-3 gap-4 mb-6">
+                  <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 text-center">
+                    <div className="text-2xl font-bold text-green-600">
+                      {importState.importResults.importedCount}
+                    </div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">Importiert</div>
+                  </div>
+                  <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-4 text-center">
+                    <div className="text-2xl font-bold text-yellow-600">
+                      {importState.importResults.duplicateCount}
+                    </div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">Übersprungen</div>
+                  </div>
+                  <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-4 text-center">
+                    <div className="text-2xl font-bold text-red-600">
+                      {importState.importResults.errorCount}
+                    </div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">Fehler</div>
+                  </div>
+                </div>
+
+                {/* Server-side errors */}
+                {importState.importResults.errors?.length > 0 && (
+                  <div className="mb-4">
+                    <h5 className="font-semibold text-red-600 mb-2">Import-Fehler:</h5>
+                    <div className="max-h-40 overflow-y-auto bg-red-50 dark:bg-red-900/20 rounded p-3">
+                      {importState.importResults.errors.map((error, index) => (
+                        <div key={index} className="text-sm text-red-600 dark:text-red-400 mb-2">
+                          <strong>Zeile {error.row} ({error.name}):</strong>
+                          <ul className="ml-4 list-disc">
+                            {error.errors.map((err, i) => (
+                              <li key={i}>{err}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="flex justify-end space-x-3">
+                  <button
+                    onClick={handleCloseBulkImport}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  >
+                    Fertig
                   </button>
                 </div>
               </div>
             )}
-
-            {/* Processing Status */}
-            {isProcessing && (
-              <div className="mb-6">
-                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                  <div className="flex items-center space-x-3 mb-2">
-                    <LoadingSpinner size="sm" />
-                    <span className="text-blue-700 dark:text-blue-300 font-medium">{getImportStatus()}</span>
-                  </div>
-                  <div className="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-2">
-                    <div className="bg-blue-600 h-2 rounded-full animate-pulse" style={{ width: '60%' }}></div>
-                  </div>
-                  <p className="text-sm text-blue-600 dark:text-blue-400 mt-2">
-                    Bitte warten Sie, während die Datei verarbeitet wird...
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Validation Results */}
-            {validationResults && (
-              <div className="mb-6">
-                <h4 className="text-md font-semibold text-gray-900 dark:text-white mb-3">Validierungsergebnisse</h4>
-                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-blue-600">{validationResults.totalRows}</div>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">Gesamtzeilen</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-green-600">{validationResults.validRows}</div>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">Gültige Zeilen</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-red-600">{validationResults.errorCount}</div>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">Fehler</div>
-                    </div>
-                  </div>
-                  
-                  {validationResults.errors.length > 0 && (
-                    <div className="mt-4">
-                      <h5 className="font-semibold text-red-600 mb-2">Validierungsfehler:</h5>
-                      <div className="max-h-40 overflow-y-auto">
-                        {validationResults.errors.map((error, index) => (
-                          <div key={index} className="text-sm text-red-600 mb-1">
-                            Zeile {error.row}: {error.field} - {error.message}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Import Results */}
-            {importResults && (
-              <div className="mb-6">
-                <h4 className="text-md font-semibold text-gray-900 dark:text-white mb-3">Import-Ergebnisse</h4>
-                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-green-600">{importResults.importedCount}</div>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">Importiert</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-yellow-600">{importResults.duplicateCount}</div>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">Duplikate übersprungen</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-red-600">{importResults.errors.length}</div>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">Fehler</div>
-                    </div>
-                  </div>
-                  
-                  {importResults.duplicates.length > 0 && (
-                    <div className="mt-4">
-                      <h5 className="font-semibold text-yellow-600 mb-2">Übersprungene Duplikate:</h5>
-                      <div className="max-h-40 overflow-y-auto">
-                        {importResults.duplicates.map((duplicate, index) => (
-                          <div key={index} className="text-sm text-yellow-600 mb-1">
-                            {duplicate.name} ({duplicate.region})
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {importResults.errors.length > 0 && (
-                    <div className="mt-4">
-                      <h5 className="font-semibold text-red-600 mb-2">Import-Fehler:</h5>
-                      <div className="max-h-40 overflow-y-auto">
-                        {importResults.errors.map((error, index) => (
-                          <div key={index} className="text-sm text-red-600 mb-1">
-                            {error}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Action Buttons */}
-            <div className="flex justify-end space-x-3">
-              {importResults && (
-                <button
-                  onClick={handleCloseBulkImport}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                >
-                  Fertig
-                </button>
-              )}
-              <button
-                onClick={handleCloseBulkImport}
-                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-              >
-                {importResults ? 'Schließen' : 'Abbrechen'}
-              </button>
-            </div>
           </div>
         </div>
       )}

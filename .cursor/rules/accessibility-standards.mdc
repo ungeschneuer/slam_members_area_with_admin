@@ -1,0 +1,422 @@
+---
+alwaysApply: true
+description: Accessibility standards and best practices for SLAM25 project
+---
+
+# Accessibility Standards - SLAM25 Project
+
+## Core Accessibility Principles
+
+This Poetry Slam members area follows **WCAG 2.1 AA standards** to ensure the application is accessible to all users, including those with disabilities.
+
+## Semantic HTML Standards
+
+### ✅ Proper HTML Structure
+```html
+<!-- ✅ Use semantic HTML elements -->
+<main>
+  <header>
+    <h1>SLAM25 Members Area</h1>
+    <nav aria-label="Main navigation">
+      <ul>
+        <li><a href="/participants">Participants</a></li>
+        <li><a href="/rounds">Rounds</a></li>
+        <li><a href="/news">News</a></li>
+      </ul>
+    </nav>
+  </header>
+  
+  <section aria-labelledby="participants-heading">
+    <h2 id="participants-heading">Participants</h2>
+    <!-- Content -->
+  </section>
+</main>
+```
+
+### ✅ Form Accessibility
+```html
+<!-- ✅ Proper form labels -->
+<form>
+  <label for="participant-name">Participant Name</label>
+  <input 
+    id="participant-name"
+    type="text"
+    name="name"
+    required
+    aria-describedby="name-help"
+  />
+  <div id="name-help">Enter the participant's full name</div>
+  
+  <label for="participant-region">Region</label>
+  <select id="participant-region" name="region">
+    <option value="">Select a region</option>
+    <option value="berlin">Berlin</option>
+    <option value="hamburg">Hamburg</option>
+  </select>
+</form>
+```
+
+### ✅ Button Accessibility
+```html
+<!-- ✅ Descriptive button text -->
+<button type="submit" aria-describedby="submit-help">
+  Save Participant
+</button>
+<div id="submit-help">Saves the participant information</div>
+
+<!-- ✅ Loading state -->
+<button type="submit" disabled aria-busy="true">
+  <span aria-hidden="true">⏳</span>
+  Saving...
+</button>
+```
+
+## ARIA Standards
+
+### ✅ ARIA Labels and Descriptions
+```html
+<!-- ✅ ARIA labels for screen readers -->
+<button aria-label="Close dialog" aria-describedby="close-help">
+  <span aria-hidden="true">×</span>
+</button>
+<div id="close-help">Closes the current dialog</div>
+
+<!-- ✅ ARIA live regions for dynamic content -->
+<div aria-live="polite" aria-atomic="true">
+  <span id="status-message">Loading participants...</span>
+</div>
+```
+
+### ✅ ARIA States and Properties
+```html
+<!-- ✅ ARIA states -->
+<div 
+  role="button" 
+  tabindex="0"
+  aria-expanded="false"
+  aria-controls="participant-details"
+  aria-describedby="expand-help"
+>
+  Show Details
+</div>
+<div id="expand-help">Click to expand participant details</div>
+
+<!-- ✅ ARIA properties -->
+<input 
+  type="text"
+  aria-invalid="true"
+  aria-describedby="error-message"
+  aria-required="true"
+/>
+<div id="error-message" role="alert">
+  This field is required
+</div>
+```
+
+### ✅ ARIA Landmarks
+```html
+<!-- ✅ ARIA landmarks -->
+<main role="main" aria-label="Main content">
+  <section aria-labelledby="participants-heading">
+    <h2 id="participants-heading">Participants</h2>
+    <!-- Content -->
+  </section>
+</main>
+
+<aside role="complementary" aria-label="Sidebar">
+  <!-- Sidebar content -->
+</aside>
+```
+
+## Keyboard Navigation
+
+### ✅ Tab Order
+```html
+<!-- ✅ Logical tab order -->
+<form>
+  <input type="text" tabindex="1" />
+  <input type="email" tabindex="2" />
+  <button type="submit" tabindex="3">Submit</button>
+</form>
+```
+
+### ✅ Keyboard Event Handling
+```javascript
+// ✅ Keyboard event handling
+const handleKeyDown = (event) => {
+  switch (event.key) {
+    case 'Enter':
+    case ' ':
+      event.preventDefault();
+      handleClick();
+      break;
+    case 'Escape':
+      handleClose();
+      break;
+    case 'ArrowDown':
+      handleNext();
+      break;
+    case 'ArrowUp':
+      handlePrevious();
+      break;
+  }
+};
+
+// ✅ Focus management
+const focusFirstElement = () => {
+  const firstElement = document.querySelector('[tabindex="0"]');
+  if (firstElement) {
+    firstElement.focus();
+  }
+};
+```
+
+### ✅ Skip Links
+```html
+<!-- ✅ Skip to main content -->
+<a href="#main-content" class="skip-link">
+  Skip to main content
+</a>
+
+<main id="main-content">
+  <!-- Main content -->
+</main>
+```
+
+## Color and Contrast
+
+### ✅ Color Contrast Standards
+```css
+/* ✅ WCAG AA contrast ratios */
+.text-primary {
+  color: #1a1a1a; /* 4.5:1 contrast ratio */
+  background-color: #ffffff;
+}
+
+.text-secondary {
+  color: #4a4a4a; /* 4.5:1 contrast ratio */
+  background-color: #f8f9fa;
+}
+
+/* ✅ High contrast mode support */
+@media (prefers-contrast: high) {
+  .text-primary {
+    color: #000000;
+    background-color: #ffffff;
+  }
+}
+```
+
+### ✅ Color Independence
+```html
+<!-- ✅ Don't rely on color alone -->
+<span class="status">
+  <span aria-hidden="true">●</span>
+  <span class="sr-only">Status: </span>
+  Active
+</span>
+
+<!-- ✅ Use icons with color -->
+<button class="delete-button">
+  <span aria-hidden="true">🗑️</span>
+  <span class="sr-only">Delete</span>
+</button>
+```
+
+## Screen Reader Support
+
+### ✅ Screen Reader Only Content
+```css
+/* ✅ Screen reader only class */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+```
+
+### ✅ Descriptive Text
+```html
+<!-- ✅ Descriptive text for screen readers -->
+<img 
+  src="participant-photo.jpg" 
+  alt="Photo of John Doe, a participant from Berlin"
+/>
+
+<button aria-label="Edit participant John Doe">
+  <span aria-hidden="true">✏️</span>
+  Edit
+</button>
+```
+
+### ✅ Live Regions
+```html
+<!-- ✅ Live regions for dynamic content -->
+<div aria-live="polite" aria-atomic="true">
+  <span id="status-message">Loading participants...</span>
+</div>
+
+<div aria-live="assertive" aria-atomic="true">
+  <span id="error-message">Error loading data</span>
+</div>
+```
+
+## Form Accessibility
+
+### ✅ Form Validation
+```html
+<!-- ✅ Accessible form validation -->
+<form>
+  <label for="email">Email Address</label>
+  <input 
+    id="email"
+    type="email"
+    name="email"
+    required
+    aria-describedby="email-error email-help"
+    aria-invalid="false"
+  />
+  <div id="email-help">We'll never share your email</div>
+  <div id="email-error" role="alert" aria-live="polite"></div>
+</form>
+```
+
+### ✅ Error Handling
+```javascript
+// ✅ Accessible error handling
+const handleFormSubmit = async (data) => {
+  try {
+    await submitForm(data);
+    setSuccessMessage('Form submitted successfully');
+  } catch (error) {
+    setErrorMessage(error.message);
+    // Focus on first error field
+    const firstError = document.querySelector('[aria-invalid="true"]');
+    if (firstError) {
+      firstError.focus();
+    }
+  }
+};
+```
+
+## Component Accessibility
+
+### ✅ Accessible Components
+```javascript
+// ✅ Accessible button component
+function AccessibleButton({ children, onClick, disabled, ariaLabel }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={ariaLabel}
+      aria-disabled={disabled}
+    >
+      {children}
+    </button>
+  );
+}
+
+// ✅ Accessible modal component
+function AccessibleModal({ isOpen, onClose, title, children }) {
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+      const firstFocusable = document.querySelector('[tabindex="0"]');
+      if (firstFocusable) firstFocusable.focus();
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+  }, [isOpen]);
+  
+  if (!isOpen) return null;
+  
+  return (
+    <div 
+      role="dialog" 
+      aria-modal="true" 
+      aria-labelledby="modal-title"
+      aria-describedby="modal-description"
+    >
+      <h2 id="modal-title">{title}</h2>
+      <div id="modal-description">{children}</div>
+      <button onClick={onClose} aria-label="Close modal">×</button>
+    </div>
+  );
+}
+```
+
+### ✅ Accessible Data Tables
+```html
+<!-- ✅ Accessible data table -->
+<table>
+  <caption>Participants List</caption>
+  <thead>
+    <tr>
+      <th scope="col">Name</th>
+      <th scope="col">Region</th>
+      <th scope="col">Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th scope="row">John Doe</th>
+      <td>Berlin</td>
+      <td>
+        <button aria-label="Edit John Doe">Edit</button>
+        <button aria-label="Delete John Doe">Delete</button>
+      </td>
+    </tr>
+  </tbody>
+</table>
+```
+
+## Testing Accessibility
+
+### ✅ Accessibility Testing
+```javascript
+// ✅ Accessibility testing with jest-axe
+import { axe, toHaveNoViolations } from 'jest-axe';
+
+expect.extend(toHaveNoViolations);
+
+describe('ParticipantCard', () => {
+  it('should not have accessibility violations', async () => {
+    const { container } = render(<ParticipantCard participant={mockParticipant} />);
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
+  });
+});
+```
+
+### ✅ Manual Testing Checklist
+- [ ] **Keyboard Navigation** - All interactive elements are keyboard accessible
+- [ ] **Screen Reader** - Content is properly announced by screen readers
+- [ ] **Color Contrast** - Text meets WCAG AA contrast requirements
+- [ ] **Focus Management** - Focus is visible and logical
+- [ ] **Error Handling** - Errors are announced to screen readers
+- [ ] **Form Labels** - All form inputs have proper labels
+- [ ] **Alternative Text** - Images have descriptive alt text
+- [ ] **Semantic HTML** - Proper use of semantic HTML elements
+
+## Benefits
+
+- **Inclusive** - Accessible to all users
+- **Legal Compliance** - Meets accessibility standards
+- **Better UX** - Improved user experience for everyone
+- **SEO Benefits** - Better search engine optimization
+- **Future-proof** - Ready for accessibility regulations
+
+## Remember
+
+> "The power of the Web is in its universality. Access by everyone regardless of disability is an essential aspect." - Tim Berners-Lee
+
+**Accessibility is not optional.**
+**Test with real users.**
+**Use semantic HTML first.**

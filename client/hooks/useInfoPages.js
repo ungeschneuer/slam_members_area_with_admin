@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { API_URL } from '../config/api.js';
 import authService from '../services/authService.js';
+import { useEntityData } from './useEntityData.js';
 
 // Query keys for info pages
 export const infoPagesKeys = {
@@ -13,10 +14,10 @@ export const infoPagesKeys = {
 };
 
 // Hook to fetch all info pages
-export function useInfoPages(filters = {}) {
-  return useQuery({
-    queryKey: infoPagesKeys.list(filters),
-    queryFn: async () => {
+export function useInfoPages(filters = {}, isAdmin = false) {
+  return useEntityData(
+    'info-pages',
+    async () => {
       const response = await fetch(`${API_URL}/info-pages`, {
         credentials: 'include'
       });
@@ -24,11 +25,12 @@ export function useInfoPages(filters = {}) {
         throw new Error(`Failed to fetch info pages: ${response.statusText}`);
       }
       const result = await response.json();
-      return result?.data || result || [];
+      // Handle nested data structure or direct array
+      const data = result?.data?.rows || result?.data || result || [];
+      return Array.isArray(data) ? data : [];
     },
-    staleTime: 15 * 60 * 1000, // 15 minutes (info pages change rarely)
-    gcTime: 60 * 60 * 1000, // 1 hour
-  });
+    { filters, staleTime: 15 * 60 * 1000, gcTime: 60 * 60 * 1000, isAdmin }
+  );
 }
 
 // Hook to fetch a single info page by ID
@@ -58,14 +60,15 @@ export function useInfoPageBySlug(slug) {
     queryKey: infoPagesKeys.bySlug(slug),
     queryFn: async () => {
       if (!slug) return null;
-      const response = await fetch(`${API_URL}/info-pages/slug/${slug}`, {
+      const response = await fetch(`${API_URL}/info-pages/${slug}`, {
         credentials: 'include'
       });
-      if (!response.ok) {
-        throw new Error(`Failed to fetch info page: ${response.statusText}`);
-      }
+      if (response.status === 404) return null;
+      if (!response.ok) throw new Error(`Failed to fetch info page: ${response.statusText}`);
       const result = await response.json();
-      return result?.data || result || null;
+      // Handle nested data structure or direct object
+      const data = result?.data?.rows?.[0] || result?.data || result || null;
+      return data;
     },
     enabled: !!slug,
     staleTime: 15 * 60 * 1000,
@@ -91,7 +94,8 @@ export function useCreateInfoPage() {
       return result?.data || result;
     },
     onSuccess: (data) => {
-      // Invalidate and refetch info pages list
+      // Invalidate all info-pages-related queries to ensure admin components update
+      queryClient.invalidateQueries({ queryKey: ['info-pages'] });
       queryClient.invalidateQueries({ queryKey: infoPagesKeys.lists() });
       
       // If we have the created info page data, add it to the cache
@@ -123,7 +127,8 @@ export function useUpdateInfoPage() {
       return result?.data || result;
     },
     onSuccess: (data, variables) => {
-      // Invalidate and refetch info pages list
+      // Invalidate all info-pages-related queries to ensure admin components update
+      queryClient.invalidateQueries({ queryKey: ['info-pages'] });
       queryClient.invalidateQueries({ queryKey: infoPagesKeys.lists() });
       
       // Update the specific info page in cache
@@ -156,7 +161,8 @@ export function useDeleteInfoPage() {
       // Remove from cache
       queryClient.removeQueries({ queryKey: infoPagesKeys.detail(id) });
       
-      // Invalidate and refetch info pages list
+      // Invalidate all info-pages-related queries to ensure admin components update
+      queryClient.invalidateQueries({ queryKey: ['info-pages'] });
       queryClient.invalidateQueries({ queryKey: infoPagesKeys.lists() });
     },
   });

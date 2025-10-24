@@ -1,51 +1,59 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { useParticipants, useRounds, useTimetable } from '../hooks/index.js';
+import { useParticipants, useRounds, useTimetable, useParticipantTeams, usePageTitle } from '../hooks/index.js';
+import { translateRoundStatus, getRoundStatusIcon, getRoundStatusColor } from '../utils/categoryTranslations.js';
+import { isCrewRole, getCrewRoleLabel } from '../utils/crewRoleUtils.js';
+import { 
+  formatTime, 
+  formatDate, 
+  getEventTypeInfo, 
+  getRoleColor, 
+  getRegionFlag,
+  getContentTypeIcon,
+  getContentTypeGradient
+} from '../utils/detailViewUtils.js';
+import BackButton from './shared/BackButton.jsx';
 
 export default function ParticipantDetail() {
   const { slug } = useParams();
-  const { data: participantsData = [], isLoading: participantsLoading, error: participantsError } = useParticipants();
+  const { data: participantsResponse = [], isLoading: participantsLoading, error: participantsError } = useParticipants({ limit: 10000 });
+  const participantsData = participantsResponse?.data || [];
   const { data: roundsData = [], isLoading: roundsLoading, error: roundsError } = useRounds();
   const { data: timetableData = [], isLoading: timetableLoading, error: timetableError } = useTimetable();
   
-  const loading = participantsLoading || roundsLoading || timetableLoading;
-  const error = participantsError || roundsError || timetableError;
-
   // Use useMemo for computed values instead of manual state synchronization
   const participant = useMemo(() => {
     return participantsData.find(p => p.slug === slug);
   }, [participantsData, slug]);
 
+  // Set dynamic page title
+  usePageTitle(participant?.name || 'Laden...');
+
+  const { data: participantTeams = [], isLoading: teamsLoading, error: teamsError } = useParticipantTeams(participant?.id);
+  
+  const loading = participantsLoading || roundsLoading || timetableLoading || teamsLoading;
+  const error = participantsError || roundsError || timetableError || teamsError;
+
   const participantRounds = useMemo(() => {
     if (!participant || !roundsData) return [];
     return roundsData.filter(round => {
-      // Check if participant is in tournament participants
-      const isTournamentParticipant = round.tournamentParticipants && 
-        round.tournamentParticipants.some(p => p.participantId === participant.id);
-      
-      // Check if participant is in crew
-      const isCrewMember = round.crew && 
-        round.crew.some(crewMember => crewMember.participantId === participant.id);
-      
-      // Check if participant is a feature artist
-      const isFeatureArtist = round.featureArtists && 
-        round.featureArtists.some(feature => feature.participantId === participant.id);
-      
-      return isTournamentParticipant || isCrewMember || isFeatureArtist;
+      // Check if participant has any role in this round
+      return round.assignments && 
+        round.assignments.some(assignment => assignment.participant_id === participant.id);
     });
   }, [participant, roundsData]);
 
   const participantTimetableEvents = useMemo(() => {
     if (!participant || !timetableData) return [];
     return timetableData.filter(event => {
-      // Check if participant is in event participants_details (new junction table structure)
-      if (!event.participants_details || !Array.isArray(event.participants_details)) {
+      // Check if participant is in event assignments (consistent with rounds structure)
+      if (!event.assignments || !Array.isArray(event.assignments)) {
         return false;
       }
       
-      return event.participants_details.some(p => {
+      return event.assignments.some(p => {
         // Ensure both IDs are numbers for comparison
-        return parseInt(p.id) === parseInt(participant.id);
+        return parseInt(p.participant_id) === parseInt(participant.id);
       });
     });
   }, [participant, timetableData]);
@@ -55,42 +63,50 @@ export default function ParticipantDetail() {
     if (!participant || !roundsData) return [];
     
     return roundsData.filter(round => {
-      // Check if participant is in tournament participants
-      const isTournamentParticipant = round.tournamentParticipants && 
-        round.tournamentParticipants.some(p => p.participantId === participant.id);
-      
-      // Check if participant is in crew
-      const isCrewMember = round.crew && 
-        round.crew.some(crewMember => crewMember.participantId === participant.id);
-      
-      // Check if participant is a feature artist
-      const isFeatureArtist = round.featureArtists && 
-        round.featureArtists.some(feature => feature.participantId === participant.id);
-      
-      return isTournamentParticipant || isCrewMember || isFeatureArtist;
+      // Check if participant has any role in this round
+      return round.assignments && 
+        round.assignments.some(assignment => assignment.participant_id === participant.id);
     }).map(round => {
       const roles = [];
       
-      // Determine roles in this round
-      if (round.tournamentParticipants && round.tournamentParticipants.some(p => p.participantId === participant.id)) {
-        roles.push('Turnier-Teilnehmer*in');
-      }
+      // Find the participant's assignment in this round
+      const assignment = round.assignments?.find(a => a.participant_id === participant.id);
       
-      if (round.crew && round.crew.some(crewMember => crewMember.participantId === participant.id)) {
-        const crewMember = round.crew.find(crewMember => crewMember.participantId === participant.id);
-        roles.push(`Crew (${crewMember.role})`);
-      }
-      
-      if (round.featureArtists && round.featureArtists.some(feature => feature.participantId === participant.id)) {
-        const feature = round.featureArtists.find(feature => feature.participantId === participant.id);
-        // Feature artists don't have a role property, they have order and description
-        const featureLabel = feature.order ? `Feature Artist #${feature.order}` : 'Feature Artist';
-        roles.push(featureLabel);
+      if (assignment) {
+        // Map roles to German labels
+        assignment.roles.forEach(role => {
+          switch (role) {
+            case 'participant':
+              roles.push('Turnier-Teilnehmer*in');
+              break;
+            case 'feature_artist':
+              const order = assignment.metadata?.display_order || 0;
+              const featureLabel = order > 0 ? `Feature Artist #${order}` : 'Feature Artist';
+              roles.push(featureLabel);
+              break;
+            case 'moderator':
+              roles.push('Moderator*in');
+              break;
+            case 'jury':
+              roles.push('Jury');
+              break;
+            default:
+              // Handle crew roles (both old and new format)
+              if (isCrewRole(role)) {
+                const crewLabel = role === 'crew' && assignment.metadata?.role 
+                  ? assignment.metadata.role 
+                  : getCrewRoleLabel(role);
+                roles.push(`Crew: ${crewLabel}`);
+              } else {
+                roles.push(role);
+              }
+          }
+        });
       }
 
       // Get performance data if tournament participant
       let performance = null;
-      if (round.tournamentParticipants && round.tournamentParticipants.some(p => p.participantId === participant.id)) {
+      if (assignment && assignment.roles.includes('participant')) {
         if (round.groups) {
           for (const group of round.groups) {
             const participantInGroup = group.participants.find(p => p.participantId === participant.id);
@@ -116,142 +132,39 @@ export default function ParticipantDetail() {
     });
   }, [participant, roundsData]);
 
-  // Enhanced participantTimetableEvents with roles
+  // Enhanced participantTimetableEvents with roles (consistent with rounds structure)
   const enhancedParticipantTimetableEvents = useMemo(() => {
     if (!participant || !timetableData) return [];
     
     return timetableData.filter(event => {
-      // Check if participant is in event participants_details (new junction table structure)
-      if (!event.participants_details || !Array.isArray(event.participants_details)) {
+      // Check if participant is in event assignments (consistent with rounds structure)
+      if (!event.assignments || !Array.isArray(event.assignments)) {
         return false;
       }
       
-      return event.participants_details.some(p => {
+      return event.assignments.some(p => {
         // Ensure both IDs are numbers for comparison
-        return parseInt(p.id) === parseInt(participant.id);
+        return parseInt(p.participant_id) === parseInt(participant.id);
       });
     }).map(event => {
-      const participantInEvent = event.participants_details.find(p => {
-        return parseInt(p.id) === parseInt(participant.id);
+      const participantInEvent = event.assignments.find(p => {
+        return parseInt(p.participant_id) === parseInt(participant.id);
       });
       
-      const role = participantInEvent?.role || 'Teilnehmer*in';
+      // Handle roles array (consistent with rounds) - use first role as primary
+      const roles = participantInEvent?.roles || ['Teilnehmer*in'];
+      const primaryRole = Array.isArray(roles) ? roles[0] : roles;
       
       return {
         ...event,
-        role,
+        role: primaryRole,
+        roles: roles,
+        metadata: participantInEvent?.metadata || {},
         type: 'event'
       };
     });
   }, [participant, timetableData]);
 
-  const getRoleColor = (role) => {
-    switch (role) {
-      case 'Teilnehmer*in': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300';
-      case 'Jury': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300';
-      case 'Supporter*in': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
-      case 'Crew': return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300';
-      case 'SLAM-MC': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300';
-      case 'Organisator*in': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
-      case 'Moderator*in': return 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300';
-      case 'Techniker*in': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300';
-      case 'Fotograf*in': return 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-300';
-      case 'Videograf*in': return 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-300';
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
-    }
-  };
-
-  const getRegionFlag = (region) => {
-    const flagMap = {
-      'Baden-Württemberg': '🇩🇪',
-      'Bayern': '🇩🇪',
-      'Berlin': '🇩🇪',
-      'Brandenburg': '🇩🇪',
-      'Bremen': '🇩🇪',
-      'Hamburg': '🇩🇪',
-      'Hessen': '🇩🇪',
-      'Mecklenburg-Vorpommern': '🇩🇪',
-      'Niedersachsen': '🇩🇪',
-      'Nordrhein-Westfalen': '🇩🇪',
-      'Rheinland-Pfalz': '🇩🇪',
-      'Saarland': '🇩🇪',
-      'Sachsen': '🇩🇪',
-      'Sachsen-Anhalt': '🇩🇪',
-      'Schleswig-Holstein': '🇩🇪',
-      'Thüringen': '🇩🇪',
-      'Österreich': '🇦🇹',
-      'Schweiz': '🇨🇭',
-      'Belgien': '🇧🇪',
-      'Luxemburg': '🇱🇺',
-      'Südtirol': '🇮🇹'
-    };
-    return flagMap[region] || '🌍';
-  };
-
-  // Helper function to format time
-  const formatTime = (timeString) => {
-    if (!timeString || typeof timeString !== 'string') return '--:--';
-    
-    if (/^\d{2}:\d{2}$/.test(timeString)) {
-      return timeString;
-    }
-    
-    if (/^\d{2}:\d{2}:\d{2}$/.test(timeString)) {
-      return timeString.substring(0, 5);
-    }
-    
-    if (timeString.includes('T')) {
-      try {
-        const date = new Date(timeString);
-        if (isNaN(date.getTime())) return '--:--';
-        return date.toLocaleTimeString('de-DE', {
-          hour: '2-digit',
-          minute: '2-digit',
-          timeZone: 'Europe/Berlin'
-        });
-      } catch (error) {
-        return '--:--';
-      }
-    }
-    
-    return timeString;
-  };
-
-  // Helper function to format date
-  const formatDate = (dateString) => {
-    if (!dateString) return 'Unbekanntes Datum';
-    
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString('de-DE', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        timeZone: 'Europe/Berlin'
-      });
-    } catch (error) {
-      return dateString;
-    }
-  };
-
-  // Helper function to get event type icon and color
-  const getEventTypeInfo = (type) => {
-    switch (type) {
-      case 'team-round':
-        return { icon: '👥', color: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300', label: 'Team-Runde' };
-      case 'individual-round':
-        return { icon: '👤', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300', label: 'Einzel-Runde' };
-      case 'workshop':
-        return { icon: '🎓', color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300', label: 'Workshop' };
-      case 'fun':
-        return { icon: '🎉', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300', label: 'Fun' };
-      case 'aftershow':
-        return { icon: '🎭', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300', label: 'Aftershow' };
-      default:
-        return { icon: '📅', color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300', label: 'Event' };
-    }
-  };
 
 
   if (loading) {
@@ -298,23 +211,12 @@ export default function ParticipantDetail() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
-          <Link
-            to="/participants"
-            className="inline-flex items-center text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 mb-4 transition-colors duration-200"
-          >
-            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
+          <BackButton to="/participants" className="mb-4">
             Zurück zu Teilnehmer*innen
-          </Link>
+          </BackButton>
           
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-            <div className="flex items-center space-x-4">
-              <div className="flex-shrink-0">
-                <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-2xl font-bold">
-                  {participant.name.charAt(0).toUpperCase()}
-                </div>
-              </div>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-8">
+            <div className="flex items-start">
               <div className="flex-1">
                 <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
                   {participant.name}
@@ -342,9 +244,11 @@ export default function ParticipantDetail() {
                       </span>
                     ));
                   })()}
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
-                    {getRegionFlag(participant.region)} {participant.region}
-                  </span>
+                  {participant.region && (
+                    <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
+                      {getRegionFlag(participant.region)} {participant.region}
+                    </span>
+                  )}
                   {participant.pronouns && (
                     <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-300">
                       {participant.pronouns}
@@ -373,7 +277,7 @@ export default function ParticipantDetail() {
         {/* Rounds Section */}
         {enhancedParticipantRounds.length > 0 && (
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
-            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <div className="px-8 py-6 border-b border-gray-200 dark:border-gray-700">
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
                 🏆 Turnier-Runden
               </h2>
@@ -393,18 +297,9 @@ export default function ParticipantDetail() {
                             🏆 Runde
                           </span>
                           
-                          {round.status && (
-                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                              round.status === 'completed' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' :
-                              round.status === 'upcoming' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' :
-                              round.status === 'active' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300' :
-                              round.status === 'confirmed' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200' :
-                              'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
-                            }`}>
-                              {round.status === 'completed' ? 'Abgeschlossen' :
-                               round.status === 'upcoming' ? 'Geplant' :
-                               round.status === 'active' ? 'Aktiv' :
-                               round.status === 'confirmed' ? '✔️ Bestätigt' : round.status}
+                          {(round.calculatedStatus || round.status) && (
+                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getRoundStatusColor(round.calculatedStatus || round.status, true)}`}>
+                              {getRoundStatusIcon(round.calculatedStatus || round.status)} {translateRoundStatus(round.calculatedStatus || round.status)}
                             </span>
                           )}
                         </div>
@@ -417,7 +312,7 @@ export default function ParticipantDetail() {
                       <div className="text-sm text-gray-600 dark:text-gray-400 mb-3">
                         <div className="flex items-center space-x-4">
                           <span>📅 {formatDate(round.date)}</span>
-                          <span>🕐 {round.startTime} - {round.endTime}</span>
+                          <span>🕐 {round.start_time} - {round.end_time}</span>
                           <span>📍 {round.location}</span>
                         </div>
                       </div>
@@ -435,10 +330,10 @@ export default function ParticipantDetail() {
                       </div>
 
                       {/* Competition Type for Rounds */}
-                      {round.competitionType && (
+                      {round.competition_type && (
                         <div className="mb-3">
                           <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300">
-                            🏆 {round.competitionType}
+                            🏆 {round.competition_type}
                           </span>
                         </div>
                       )}
@@ -447,7 +342,7 @@ export default function ParticipantDetail() {
                     {/* Link to Details */}
                     <div className="ml-4">
                       <Link
-                        to={`/rounds/${round.slug || round.id}`}
+                        to={`/rounds/${round.slug}`}
                         className="inline-flex items-center px-3 py-1 text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
                       >
                         Details →
@@ -474,18 +369,22 @@ export default function ParticipantDetail() {
                             {round.performance.order}
                           </p>
                         </div>
-                        <div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">Gesamtpunktzahl</p>
-                          <p className="text-sm font-medium text-gray-900 dark:text-white">
-                            {round.performance.totalScore.toFixed(1)}
-                            {round.performance.isWinner && (
-                              <span className="ml-2 text-yellow-600 dark:text-yellow-400">👑</span>
-                            )}
-                          </p>
-                        </div>
+                        {/* Only show total score if there are meaningful scores */}
+                        {round.performance.scores && round.performance.scores.length > 0 && round.performance.scores.some(score => score > 0) && (
+                          <div>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Gesamtpunktzahl</p>
+                            <p className="text-sm font-medium text-gray-900 dark:text-white">
+                              {round.performance.totalScore.toFixed(1)}
+                              {round.performance.isWinner && (
+                                <span className="ml-2 text-yellow-600 dark:text-yellow-400">👑</span>
+                              )}
+                            </p>
+                          </div>
+                        )}
                       </div>
                       
-                      {round.performance.scores && round.performance.scores.length > 0 && (
+                      {/* Only show jury scores if there are meaningful scores */}
+                      {round.performance.scores && round.performance.scores.length > 0 && round.performance.scores.some(score => score > 0) && (
                         <div className="mt-3">
                           <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Jury-Bewertungen</p>
                           <div className="flex flex-wrap gap-2">
@@ -511,7 +410,7 @@ export default function ParticipantDetail() {
         {/* Events Section */}
         {enhancedParticipantTimetableEvents.length > 0 && (
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <div className="px-8 py-6 border-b border-gray-200 dark:border-gray-700">
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
                 📅 Events & Workshops
               </h2>
@@ -532,17 +431,8 @@ export default function ParticipantDetail() {
                           </span>
                           
                           {event.status && (
-                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                              event.status === 'completed' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' :
-                              event.status === 'upcoming' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' :
-                              event.status === 'active' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300' :
-                              event.status === 'confirmed' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200' :
-                              'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
-                            }`}>
-                              {event.status === 'completed' ? 'Abgeschlossen' :
-                               event.status === 'upcoming' ? 'Geplant' :
-                               event.status === 'active' ? 'Aktiv' :
-                               event.status === 'confirmed' ? '✔️ Bestätigt' : event.status}
+                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getRoundStatusColor(event.status, true)}`}>
+                              {getRoundStatusIcon(event.status)} {translateRoundStatus(event.status)}
                             </span>
                           )}
                         </div>
@@ -596,8 +486,88 @@ export default function ParticipantDetail() {
           </div>
         )}
 
+        {/* Team Membership Section */}
+        {participantTeams.length > 0 && (
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
+            <div className="px-8 py-6 border-b border-gray-200 dark:border-gray-700">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                👥 Team-Mitgliedschaften
+              </h2>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                Teams, denen {participant.name} angehört
+              </p>
+            </div>
+            
+            <div className="divide-y divide-gray-200 dark:divide-gray-700">
+              {participantTeams.map((team, index) => (
+                <div key={`team-${team.id}-${index}`} className="p-6">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-3 mb-3">
+                        <div className="flex items-center space-x-2">
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
+                            👥 Team
+                          </span>
+                          {team.region && (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
+                              {team.region}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                        <Link
+                          to={`/teams/${team.slug}`}
+                          className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+                        >
+                          {team.name}
+                        </Link>
+                      </h3>
+                      
+                      {team.description && (
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                          {team.description}
+                        </p>
+                      )}
+                      
+                      <div className="text-sm text-gray-600 dark:text-gray-400">
+                        <div className="flex items-center space-x-4">
+                          {team.region && <span>📍 {team.region}</span>}
+                          {team.instagram && (
+                            <a
+                              href={`https://instagram.com/${team.instagram}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                            >
+                              📷 @{team.instagram}
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex-shrink-0">
+                      <Link
+                        to={`/teams/${team.slug}`}
+                        className="inline-flex items-center px-3 py-1 text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+                      >
+                        View Team
+                        <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* No Participation Message */}
-        {enhancedParticipantRounds.length === 0 && enhancedParticipantTimetableEvents.length === 0 && (
+        {enhancedParticipantRounds.length === 0 && enhancedParticipantTimetableEvents.length === 0 && participantTeams.length === 0 && (
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
             <div className="p-6 text-center text-gray-500 dark:text-gray-400">
               <div className="text-4xl mb-2">📅</div>
@@ -605,6 +575,13 @@ export default function ParticipantDetail() {
             </div>
           </div>
         )}
+
+        {/* Bottom Back Button */}
+        <div className="mt-8">
+          <BackButton to="/participants">
+            Zurück zu Teilnehmer*innen
+          </BackButton>
+        </div>
       </div>
     </div>
   );

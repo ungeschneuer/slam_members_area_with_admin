@@ -1,0 +1,202 @@
+---
+alwaysApply: true
+description: Read-only portal user interaction model
+---
+
+# User Interaction Model - Read-Only Portal
+
+## Core Principle: Content Consumption Only
+
+This Poetry Slam members area is a **read-only portal** where users consume information without any interactive features.
+
+## What Users DO
+
+### ✅ View Information
+- **Browse competition data** - Rounds, participants, results
+- **Read news and updates** - Stay informed about slam events
+- **Access city tips** - Location recommendations and venue info
+- **Check timetables** - Event schedules and timing
+- **Navigate content** - Browse through different sections
+
+### ✅ Real-time Updates
+- **Live data refresh** - Automatic updates every 30 seconds
+- **Status indicators** - Real-time competition status
+- **Countdown timers** - Event countdowns and deadlines
+
+## What Users DON'T DO
+
+### ❌ No User Registration
+```javascript
+// ❌ DON'T create user registration
+const registerUser = async (userData) => {
+  // No user registration system
+};
+```
+
+### ❌ No Content Creation
+```javascript
+// ❌ DON'T allow user content creation
+const createPost = async (content) => {
+  // No user-generated content
+};
+```
+
+### ❌ No Interactive Features
+```javascript
+// ❌ DON'T create interactive features
+const likePost = async (postId) => {
+  // No likes, comments, or interactions
+};
+
+const submitForm = async (formData) => {
+  // No user input forms
+};
+```
+
+### ❌ No Social Features
+```javascript
+// ❌ DON'T create social features
+const followUser = async (userId) => {
+  // No following, sharing, or social interactions
+};
+```
+
+## Component Patterns
+
+### ✅ Display Components
+```javascript
+// ✅ Information display
+function ParticipantCard({ participant }) {
+  return (
+    <div className="participant-card">
+      <h3>{participant.name}</h3>
+      <p>{participant.region}</p>
+      <p>{participant.instagram}</p>
+    </div>
+  );
+}
+
+// ✅ Navigation components
+function NavigationMenu() {
+  return (
+    <nav>
+      <Link to="/participants">Participants</Link>
+      <Link to="/rounds">Rounds</Link>
+      <Link to="/news">News</Link>
+    </nav>
+  );
+}
+```
+
+### ❌ Interactive Components
+```javascript
+// ❌ DON'T create interactive components
+function CommentForm() {
+  // No comment forms
+}
+
+function LikeButton() {
+  // No like buttons
+}
+
+function ShareButton() {
+  // No share buttons
+}
+```
+
+## Data Flow
+
+### ✅ Consumption Only
+```javascript
+// ✅ Simple data fetching
+const { data: participants } = useQuery(['participants'], fetchParticipants);
+const { data: rounds } = useQuery(['rounds'], fetchRounds);
+const { data: news } = useQuery(['news'], fetchNews);
+
+// ✅ Display data
+return (
+  <div>
+    <ParticipantsList participants={participants} />
+    <RoundsList rounds={rounds} />
+    <NewsList news={news} />
+  </div>
+);
+```
+
+### ❌ No Data Modification
+```javascript
+// ❌ DON'T allow data modification
+const updateParticipant = async (id, data) => {
+  // No user data modification
+};
+
+const deleteNews = async (id) => {
+  // No user content deletion
+};
+```
+
+## Admin vs User Experience
+
+### Admin Panel (Interactive)
+```javascript
+// ✅ Admin can create/edit content
+function AdminParticipantForm() {
+  const [formData, setFormData] = useState({});
+  
+  const handleSubmit = async (data) => {
+    await createParticipant(data);
+  };
+  
+  return (
+    <form onSubmit={handleSubmit}>
+      <input name="name" />
+      <button type="submit">Create</button>
+    </form>
+  );
+}
+```
+
+### User Portal (Read-Only)
+```javascript
+// ✅ Users only view content
+function ParticipantCard({ participant }) {
+  return (
+    <div>
+      <h3>{participant.name}</h3>
+      <p>{participant.region}</p>
+    </div>
+  );
+}
+```
+
+## Benefits
+
+- **Simple UX** - Users focus on consuming information
+- **Fast Performance** - No complex interactions to slow down
+- **Easy Maintenance** - No user-generated content to manage
+- **Clear Purpose** - Information portal, not social platform
+- **Secure** - No user input means fewer security concerns
+
+## Implementation Guidelines
+
+### ✅ Do Create
+- **Information displays** - Cards, lists, detail views
+- **Navigation** - Menu-based content browsing
+- **Real-time updates** - Live data synchronization
+- **Responsive design** - Mobile-friendly consumption
+
+### ❌ Don't Create
+- **User forms** - No input fields or submissions
+- **Interactive features** - No likes, comments, or interactions
+- **Social features** - No following, sharing, or social elements
+- **User accounts** - No registration or login for users
+
+## Remember
+
+This is a **Poetry Slam members area** focused on:
+- **Competition information** - Rounds, participants, results
+- **Event updates** - News, announcements, schedules
+- **Location guidance** - City tips, venue information
+- **Real-time status** - Live competition updates
+
+**Users browse, read, and stay informed - they don't create, modify, or interact with content.**

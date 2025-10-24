@@ -1,6 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { API_URL } from '../config/api.js';
 import authService from '../services/authService.js';
+import { useEntityData } from './useEntityData.js';
+import { getQueryConfig } from '../config/polling.js';
 
 // Query keys for news
 export const newsKeys = {
@@ -13,10 +15,10 @@ export const newsKeys = {
 };
 
 // Hook to fetch all news
-export function useNews(filters = {}) {
-  return useQuery({
-    queryKey: newsKeys.list(filters),
-    queryFn: async () => {
+export function useNews(filters = {}, isAdmin = false) {
+  return useEntityData(
+    'news',
+    async () => {
       const response = await fetch(`${API_URL}/news`, {
         credentials: 'include'
       });
@@ -24,11 +26,12 @@ export function useNews(filters = {}) {
         throw new Error(`Failed to fetch news: ${response.statusText}`);
       }
       const result = await response.json();
-      return result?.data || result || [];
+      // Handle nested data structure or direct array
+      const data = result?.data?.data?.rows || result?.data?.rows || result?.data || result;
+      return Array.isArray(data) ? data : [];
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
-  });
+    { filters, ...getQueryConfig('news', isAdmin), isAdmin }
+  );
 }
 
 // Hook to fetch a single news item by slug
@@ -37,7 +40,7 @@ export function useNewsItem(slug) {
     queryKey: newsKeys.detail(slug),
     queryFn: async () => {
       if (!slug) return null;
-      const response = await fetch(`${API_URL}/news/slug/${slug}`, {
+      const response = await fetch(`${API_URL}/news/${slug}`, {
         credentials: 'include'
       });
       if (!response.ok) {
@@ -64,10 +67,12 @@ export function useBreakingNews() {
         throw new Error(`Failed to fetch breaking news: ${response.statusText}`);
       }
       const result = await response.json();
-      return result?.data || result || [];
+      const data = result?.data || result || [];
+      // Return the first breaking news item or null if none
+      return Array.isArray(data) ? data[0] || null : data;
     },
-    staleTime: 2 * 60 * 1000, // 2 minutes (breaking news should be fresher)
-    gcTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000, // 5 minutes (same as default)
+    gcTime: 10 * 60 * 1000, // 10 minutes (same as default)
   });
 }
 
@@ -89,12 +94,13 @@ export function useCreateNews() {
       return result?.data || result;
     },
     onSuccess: (data) => {
-      // Invalidate and refetch news list
+      // Invalidate all news-related queries to ensure admin components update
+      queryClient.invalidateQueries({ queryKey: ['news'] });
       queryClient.invalidateQueries({ queryKey: newsKeys.lists() });
       
       // If we have the created news data, add it to the cache
-      if (data?.data) {
-        queryClient.setQueryData(newsKeys.detail(data.data.id), data.data);
+      if (data && data.id) {
+        queryClient.setQueryData(newsKeys.detail(data.id), data);
       }
     },
   });
@@ -118,12 +124,13 @@ export function useUpdateNews() {
       return result?.data || result;
     },
     onSuccess: (data, variables) => {
-      // Invalidate and refetch news list
+      // Invalidate all news-related queries to ensure admin components update
+      queryClient.invalidateQueries({ queryKey: ['news'] });
       queryClient.invalidateQueries({ queryKey: newsKeys.lists() });
       
       // Update the specific news item in cache
-      if (data?.data) {
-        queryClient.setQueryData(newsKeys.detail(variables.id), data.data);
+      if (data && data.id) {
+        queryClient.setQueryData(newsKeys.detail(variables.id), data);
       }
     },
   });
@@ -148,7 +155,8 @@ export function useDeleteNews() {
       // Remove from cache
       queryClient.removeQueries({ queryKey: newsKeys.detail(id) });
       
-      // Invalidate and refetch news list
+      // Invalidate all news-related queries to ensure admin components update
+      queryClient.invalidateQueries({ queryKey: ['news'] });
       queryClient.invalidateQueries({ queryKey: newsKeys.lists() });
     },
   });

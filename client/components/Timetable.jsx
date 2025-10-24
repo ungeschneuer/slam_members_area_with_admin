@@ -1,144 +1,221 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { useTimetable } from '../hooks/index.js';
+import { useTimetable, usePageTitle } from '../hooks/index.js';
 import LoadingSpinner from './LoadingSpinner';
 import { ErrorMessage, SuccessMessage } from './StatusMessages.jsx';
+import { getTodayBerlinDateString, isFutureDateBerlin } from '../utils/dateUtils';
+import { getAvailableContentFilterOptions, validateFilterValue } from '../utils/filterUtils.js';
+
+// Event type translations
+const translateEventType = (type) => {
+  const translations = {
+    'meeting': 'Meeting',
+    'registration': 'Anmeldung',
+    'technical': 'Technik',
+    'party': 'Party',
+    'workshop': 'Workshop',
+    'Einzel-Runde': 'Einzel-Runde'
+  };
+  return translations[type] || type;
+};
 
 export default function Timetable() {
-  const { data: timetableData, isLoading: loading, error } = useTimetable();
-  const [events, setEvents] = useState([]);
+  usePageTitle('Zeitplan');
+  const { data: events = [], isLoading: loading, error } = useTimetable();
   const [success, setSuccess] = useState(null);
-  const [selectedDate, setSelectedDate] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState('all');
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [filterLocation, setFilterLocation] = useState('all');
-  const [sortBy, setSortBy] = useState('date');
-  const [expandedEvents, setExpandedEvents] = useState(new Set());
   const [dayFilter, setDayFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
+  const [locationFilter, setLocationFilter] = useState('all');
+  
+  // Ref to track if initial day selection was made
+  const hasSetInitialDay = useRef(false);
 
-  // Update local state when useLiveData changes
-  useEffect(() => {
-    if (timetableData && timetableData.length > 0) {
-      setEvents(timetableData);
-    } else {
-          // Set default events if none exist
-          const defaultEvents = [
-            { 
-              id: 1, 
-              title: 'Anmeldung & Check-in', 
-              date: '2025-10-28', 
-              time: '09:00', 
-              end_time: '10:00',
-              location: 'Hauptsaal', 
-              type: 'workshop', 
-              description: 'Alle Teilnehmer*innen müssen sich registrieren und einchecken, bevor der Wettbewerb beginnt', 
-              detailedDescription: 'Die Anmeldung findet im Hauptsaal statt. Bitte bringen Sie Ihren Ausweis und die Bestätigungs-E-Mail mit. Nach der Registrierung erhalten Sie Ihr Teilnehmer*innenpaket mit Namensschild, Programmheft und weiteren wichtigen Informationen.',
-              additionalLinks: [
-                { title: 'Anmeldeformular', url: 'https://example.com/registration', type: 'form' },
-                { title: 'Teilnehmer*innenrichtlinien', url: 'https://example.com/guidelines', type: 'document' }
-              ],
-              status: 'upcoming' 
-            },
-            { 
-              id: 2, 
-              title: 'Qualifikationsrunde 1', 
-              date: '2025-10-28', 
-              time: '10:30',
-              end_time: '12:30', 
-              location: 'Bühne 1', 
-              type: 'individual-round', 
-              description: 'Erste Qualifikationsrunde - 24 Teilnehmer*innen präsentieren eigene Werke', 
-              detailedDescription: 'In der ersten Qualifikationsrunde treten 24 Teilnehmer*innen in drei Gruppen à 8 Personen an. Jeder Teilnehmer*innen hat maximal 5 Minuten für seinen Vortrag. Die Jury besteht aus 5 Personen aus dem Publikum. Die Top 3 jeder Gruppe qualifizieren sich für das Halbfinale.',
-              additionalLinks: [
-                { title: 'Teilnehmer*innenliste', url: 'https://example.com/participants', type: 'list' },
-                { title: 'Bewertungskriterien', url: 'https://example.com/criteria', type: 'document' },
-                { title: 'Live-Stream', url: 'https://example.com/livestream', type: 'stream' }
-              ],
-              status: 'completed' 
-            },
-            { 
-              id: 3, 
-              title: 'Mittagspause', 
-              date: '2025-10-28', 
-              time: '12:30',
-              end_time: '13:30', 
-              location: 'Speisesaal', 
-              type: 'fun', 
-              description: 'Mittagspause für Teilnehmer*innen und Publikum', 
-              detailedDescription: 'Während der Mittagspause können Sie sich im Speisesaal mit einem Buffet stärken. Es gibt vegetarische und vegane Optionen. Nutzen Sie die Zeit auch zum Netzwerken mit anderen Teilnehmer*innen und Jury-Mitgliedern.',
-              additionalLinks: [
-                { title: 'Speisekarte', url: 'https://example.com/menu', type: 'menu' },
-                { title: 'Networking-Bereich', url: 'https://example.com/networking', type: 'info' }
-              ],
-              status: 'completed' 
-            },
-            { 
-              id: 4, 
-              title: 'Qualifikationsrunde 2', 
-              date: '2025-10-28', 
-              time: '13:30',
-              end_time: '15:30', 
-              location: 'Bühne 1', 
-              type: 'individual-round', 
-              description: 'Zweite Qualifikationsrunde - verbleibende Teilnehmer*innen', 
-              detailedDescription: 'Die zweite Qualifikationsrunde folgt dem gleichen Format wie die erste. Die verbleibenden Teilnehmer*innen werden in neue Gruppen eingeteilt. Auch hier qualifizieren sich die Top 3 jeder Gruppe für das Halbfinale.',
-              additionalLinks: [
-                { title: 'Gruppeneinteilung', url: 'https://example.com/groups', type: 'list' },
-                { title: 'Live-Stream', url: 'https://example.com/livestream2', type: 'stream' }
-              ],
-              status: 'upcoming' 
-            },
-            { 
-              id: 5, 
-              title: 'Halbfinale 1', 
-              date: '2025-10-29', 
-              time: '19:00',
-              end_time: '21:00', 
-              location: 'Hauptbühne', 
-              type: 'individual-round', 
-              description: 'Erstes Halbfinale - Top 8 Dichter kämpfen um Finalplätze', 
-              detailedDescription: 'Das erste Halbfinale findet auf der Hauptbühne statt. Die 8 qualifizierten Teilnehmer*innen treten in zwei Gruppen à 4 Personen an. Jeder hat 6 Minuten für seinen Vortrag. Die Top 2 jeder Gruppe erreichen das Finale.',
-              additionalLinks: [
-                { title: 'Qualifizierte Teilnehmer*innen', url: 'https://example.com/semifinalists', type: 'list' },
-                { title: 'Tickets kaufen', url: 'https://example.com/tickets', type: 'ticket' },
-                { title: 'Live-Stream', url: 'https://example.com/semifinal-live', type: 'stream' }
-              ],
-              status: 'upcoming' 
-            },
-            { 
-              id: 6, 
-              title: 'Großes Finale', 
-              date: '2025-10-30', 
-              time: '20:00',
-              end_time: '22:00', 
-              location: 'Hauptbühne', 
-              type: 'individual-round', 
-              description: 'Das große Finale - Die besten 4 Dichter kämpfen um den Titel', 
-              detailedDescription: 'Das große Finale ist der Höhepunkt des Wettbewerbs. Die 4 Finalisten treten vor einer großen Jury und Publikum an. Jeder Finalist hat 8 Minuten für seinen Vortrag. Der Gewinner erhält den SLAM25-Titel und ein Preisgeld.',
-              additionalLinks: [
-                { title: 'Finalisten', url: 'https://example.com/finalists', type: 'list' },
-                { title: 'Tickets kaufen', url: 'https://example.com/final-tickets', type: 'ticket' },
-                { title: 'Live-Stream', url: 'https://example.com/final-live', type: 'stream' }
-              ],
-              status: 'upcoming' 
-            }
-          ];
-          setEvents(defaultEvents);
-    }
-  }, [timetableData]);
-
-  // Filter and sort events
-  const filteredEvents = (events || []).filter(event => {
-    const matchesSearch = event.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         event.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         event.location?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesDay = dayFilter === 'all' || event.date === dayFilter;
-    const matchesType = typeFilter === 'all' || event.type === typeFilter;
+  // Extract matching logic to reusable functions
+  const matchesSearchFilter = (event, search) => {
+    if (!search) return true;
+    const searchLower = search.toLowerCase();
     
-    return matchesSearch && matchesDay && matchesType;
-  });
+    // Early returns for performance
+    if (event.title?.toLowerCase().includes(searchLower)) return true;
+    if (event.location?.toLowerCase().includes(searchLower)) return true;
+    if (event.description?.toLowerCase().includes(searchLower)) return true;
+    
+    return false;
+  };
+
+  const matchesDayFilter = (event, dayFilter) => {
+    return dayFilter === 'all' || event.date === dayFilter;
+  };
+
+  const matchesTypeFilter = (event, typeFilter) => {
+    return typeFilter === 'all' || event.type === typeFilter;
+  };
+
+  const matchesLocationFilter = (event, locationFilter) => {
+    return locationFilter === 'all' || event.location === locationFilter;
+  };
+
+  // Predefined event type options
+  const predefinedTypeOptions = [
+    { id: 'all', name: 'Alle Typen' },
+    { id: 'team-round', name: 'Team-Runde' },
+    { id: 'individual-round', name: 'Einzel-Runde' },
+    { id: 'workshop', name: 'Workshop' },
+    { id: 'fun', name: 'Fun' },
+    { id: 'aftershow', name: 'Aftershow' },
+    { id: 'panel', name: 'Panel' }
+  ];
+
+  // Single-pass cascading filter options and results
+  const { typeOptions, locationOptions, dayOptions, filteredEvents } = useMemo(() => {
+    try {
+      // Handle empty or invalid datasets
+      if (!Array.isArray(events) || events.length === 0) {
+        return {
+          typeOptions: predefinedTypeOptions,
+          locationOptions: [{ id: 'all', name: 'Alle Orte' }],
+          dayOptions: [{ id: 'all', name: 'Alle Tage' }],
+          filteredEvents: []
+        };
+      }
+    
+    const afterSearch = events.filter(event => {
+      if (!event || typeof event !== 'object') return false;
+      return matchesSearchFilter(event, searchTerm);
+    });
+    
+    const types = new Set();
+    const locations = new Set();
+    const days = new Set();
+    const filtered = [];
+    
+    afterSearch.forEach(event => {
+      const passesDay = matchesDayFilter(event, dayFilter);
+      const passesType = matchesTypeFilter(event, typeFilter);
+      const passesLocation = matchesLocationFilter(event, locationFilter);
+      
+      if (passesDay && passesType && passesLocation) {
+        filtered.push(event);
+      }
+      
+      // For type options: match day + location (but NOT type filter)
+      if (passesDay && passesLocation && event.type) {
+        types.add(event.type);
+      }
+      
+      // For location options: match day + type (but NOT location filter)
+      if (passesDay && passesType && event.location) {
+        locations.add(event.location);
+      }
+      
+      // For day options: match type + location (but NOT day filter)
+      if (passesType && passesLocation && event.date) {
+        days.add(event.date);
+      }
+    });
+    
+    const typeOpts = [
+      predefinedTypeOptions[0], // "Alle Typen"
+      ...Array.from(types).map(type => 
+        predefinedTypeOptions.find(opt => opt.id === type) || { id: type, name: type }
+      )
+    ].filter(Boolean);
+    
+    const locationOpts = [
+      { id: 'all', name: 'Alle Orte' },
+      ...Array.from(locations).sort().map(loc => ({ id: loc, name: loc }))
+    ];
+    
+    const dayOpts = [
+      { id: 'all', name: 'Alle Tage' },
+      ...Array.from(days).sort().map(date => ({
+        id: date,
+        name: new Date(date).toLocaleDateString('de-DE', { 
+          weekday: 'long', 
+          day: 'numeric', 
+          month: 'long',
+          timeZone: 'Europe/Berlin'
+        })
+      }))
+    ];
+    
+      return {
+        typeOptions: typeOpts,
+        locationOptions: locationOpts,
+        dayOptions: dayOpts,
+        filteredEvents: filtered
+      };
+    } catch (error) {
+      console.error('Error in filter calculation:', error);
+      // Return safe defaults on error
+      return {
+        typeOptions: predefinedTypeOptions,
+        locationOptions: [{ id: 'all', name: 'Alle Orte' }],
+        dayOptions: [{ id: 'all', name: 'Alle Tage' }],
+        filteredEvents: []
+      };
+    }
+  }, [events, searchTerm, dayFilter, typeFilter, locationFilter]);
+
+  // Auto-reset logic (with loop prevention)
+  const resetInProgress = useRef(false);
+  
+  useEffect(() => {
+    if (resetInProgress.current) return;
+    if (!typeOptions.some(opt => opt.id === typeFilter)) {
+      resetInProgress.current = true;
+      setTypeFilter('all');
+      setTimeout(() => { resetInProgress.current = false; }, 0);
+    }
+  }, [typeOptions, typeFilter]);
+
+  useEffect(() => {
+    if (resetInProgress.current) return;
+    if (!locationOptions.some(opt => opt.id === locationFilter)) {
+      resetInProgress.current = true;
+      setLocationFilter('all');
+      setTimeout(() => { resetInProgress.current = false; }, 0);
+    }
+  }, [locationOptions, locationFilter]);
+
+  // Smart default day selection - runs once when data loads
+  useEffect(() => {
+    // Only run once and when loading completes
+    if (hasSetInitialDay.current || loading || !events || events.length === 0) {
+      return;
+    }
+    
+    // Mark as completed to prevent future runs
+    hasSetInitialDay.current = true;
+    
+    // Get today's date in Berlin timezone
+    const todayStr = getTodayBerlinDateString();
+    
+    // Get unique dates from events and sort them
+    const eventsArray = Array.isArray(events) ? events : [];
+    const eventDates = [...new Set(eventsArray.map(e => e.date))].sort();
+    
+    // Check if today has events
+    if (eventDates.includes(todayStr)) {
+      setDayFilter(todayStr);
+      return;
+    }
+    
+    // Find future and past dates
+    const futureDates = eventDates.filter(date => isFutureDateBerlin(date));
+    const pastDates = eventDates.filter(date => !isFutureDateBerlin(date));
+    
+    // If we have both past and future events, select the next future date
+    if (futureDates.length > 0 && pastDates.length > 0) {
+      setDayFilter(futureDates[0]);
+      return;
+    }
+    
+    // If all events are in the future OR all events are in the past OR no events, show "all"
+    setDayFilter('all');
+  }, [events, loading]);
+
 
   // Group events by date
   const groupedEvents = filteredEvents.reduce((groups, event) => {
@@ -249,6 +326,13 @@ export default function Timetable() {
           timeCircle: 'bg-gradient-to-br from-purple-500 to-purple-600',
           accent: 'text-purple-800 dark:text-purple-200'
         };
+      case 'panel':
+        return {
+          cardBg: 'bg-orange-100 dark:bg-orange-900/40',
+          cardBorder: 'border-orange-300 dark:border-orange-700',
+          timeCircle: 'bg-gradient-to-br from-orange-500 to-orange-600',
+          accent: 'text-orange-800 dark:text-orange-200'
+        };
       default:
         return {
           cardBg: 'bg-gray-100 dark:bg-gray-800',
@@ -256,6 +340,19 @@ export default function Timetable() {
           timeCircle: 'bg-gradient-to-br from-gray-500 to-gray-600',
           accent: 'text-gray-800 dark:text-gray-200'
         };
+    }
+  };
+
+  // Helper to get border-left color from category colors
+  const getBorderColorClass = (eventType) => {
+    switch (eventType) {
+      case 'team-round': return 'border-l-red-500';
+      case 'individual-round': return 'border-l-blue-500';
+      case 'workshop': return 'border-l-green-500';
+      case 'fun': return 'border-l-yellow-500';
+      case 'aftershow': return 'border-l-purple-500';
+      case 'panel': return 'border-l-orange-500';
+      default: return 'border-l-gray-500';
     }
   };
 
@@ -290,7 +387,7 @@ export default function Timetable() {
         </div>
 
         {/* Search and Filter Controls */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <input
             type="text"
             placeholder="Events durchsuchen..."
@@ -304,34 +401,58 @@ export default function Timetable() {
             className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
           >
             <option value="all">Alle Tage</option>
-            <option value="2025-10-25">Samstag, 25. Oktober</option>
-            <option value="2025-10-26">Sonntag, 26. Oktober</option>
-            <option value="2025-10-27">Montag, 27. Oktober</option>
-            <option value="2025-10-28">Dienstag, 28. Oktober</option>
+            {[...new Set(events.map(e => e.date))].sort().map(date => (
+              <option key={date} value={date}>
+                {new Date(date).toLocaleDateString('de-DE', { 
+                  weekday: 'short', 
+                  year: '2-digit', 
+                  month: '2-digit', 
+                  day: '2-digit',
+                  timeZone: 'Europe/Berlin'
+                })}
+              </option>
+            ))}
           </select>
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
             className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
           >
-            <option value="all">Alle Typen</option>
-            <option value="team-round">Team-Runde</option>
-            <option value="individual-round">Einzel-Runde</option>
-            <option value="workshop">Workshop</option>
-            <option value="fun">Fun</option>
-            <option value="aftershow">Aftershow</option>
+            {typeOptions.map(option => (
+              <option key={option.id} value={option.id}>
+                {option.id === 'all' ? option.name : translateEventType(option.id)}
+              </option>
+            ))}
+          </select>
+          <select
+            value={locationFilter}
+            onChange={(e) => setLocationFilter(e.target.value)}
+            className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+            aria-label="Ort filtern"
+          >
+            {locationOptions.map(option => (
+              <option key={option.id} value={option.id}>
+                {option.name}
+              </option>
+            ))}
           </select>
         </div>
 
         {/* Timetable */}
         <div className="space-y-6">
           {Array.isArray(groupedEventsArray) && groupedEventsArray.map((dayGroup, dayIndex) => (
-            <div key={`day-${dayGroup.date}-${dayIndex}`} className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-                {dayGroup.dayName}
-              </h2>
+            <div key={`day-${dayGroup.date}-${dayIndex}`} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+              {/* Date Header */}
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                  {dayGroup.dayName}
+                </h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  {dayGroup.events.length} Event{dayGroup.events.length !== 1 ? 's' : ''}
+                </p>
+              </div>
               
-              <div className="space-y-4">
+              <div className="divide-y divide-gray-200 dark:divide-gray-700">
                 {Array.isArray(dayGroup.events) && dayGroup.events.map((event, eventIndex) => {
                   // Sicherheitsprüfung für Event-Daten
                   if (!event || typeof event !== 'object') {
@@ -343,8 +464,8 @@ export default function Timetable() {
                   return (
                     <Link 
                       key={`event-${event.id || eventIndex}-${eventIndex}`} 
-                      to={event.internal_link ? `/rounds/${event.internal_link}` : `/timetable/event/${event.slug || event.id}`}
-                      className={`${colors.cardBg} rounded-lg p-3 sm:p-6 shadow-sm border ${colors.cardBorder} hover:shadow-md transition-all duration-200 block`}
+                      to={event.internal_link ? `/rounds/${event.internal_link}` : `/timetable/event/${event.slug}`}
+                      className={`${colors.cardBg} ${getBorderColorClass(event.type)} border-l-4 rounded-lg p-3 sm:p-6 shadow-sm border ${colors.cardBorder} hover:shadow-md transition-all duration-200 block group`}
                     >
                       <div className="flex items-start space-x-3 sm:space-x-4">
                         <div className="flex-shrink-0">
@@ -354,21 +475,38 @@ export default function Timetable() {
                         </div>
                         
                         <div className="flex-1 min-w-0">
+                          {/* Title Row with Navigation Arrow */}
                           <div className="flex items-start justify-between mb-1 sm:mb-2">
-                            <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white leading-tight">{event.title || 'Unbekanntes Event'}</h3>
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ml-2 ${
+                            <div className="flex-1 min-w-0">
+                              <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white leading-tight group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                                {event.title || 'Unbekanntes Event'}
+                              </h3>
+                            </div>
+                            {/* Navigation Arrow - Rounds-style */}
+                            <div className="flex items-center text-blue-600 dark:text-blue-400 group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors ml-2">
+                              <svg className="w-5 h-5 sm:w-6 sm:h-6 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                              </svg>
+                            </div>
+                          </div>
+                          
+                          {/* Event Type Badge */}
+                          <div className="mb-3">
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                               event.type === 'team-round' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
                               event.type === 'individual-round' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
                               event.type === 'workshop' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
                               event.type === 'fun' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
                               event.type === 'aftershow' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' :
+                              event.type === 'panel' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200' :
                               'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
                             }`}>
                               {event.type === 'team-round' ? '👥' :
                                event.type === 'individual-round' ? '👤' :
                                event.type === 'workshop' ? '🎓' :
                                event.type === 'fun' ? '🎉' :
-                               event.type === 'aftershow' ? '🎭' : '📅'}
+                               event.type === 'aftershow' ? '🎭' :
+                               event.type === 'panel' ? '🎤' : '📅'}
                             </span>
                           </div>
                           
@@ -381,10 +519,10 @@ export default function Timetable() {
                               <span className="text-xs">📍</span>
                               <span className="truncate">{event.location || 'Unbekannter Ort'}</span>
                             </div>
-                            {event.participants_details && Array.isArray(event.participants_details) && event.participants_details.length > 0 && (
+                            {event.assignments && Array.isArray(event.assignments) && event.assignments.length > 0 && (
                               <div className="flex items-center space-x-1 sm:space-x-2">
                                 <span className="text-xs">👥</span>
-                                <span>{event.participants_details.length} Teilnehmer*innen</span>
+                                <span>{event.assignments.length} Teilnehmer*innen</span>
                               </div>
                             )}
                           </div>
@@ -392,9 +530,9 @@ export default function Timetable() {
                           <p className="text-sm text-gray-700 dark:text-gray-300 mb-2 sm:mb-4 line-clamp-2">{event.description || 'Keine Beschreibung verfügbar'}</p>
                           
                           {/* Additional Links - Hidden on mobile for compactness */}
-                          {event.additionalLinks && Array.isArray(event.additionalLinks) && event.additionalLinks.length > 0 && (
+                          {event.additional_links && Array.isArray(event.additional_links) && event.additional_links.length > 0 && (
                             <div className="hidden sm:flex flex-wrap gap-2 mb-4">
-                              {event.additionalLinks.map((link, linkIndex) => {
+                              {event.additional_links.map((link, linkIndex) => {
                                 if (!link || typeof link !== 'object') return null;
                                 
                                 return (
@@ -416,25 +554,12 @@ export default function Timetable() {
                           )}
                           
                           {/* Detailed Description - Hidden on mobile */}
-                          {event.detailedDescription && (
+                          {event.detailed_description && (
                             <div className="hidden sm:block bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
                               <h4 className="font-medium text-gray-900 dark:text-white mb-2">Details</h4>
-                              <p className="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-wrap">{event.detailedDescription}</p>
+                              <p className="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-wrap">{event.detailed_description}</p>
                             </div>
                           )}
-                          
-                          {/* Mehr Informationen Link - Simplified for mobile */}
-                          <div className="mt-2 sm:mt-4 pt-2 sm:pt-4 border-t border-gray-200 dark:border-gray-600">
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Details</span>
-                              <div className="flex items-center text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors">
-                                <span className="text-xs sm:text-sm font-medium">Mehr</span>
-                                <svg className="w-3 h-3 sm:w-4 sm:h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                </svg>
-                              </div>
-                            </div>
-                          </div>
                         </div>
                       </div>
                     </Link>
@@ -452,7 +577,7 @@ export default function Timetable() {
               Keine Events gefunden
             </h3>
             <p className="text-gray-600 dark:text-gray-400">
-              Versuchen Sie andere Suchkriterien oder schauen Sie später wieder vorbei.
+              Versuchen Sie andere Suchbegriffe oder Filter.
             </p>
           </div>
         )}

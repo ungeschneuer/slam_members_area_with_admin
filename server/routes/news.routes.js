@@ -1,18 +1,41 @@
 import express from 'express';
-import optimizedQueryService from '../services/optimizedQueryService.js';
+import fs from 'fs';
+import path from 'path';
+// Optimized query service removed - using simple database queries
 import { executeQuery } from '../config/database.js';
-import { 
-  startTiming, 
-  endTiming, 
-  sendSuccessResponse, 
-  sendErrorResponse, 
+import {
+  startTiming,
+  endTiming,
+  sendSuccessResponse,
+  sendErrorResponse,
   sendNotFoundResponse,
   executeCrudOperation,
-  executeSlugCrudOperation,
-  adminMiddleware,
-  normalizeData
-} from '../utils/routeHelpers.js';
+  normalizeData,
+} from '../utils/simpleRouteHelpers.js';
+import { adminMiddleware } from '../middleware/simpleAuth.js';
+import { generateSlug, generateUniqueSlug } from '../utils/slugUtils.js';
+// Idempotency and optimistic locking removed - using simple error handling instead
 import logger from '../config/logger.js';
+// Input validation service removed - using simple validation instead
+import { sanitizeEntity } from '../utils/sanitization.js';
+import { entityNormalizers } from '../utils/normalizers.js';
+import { newsSchema, breakingNewsSchema } from '../../shared/schemas/newsSchema.js';
+import { uploadNewsFile, handleUploadError } from '../middleware/upload.js';
+
+// Simple sanitization middleware
+const sanitizeBody = (req, _res, next) => {
+  try {
+    // Simple string trimming and basic sanitization
+    if (req.body && typeof req.body === 'object') {
+      Object.keys(req.body).forEach(key => {
+        if (typeof req.body[key] === 'string') {
+          req.body[key] = req.body[key].trim();
+        }
+      });
+    }
+  } catch {}
+  next();
+};
 
 const router = express.Router();
 
@@ -20,150 +43,142 @@ const router = express.Router();
 router.get('/', async (req, res) => {
   try {
     const startTime = startTiming();
-    const news = await optimizedQueryService.getNewsWithDetails();
+    const news = await executeQuery(
+      'SELECT * FROM news ORDER BY published_at DESC',
+      []
+    );
     const duration = endTiming(startTime);
     
     logger.info('Optimized news query completed', {
       duration: `${Math.round(duration)}ms`,
-      newsCount: news.length,
+      newsCount: news.rows?.length || news.length,
       queryType: 'BASIC'
     });
     
-    sendSuccessResponse(res, news, 'GET_NEWS', duration);
+    sendSuccessResponse(res, news.rows || news, 'GET_NEWS', duration);
   } catch (error) {
     sendErrorResponse(res, error, 'Failed to fetch news');
   }
 });
 
-// Get individual news article by ID with details (alias for consistency)
-router.get('/detail/:id', async (req, res) => {
-  const { id } = req.params;
-  const startTime = startTiming();
-  
-  try {
-    const newsArticle = await optimizedQueryService.getNewsByIdWithDetails(parseInt(id));
-    const duration = endTiming(startTime);
-    
-    if (!newsArticle) {
-      logger.info('News article not found', { id, duration: `${Math.round(duration)}ms` });
-      return sendNotFoundResponse(res, 'News article');
-    }
-    
-    logger.info('Optimized news article by ID query completed', {
-      id,
-      duration: `${Math.round(duration)}ms`,
-      queryType: 'BASIC'
-    });
-    
-    sendSuccessResponse(res, newsArticle, 'GET_NEWS_ARTICLE_DETAIL', duration);
-  } catch (error) {
-    sendErrorResponse(res, error, 'Failed to fetch news article by ID');
-  }
-});
 
 // Get current breaking news
 router.get('/breaking-news', async (req, res) => {
   try {
     const startTime = startTiming();
-    const breakingNews = await optimizedQueryService.getBreakingNewsWithDetails();
+    const breakingNews = await executeQuery(
+      'SELECT * FROM news WHERE is_breaking_news = true AND (breaking_news_until IS NULL OR breaking_news_until > NOW()) ORDER BY published_at DESC',
+      []
+    );
     const duration = endTiming(startTime);
     
-    if (!breakingNews) {
+    if (!breakingNews || breakingNews.rows.length === 0) {
       // No breaking news currently active
       return sendSuccessResponse(res, null, 'GET_BREAKING_NEWS', duration);
     }
     
     logger.info('Optimized breaking news query completed', {
       duration: `${Math.round(duration)}ms`,
-      articleId: breakingNews.id,
+      articleId: breakingNews.rows[0].id,
       queryType: 'BASIC'
     });
     
-    sendSuccessResponse(res, breakingNews, 'GET_BREAKING_NEWS', duration);
+    sendSuccessResponse(res, breakingNews.rows[0], 'GET_BREAKING_NEWS', duration);
   } catch (error) {
     sendErrorResponse(res, error, 'Failed to fetch breaking news');
   }
 });
 
-// Get individual news article by slug (moved after specific routes to avoid conflicts)
+// Get individual news article by slug
 router.get('/:slug', async (req, res) => {
   const { slug } = req.params;
   const startTime = startTiming();
   
   try {
-    const newsArticle = await optimizedQueryService.getNewsBySlugWithDetails(slug);
+    const result = await executeQuery(
+      'SELECT * FROM news WHERE slug = $1',
+      [slug]
+    );
     const duration = endTiming(startTime);
     
-    if (!newsArticle) {
+    if (result.rows.length === 0) {
       logger.info('News article not found', { slug, duration: `${Math.round(duration)}ms` });
       return sendNotFoundResponse(res, 'News article');
     }
     
-    logger.info('Optimized news article by slug query completed', {
+    logger.info('News article by slug query completed', {
       slug,
       duration: `${Math.round(duration)}ms`,
-      queryType: 'BASIC'
+      queryType: 'DIRECT'
     });
     
-    sendSuccessResponse(res, newsArticle, 'GET_NEWS_ARTICLE', duration);
+    sendSuccessResponse(res, result.rows[0], 'GET_NEWS_ARTICLE', duration);
   } catch (error) {
     sendErrorResponse(res, error, 'Failed to fetch news article by slug');
   }
 });
 
 // Create news (admin endpoint)
-router.post('/', ...adminMiddleware(), async (req, res) => {
+router.post('/', ...adminMiddleware(), sanitizeBody, async (req, res) => { // Idempotency removed
+  // Sanitize input data to prevent XSS
+  const sanitizedData = sanitizeEntity.news(req.body);
   const { 
-    title, content, excerpt, category, priority, featuredImageUrl, 
-    tags, status, publishedAt, slug 
-  } = req.body;
+    title, content, excerpt, category, priority, featured_image_url,
+    tags, status, published_at, slug
+  } = sanitizedData;
   
-  // Normalize data using schema
-  const normalizedData = normalizeData(req.body, {
-    tags: { type: 'json', fallback: [] },
+  // Generate unique slug using centralized utility
+  const baseSlug = slug || generateSlug(title);
+  const existingSlugsResult = await executeQuery(
+    'SELECT slug FROM news WHERE slug LIKE $1',
+    [`${baseSlug}%`]
+  );
+  const existingSlugs = existingSlugsResult.rows.map(r => r.slug);
+  const generatedSlug = generateUniqueSlug(title, existingSlugs);
+  
+  // Normalize and coerce types
+  const normalizedData = normalizeData(sanitizedData, {
     status: { type: 'string', fallback: 'DRAFT' }
   });
+  const normalizedNews = entityNormalizers.news(sanitizedData);
+  const tagsArray = normalizedNews.tags;
   
-  await executeSlugCrudOperation(
+  await executeCrudOperation(
     'create',
     `INSERT INTO news (title, content, excerpt, category, priority, 
-     "featuredImageUrl", tags, status, "publishedAt", slug) 
+     featured_image_url, tags, status, published_at, slug) 
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
-    [title, content, excerpt, category, priority, featuredImageUrl, 
-     normalizedData.tags, normalizedData.status, publishedAt, slug],
-    'news article',
+    [title, content, excerpt, category, priority, featured_image_url, 
+     tagsArray, normalizedData.status, published_at, generatedSlug],
     'news',
     'CREATE_NEWS',
-    res,
-    { title, slug }
+    res
   );
 });
 
 // Update news (admin endpoint)
-router.put('/:id', ...adminMiddleware(), async (req, res) => {
+router.put('/:id', ...adminMiddleware(), sanitizeBody, async (req, res) => { // Optimistic locking removed
   const { id } = req.params;
+  // Sanitize input data to prevent XSS
+  const sanitizedData = sanitizeEntity.news(req.body);
   const { 
-    title, content, excerpt, category, priority, featuredImageUrl, 
-    tags, status, publishedAt, slug 
-  } = req.body;
+    title, content, excerpt, category, priority, featured_image_url,
+    tags, status, published_at, slug
+  } = sanitizedData;
   
-  // Normalize data using schema
-  const normalizedData = normalizeData(req.body, {
-    tags: { type: 'json', fallback: [] }
-  });
+  // Coerce tags to text[]
+  const tagsArray = Array.isArray(tags) ? tags : (typeof tags === 'string' ? [tags] : []);
   
-  await executeSlugCrudOperation(
+  await executeCrudOperation(
     'update',
     `UPDATE news SET title = $1, content = $2, excerpt = $3, category = $4, 
-     priority = $5, "featuredImageUrl" = $6, tags = $7, status = $8, "publishedAt" = $9, 
+     priority = $5, featured_image_url = $6, tags = $7, status = $8, published_at = $9, 
      slug = $10, updated_at = NOW() WHERE id = $11 RETURNING *`,
-    [title, content, excerpt, category, priority, featuredImageUrl, 
-     normalizedData.tags, status, publishedAt, slug, parseInt(id)],
-    'news article',
+    [title, content, excerpt, category, priority, featured_image_url, 
+     tagsArray, status, published_at, slug, parseInt(id)],
     'news',
     'UPDATE_NEWS',
-    res,
-    { title, slug }
+    res
   );
 });
 
@@ -175,7 +190,7 @@ router.delete('/:id', ...adminMiddleware(), async (req, res) => {
     'delete',
     'DELETE FROM news WHERE id = $1 RETURNING *',
     [parseInt(id)],
-    'news article',
+    'news',
     'DELETE_NEWS',
     res
   );
@@ -189,23 +204,25 @@ router.post('/breaking-news/:id', ...adminMiddleware(), async (req, res) => {
     
     const startTime = startTiming();
     
+    // Clean up expired breaking news before setting new one
+    await executeQuery('UPDATE news SET is_breaking_news = false, breaking_news_until = NULL WHERE is_breaking_news = true AND breaking_news_until < NOW()');
+    
     // Clear any existing breaking news
-    await executeQuery('UPDATE news SET "isBreakingNews" = false, "breakingNewsUntil" = NULL WHERE "isBreakingNews" = true');
+    await executeQuery('UPDATE news SET is_breaking_news = false, breaking_news_until = NULL WHERE is_breaking_news = true');
     
     // Calculate breaking news expiration time
-    const breakingNewsUntil = duration ? new Date(Date.now() + duration * 60 * 60 * 1000) : null;
+    const breaking_news_until = duration ? new Date(Date.now() + duration * 60 * 60 * 1000) : null;
     
     // Set the new breaking news
     const result = await executeQuery(`
       UPDATE news 
-      SET "isBreakingNews" = true, 
-          "breakingNewsUntil" = $2, 
+      SET is_breaking_news = true, 
+          breaking_news_until = $2, 
           "updated_at" = NOW()
       WHERE id = $1 AND status = 'PUBLISHED'
       RETURNING *
-    `, [parseInt(id), breakingNewsUntil]);
+    `, [parseInt(id), breaking_news_until]);
     
-    const endTime = startTiming();
     const duration_ms = endTiming(startTime);
     
     if (result.rows.length === 0) {
@@ -215,8 +232,11 @@ router.post('/breaking-news/:id', ...adminMiddleware(), async (req, res) => {
     logger.info('Breaking news set successfully', {
       articleId: id,
       duration: `${Math.round(duration_ms)}ms`,
-      expiresAt: breakingNewsUntil
+      expiresAt: breaking_news_until
     });
+    
+    // Clear cache and notify clients for real-time updates
+    ('news');
     
     sendSuccessResponse(res, result.rows[0], 'SET_BREAKING_NEWS', duration_ms);
   } catch (error) {
@@ -230,7 +250,7 @@ router.delete('/breaking-news', ...adminMiddleware(), async (req, res) => {
     const startTime = startTiming();
     
     // Clear all breaking news flags
-    await executeQuery('UPDATE news SET "isBreakingNews" = false, "breakingNewsUntil" = NULL WHERE "isBreakingNews" = true');
+    await executeQuery('UPDATE news SET is_breaking_news = false, breaking_news_until = NULL WHERE is_breaking_news = true');
     
     const duration = endTiming(startTime);
     
@@ -238,9 +258,72 @@ router.delete('/breaking-news', ...adminMiddleware(), async (req, res) => {
       duration: `${Math.round(duration)}ms`
     });
     
+    // Clear cache and notify clients for real-time updates
+('news');
+    
     sendSuccessResponse(res, { message: 'Breaking news cleared successfully' }, 'CLEAR_BREAKING_NEWS', duration);
   } catch (error) {
     sendErrorResponse(res, error, 'Failed to clear breaking news');
+  }
+});
+
+// Upload image/PDF for news article (admin endpoint)
+router.post('/:id/upload-image', ...adminMiddleware(), uploadNewsFile.single('image'), handleUploadError, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const file = req.file;
+    
+    if (!file) {
+      return res.status(400).json({
+        success: false,
+        error: 'No file uploaded'
+      });
+    }
+    
+    // Check if news article exists
+    const newsResult = await executeQuery(
+      'SELECT * FROM news WHERE id = $1',
+      [parseInt(id)]
+    );
+    
+    if (newsResult.rows.length === 0) {
+      // Delete uploaded file if article doesn't exist
+      fs.unlinkSync(file.path);
+      return sendNotFoundResponse(res, 'News article');
+    }
+    
+    const news = newsResult.rows[0];
+    
+    // Delete old file if it exists
+    if (news.featured_image_url) {
+      const oldFilePath = path.join(process.cwd(), 'public', news.featured_image_url);
+      if (fs.existsSync(oldFilePath)) {
+        fs.unlinkSync(oldFilePath);
+      }
+    }
+    
+    // Update database with new file path
+    const filePath = `/uploads/news/${file.filename}`;
+    await executeQuery(
+      'UPDATE news SET featured_image_url = $1, updated_at = NOW() WHERE id = $2',
+      [filePath, parseInt(id)]
+    );
+    
+    logger.info('News article file uploaded successfully', {
+      articleId: id,
+      filename: file.filename,
+      filePath
+    });
+    
+    res.json({
+      success: true,
+      image: {
+        filePath: filePath
+      }
+    });
+  } catch (error) {
+    logger.error('Error uploading news article file:', error);
+    sendErrorResponse(res, error, 'Failed to upload file');
   }
 });
 

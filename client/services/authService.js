@@ -1,6 +1,15 @@
 /**
- * Simplified Authentication Service for SLAM25
- * Simple JWT-in-httpOnly-cookie authentication without client-side complexity
+ * Unified Authentication Service for SLAM25
+ * 
+ * This is the SINGLE authentication service for the entire application.
+ * Previously, there were multiple auth services (authService + adminAuthService),
+ * but they have been consolidated into this single service.
+ * 
+ * Features:
+ * - JWT-in-httpOnly-cookie authentication
+ * - Automatic session management
+ * - Role-based access control (admin/organizer)
+ * - Event-driven authentication state changes
  */
 
 class AuthService {
@@ -178,7 +187,10 @@ class AuthService {
    * Make authenticated request
    */
   async authenticatedRequest(url, options = {}) {
+    console.log('[AuthService] authenticatedRequest called:', { url, options });
+    
     if (!this.isAuthenticated) {
+      console.error('[AuthService] Not authenticated, throwing error');
       throw new Error('Not authenticated');
     }
 
@@ -190,13 +202,58 @@ class AuthService {
       }
     };
 
+    console.log('[AuthService] Making request with options:', { ...defaultOptions, ...options });
+    
     const response = await fetch(url, { ...defaultOptions, ...options });
+    
+    console.log('[AuthService] Response received:', { 
+      status: response.status, 
+      statusText: response.statusText,
+      url: response.url 
+    });
 
-    // If we get a 401, the session might be expired
+    // Handle different HTTP status codes
     if (response.status === 401) {
       console.warn('Session expired, logging out');
       await this.logout();
       throw new Error('Session expired');
+    }
+
+    // Handle client errors (400-499)
+    if (response.status >= 400 && response.status < 500) {
+      let errorMessage = `Client error: ${response.status}`;
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.error || errorData.message || errorMessage;
+      } catch (e) {
+        // If we can't parse JSON, use status text
+        errorMessage = response.statusText || errorMessage;
+      }
+      console.error('Client error in authenticated request:', {
+        url,
+        status: response.status,
+        statusText: response.statusText,
+        error: errorMessage
+      });
+      throw new Error(errorMessage);
+    }
+
+    // Handle server errors (500-599)
+    if (response.status >= 500) {
+      let errorMessage = `Server error: ${response.status}`;
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.error || errorData.message || errorMessage;
+      } catch (e) {
+        errorMessage = response.statusText || errorMessage;
+      }
+      console.error('Server error in authenticated request:', {
+        url,
+        status: response.status,
+        statusText: response.statusText,
+        error: errorMessage
+      });
+      throw new Error(errorMessage);
     }
 
     return response;
@@ -260,7 +317,7 @@ class AuthService {
 const authService = new AuthService();
 
 // Make debug methods available globally for development
-if (import.meta.env.DEV) {
+if (typeof window !== 'undefined' && import.meta && import.meta.env && import.meta.env.DEV) {
   window.authDebug = {
     service: authService,
     getState: () => authService.getAuthState(),

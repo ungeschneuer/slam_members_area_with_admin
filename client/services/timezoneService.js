@@ -3,41 +3,79 @@
  * Provides timezone-aware time utilities for the frontend
  */
 
+// Cache for timezone configuration to reduce API calls
+let timezoneCache = null;
+let cacheTimestamp = 0;
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Get cached timezone configuration or fetch from API
+ * @returns {Promise<{timezone: string, app_name: string, app_version: string}>}
+ */
+async function getTimezoneConfig() {
+  const now = Date.now();
+  
+  // Return cached data if still valid
+  if (timezoneCache && (now - cacheTimestamp) < CACHE_DURATION) {
+    return timezoneCache;
+  }
+  
+  try {
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3005/api';
+    const response = await fetch(`${apiUrl}/settings`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      signal: AbortSignal.timeout(5000)
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    
+    if (data.success && data.data) {
+      timezoneCache = data.data;
+      cacheTimestamp = now;
+      return data.data;
+    }
+    
+    throw new Error('Invalid response format');
+  } catch (error) {
+    console.warn('Failed to fetch timezone configuration:', error);
+    
+    // Return fallback configuration
+    return {
+      timezone: 'Europe/Berlin',
+      app_name: 'SLAM25 Members Area',
+      app_version: '1.0.0'
+    };
+  }
+}
+
 /**
  * Get the current time in the configured timezone
  * @returns {Promise<Date>} - Current time in configured timezone
  */
 export async function getCurrentTimeInConfiguredTimezone() {
   try {
-    const response = await fetch(`${import.meta.env.VITE_API_URL}/settings`);
-    const data = await response.json();
+    const config = await getTimezoneConfig();
+    const timezone = config.timezone;
+    const now = new Date();
     
-    if (data.success && data.data.timezone) {
-      const timezone = data.data.timezone;
-      const now = new Date();
-      
-      // Convert to the configured timezone
-      const formatter = new Intl.DateTimeFormat('en-CA', {
-        timeZone: timezone,
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false
-      });
-      
-      const parts = formatter.formatToParts(now);
-      return new Date(
-        `${parts.find(p => p.type === 'year').value}-${parts.find(p => p.type === 'month').value}-${parts.find(p => p.type === 'day').value}T${parts.find(p => p.type === 'hour').value}:${parts.find(p => p.type === 'minute').value}:${parts.find(p => p.type === 'second').value}`
-      );
-    }
+    // Get the current time in the configured timezone
+    // We need to create a Date object that represents the current time in the target timezone
+    // This is done by getting the timezone offset and adjusting the UTC time accordingly
+    const utcTime = new Date(now.getTime() + (now.getTimezoneOffset() * 60000));
+    const targetTime = new Date(utcTime.toLocaleString("en-US", { timeZone: timezone }));
+    const offset = targetTime.getTime() - utcTime.getTime();
     
-    // Fallback to local time if API fails
-    return new Date();
+    // Return a Date object representing the current time in the target timezone
+    return new Date(now.getTime() + offset);
   } catch (error) {
-    console.warn('Failed to fetch timezone configuration, using local time:', error);
+    console.warn('Failed to get timezone configuration, using local time:', error);
     return new Date();
   }
 }
@@ -50,24 +88,42 @@ export async function getCurrentTimeInConfiguredTimezone() {
  */
 export async function formatDateInConfiguredTimezone(date, options = {}) {
   try {
-    const response = await fetch(`${import.meta.env.VITE_API_URL}/settings`);
-    const data = await response.json();
-    
-    if (data.success && data.data.timezone) {
-      const timezone = data.data.timezone;
-      const dateObj = new Date(date);
-      
-      return new Intl.DateTimeFormat('de-DE', {
-        timeZone: timezone,
-        ...options
-      }).format(dateObj);
+    // Validate input date
+    if (!date) {
+      console.warn('Invalid date provided to formatDateInConfiguredTimezone:', date);
+      return '';
     }
     
-    // Fallback to local timezone
-    return new Intl.DateTimeFormat('de-DE', options).format(new Date(date));
+    const dateObj = new Date(date);
+    
+    // Check if the date is valid
+    if (isNaN(dateObj.getTime())) {
+      console.warn('Invalid date value provided to formatDateInConfiguredTimezone:', date);
+      return '';
+    }
+    
+    const config = await getTimezoneConfig();
+    const timezone = config.timezone;
+    
+    return new Intl.DateTimeFormat('de-DE', {
+      timeZone: timezone,
+      ...options
+    }).format(dateObj);
   } catch (error) {
-    console.warn('Failed to fetch timezone configuration, using local timezone:', error);
-    return new Intl.DateTimeFormat('de-DE', options).format(new Date(date));
+    console.warn('Failed to get timezone configuration, using local timezone:', error);
+    
+    // Validate date before fallback formatting
+    if (!date) {
+      return '';
+    }
+    
+    const dateObj = new Date(date);
+    if (isNaN(dateObj.getTime())) {
+      console.warn('Invalid date value in fallback formatting:', date);
+      return '';
+    }
+    
+    return new Intl.DateTimeFormat('de-DE', options).format(dateObj);
   }
 }
 
@@ -77,24 +133,37 @@ export async function formatDateInConfiguredTimezone(date, options = {}) {
  */
 export async function getTimezoneOffset() {
   try {
-    const response = await fetch(`${import.meta.env.VITE_API_URL}/settings`);
-    const data = await response.json();
+    const config = await getTimezoneConfig();
+    const timezone = config.timezone;
+    const now = new Date();
     
-    if (data.success && data.data.timezone) {
-      const timezone = data.data.timezone;
-      const now = new Date();
-      
-      // Get offset for the configured timezone
-      const utc = new Date(now.getTime() + (now.getTimezoneOffset() * 60000));
-      const targetTime = new Date(utc.toLocaleString("en-US", { timeZone: timezone }));
-      return (targetTime.getTime() - utc.getTime()) / 60000;
-    }
-    
-    // Fallback to local timezone offset
-    return new Date().getTimezoneOffset();
+    // Get offset for the configured timezone
+    const utc = new Date(now.getTime() + (now.getTimezoneOffset() * 60000));
+    const targetTime = new Date(utc.toLocaleString("en-US", { timeZone: timezone }));
+    return (targetTime.getTime() - utc.getTime()) / 60000;
   } catch (error) {
-    console.warn('Failed to fetch timezone configuration, using local offset:', error);
+    console.warn('Failed to get timezone configuration, using local offset:', error);
     return new Date().getTimezoneOffset();
+  }
+}
+
+/**
+ * Get timezone offset for a specific date in the configured timezone
+ * @param {Date|string} dateLike - Date to evaluate
+ * @returns {Promise<number>} - Timezone offset in minutes at that date
+ */
+export async function getTimezoneOffsetFor(dateLike) {
+  try {
+    const config = await getTimezoneConfig();
+    const timezone = config.timezone;
+    const date = new Date(dateLike);
+    const utc = new Date(date.getTime() + (date.getTimezoneOffset() * 60000));
+    const targetTime = new Date(utc.toLocaleString('en-US', { timeZone: timezone }));
+    return (targetTime.getTime() - utc.getTime()) / 60000;
+  } catch (error) {
+    console.warn('Failed to get timezone configuration, using local offset for date:', error);
+    const d = new Date(dateLike);
+    return d.getTimezoneOffset();
   }
 }
 
@@ -178,4 +247,21 @@ export function createTimezoneAwareCountdown(targetDate, updateCallback, interva
   
   // Return cleanup function
   return () => clearInterval(interval);
+}
+
+/**
+ * Clear the timezone configuration cache
+ * Useful when timezone settings change
+ */
+export function clearTimezoneCache() {
+  timezoneCache = null;
+  cacheTimestamp = 0;
+}
+
+/**
+ * Get the current cached timezone configuration
+ * @returns {Object|null} - Cached configuration or null
+ */
+export function getCachedTimezoneConfig() {
+  return timezoneCache;
 }

@@ -4,8 +4,8 @@ import { createTimezoneAwareCountdown } from '../../services/timezoneService.js'
 /**
  * Shared BreakingNewsCountdown component with variant support
  * @param {Object} props
- * @param {string} props.breakingNewsUntil - ISO date string for countdown end
- * @param {string} props.variant - 'default' | 'admin' - determines styling and update frequency
+ * @param {string} props.breaking_news_until - ISO date string for countdown end
+ * @param {string} props.variant - 'default' | 'admin' | 'compact' - determines styling and update frequency
  * @param {string} props.className - Additional CSS classes
  */
 const BreakingNewsCountdown = ({ 
@@ -64,6 +64,14 @@ const BreakingNewsCountdown = ({
       } ${className}`}>
         {timeLeft}
       </div>
+    );
+  }
+
+  if (variant === 'compact') {
+    return (
+      <span className={`text-xs text-white/70 ${className}`}>
+        (noch {timeLeft})
+      </span>
     );
   }
 

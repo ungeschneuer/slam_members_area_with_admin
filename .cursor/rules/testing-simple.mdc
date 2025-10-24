@@ -1,0 +1,203 @@
+---
+alwaysApply: true
+description: Simple testing patterns for simplified architecture
+---
+
+# Testing - Simple Patterns
+
+## Testing Philosophy
+
+Test the **simplified architecture** with **simple testing patterns**. Focus on essential functionality.
+
+## Test Structure
+
+### Unit Tests
+```javascript
+// ✅ Simple unit tests
+describe('ParticipantCard', () => {
+  it('displays participant information', () => {
+    const participant = { name: 'John Doe', region: 'Berlin' };
+    render(<ParticipantCard participant={participant} />);
+    
+    expect(screen.getByText('John Doe')).toBeInTheDocument();
+    expect(screen.getByText('Berlin')).toBeInTheDocument();
+  });
+});
+```
+
+### Hook Tests
+```javascript
+// ✅ Simple hook tests
+describe('useParticipants', () => {
+  it('fetches participants successfully', async () => {
+    const mockParticipants = [{ id: 1, name: 'John Doe' }];
+    global.fetch = jest.fn().mockResolvedValue({
+      json: () => Promise.resolve({ success: true, data: mockParticipants })
+    });
+
+    const { result } = renderHook(() => useParticipants());
+    
+    await waitFor(() => {
+      expect(result.current.data).toEqual(mockParticipants);
+    });
+  });
+});
+```
+
+### API Tests
+```javascript
+// ✅ Simple API tests
+describe('GET /api/participants', () => {
+  it('returns participants list', async () => {
+    const response = await request(app)
+      .get('/api/participants')
+      .expect(200);
+    
+    expect(response.body.success).toBe(true);
+    expect(Array.isArray(response.body.data)).toBe(true);
+  });
+});
+```
+
+## Test Configuration
+
+### Vitest Setup
+```javascript
+// ✅ Simple test configuration
+export default defineConfig({
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: ['client/test.setup.js']
+  }
+});
+```
+
+### Test Environment
+```javascript
+// ✅ Simple test environment
+// client/test.setup.js
+globalThis.import = { 
+  meta: { 
+    env: {
+      VITE_API_URL: 'http://localhost:3005/api',
+      MODE: 'test'
+    } 
+  } 
+};
+```
+
+## Anti-Patterns to Avoid
+
+### ❌ Complex Test Setup
+```javascript
+// ❌ DON'T create complex test setup
+const complexTestSetup = () => {
+  // Complex mocking
+  // Complex state management
+  // Complex test utilities
+};
+```
+
+### ❌ Over-Testing
+```javascript
+// ❌ DON'T test implementation details
+it('calls setState with correct parameters', () => {
+  // Testing internal implementation
+});
+```
+
+### ❌ Complex Mocking
+```javascript
+// ❌ DON'T create complex mocks
+const complexMock = jest.fn().mockImplementation(() => {
+  // Complex mock logic
+});
+```
+
+## Simple Testing Patterns
+
+### Component Testing
+```javascript
+// ✅ Test user interactions
+it('displays loading state', () => {
+  render(<ParticipantsList loading={true} />);
+  expect(screen.getByText('Loading...')).toBeInTheDocument();
+});
+
+it('displays error state', () => {
+  render(<ParticipantsList error="Failed to load" />);
+  expect(screen.getByText('Failed to load')).toBeInTheDocument();
+});
+```
+
+### API Testing
+```javascript
+// ✅ Test API responses
+it('creates participant successfully', async () => {
+  const participantData = { name: 'John Doe', region: 'Berlin' };
+  
+  const response = await request(app)
+    .post('/api/participants')
+    .send(participantData)
+    .expect(201);
+  
+  expect(response.body.success).toBe(true);
+  expect(response.body.data.name).toBe('John Doe');
+});
+```
+
+### Database Testing
+```javascript
+// ✅ Test database operations
+it('inserts participant into database', async () => {
+  const participant = { name: 'John Doe', region: 'Berlin' };
+  
+  const result = await executeQuery(
+    'INSERT INTO participants (name, region) VALUES ($1, $2) RETURNING *',
+    [participant.name, participant.region]
+  );
+  
+  expect(result.rows[0].name).toBe('John Doe');
+});
+```
+
+## Test Coverage
+
+### Essential Tests
+- [ ] **Component rendering** - Components display correctly
+- [ ] **API endpoints** - Routes return expected responses
+- [ ] **Database queries** - Data operations work correctly
+- [ ] **Authentication** - Auth flows work properly
+- [ ] **Error handling** - Errors are handled gracefully
+
+### Non-Essential Tests
+- [ ] **Implementation details** - Internal function calls
+- [ ] **Complex edge cases** - Rare scenarios
+- [ ] **Performance tests** - Load testing
+- [ ] **Integration tests** - Complex workflows
+
+## Benefits
+
+- **Fast tests** - Simple tests run quickly
+- **Easy maintenance** - Simple tests are easy to update
+- **Clear failures** - Simple tests have clear error messages
+- **Focused coverage** - Tests cover essential functionality
+- **Developer friendly** - Easy to write and understand
+
+## Test Commands
+
+```bash
+# ✅ Simple test commands
+npm test                    # Run all tests
+npm run test:watch         # Watch mode
+npm run test:coverage      # Coverage report
+```
+
+## Remember
+
+> "Tests are a specification that happens to be executable." - Kent Beck
+
+**Test behavior, not implementation.**
+**Keep tests simple and focused.**
+**Test the user experience, not the code.**

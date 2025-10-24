@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { API_URL } from '../config/api.js';
 import authService from '../services/authService.js';
+import { useEntityData } from './useEntityData.js';
 
 // Query keys for links
 export const linksKeys = {
@@ -12,10 +13,10 @@ export const linksKeys = {
 };
 
 // Hook to fetch all links
-export function useLinks(filters = {}) {
-  return useQuery({
-    queryKey: linksKeys.list(filters),
-    queryFn: async () => {
+export function useLinks(filters = {}, isAdmin = false) {
+  return useEntityData(
+    'links',
+    async () => {
       const response = await fetch(`${API_URL}/links`, {
         credentials: 'include'
       });
@@ -25,9 +26,8 @@ export function useLinks(filters = {}) {
       const result = await response.json();
       return result?.data || result || [];
     },
-    staleTime: 10 * 60 * 1000, // 10 minutes
-    gcTime: 30 * 60 * 1000, // 30 minutes
-  });
+    { filters, staleTime: 10 * 60 * 1000, gcTime: 30 * 60 * 1000, isAdmin }
+  );
 }
 
 // Hook to fetch a single link
@@ -70,7 +70,8 @@ export function useCreateLink() {
       return result?.data || result;
     },
     onSuccess: (data) => {
-      // Invalidate and refetch links list
+      // Invalidate all links-related queries to ensure admin components update
+      queryClient.invalidateQueries({ queryKey: ['links'] });
       queryClient.invalidateQueries({ queryKey: linksKeys.lists() });
       
       // If we have the created link data, add it to the cache
@@ -99,7 +100,8 @@ export function useUpdateLink() {
       return result?.data || result;
     },
     onSuccess: (data, variables) => {
-      // Invalidate and refetch links list
+      // Invalidate all links-related queries to ensure admin components update
+      queryClient.invalidateQueries({ queryKey: ['links'] });
       queryClient.invalidateQueries({ queryKey: linksKeys.lists() });
       
       // Update the specific link in cache
@@ -129,7 +131,8 @@ export function useDeleteLink() {
       // Remove from cache
       queryClient.removeQueries({ queryKey: linksKeys.detail(id) });
       
-      // Invalidate and refetch links list
+      // Invalidate all links-related queries to ensure admin components update
+      queryClient.invalidateQueries({ queryKey: ['links'] });
       queryClient.invalidateQueries({ queryKey: linksKeys.lists() });
     },
   });

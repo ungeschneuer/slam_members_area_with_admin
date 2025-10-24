@@ -8,7 +8,7 @@ import TextareaInput from '../forms/TextareaInput.jsx';
 import CheckboxInput from '../forms/CheckboxInput.jsx';
 
 const AdminSchnellzugriff = () => {
-  const { data: linksData, isLoading: loading, error } = useSchnellzugriff();
+  const { data: linksData, isLoading: loading, error } = useSchnellzugriff({}, true); // isAdmin = true
   const createSchnellzugriff = useCreateSchnellzugriff();
   const updateSchnellzugriff = useUpdateSchnellzugriff();
   const deleteSchnellzugriff = useDeleteSchnellzugriff();
@@ -22,14 +22,18 @@ const AdminSchnellzugriff = () => {
     title: z.string().min(1, 'Titel ist erforderlich'),
     description: z.string().optional(),
     url: z.string().url('Gültige URL ist erforderlich'),
-    icon: z.string().optional(),
+    icon: z.string()
+      .min(1, 'Icon ist erforderlich')
+      .max(10, 'Icon ist zu lang')
+      .regex(/^[\p{Emoji}\u200d\ufe0f]+$/u, 'Bitte gib ein gültiges Emoji ein')
+      .optional(),
     color: z.string().optional(),
     sortOrder: z.number().optional(),
     isActive: z.boolean().optional(),
     isExternal: z.boolean().optional()
   });
 
-  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm({
+  const { register, handleSubmit, reset, watch, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(schema),
     defaultValues: {
       title: '',
@@ -56,9 +60,6 @@ const AdminSchnellzugriff = () => {
     { value: 'cyan', label: 'Cyan', class: 'bg-cyan-100 text-cyan-800' }
   ];
 
-  const iconOptions = [
-    '🔗', '🏠', '📝', '📅', '📰', '👥', '🎭', '📸', '📱', '🎵', '💬', '📄', '🛠️', '📊', '🎯', '⭐', '🔥', '💡', '🚀', '💎', '🌟', '🎨', '🎪', '🎉'
-  ];
 
   // Live data handled by useLiveData
 
@@ -207,34 +208,43 @@ const AdminSchnellzugriff = () => {
                   {errors.url && <p className="text-red-500 text-sm mt-1">{errors.url.message}</p>}
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Icon
-                    </label>
-                    <select
+                <div>
+                  <label htmlFor="icon" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Icon (Emoji)
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      id="icon"
+                      type="text"
                       {...register('icon')}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                    >
-                      {iconOptions.map(icon => (
-                        <option key={icon} value={icon}>{icon}</option>
-                      ))}
-                    </select>
+                      placeholder="🔗"
+                      className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                      maxLength="10"
+                    />
+                    <div className="flex-shrink-0 w-12 h-12 flex items-center justify-center text-3xl border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700">
+                      {watch('icon') || '🔗'}
+                    </div>
                   </div>
+                  {errors.icon && (
+                    <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.icon.message}</p>
+                  )}
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    Tipp: Kopiere ein Emoji von deinem System-Emoji-Picker (Windows: Win + . | Mac: Cmd + Ctrl + Space)
+                  </p>
+                </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Farbe
-                    </label>
-                    <select
-                      {...register('color')}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                    >
-                      {colorOptions.map(color => (
-                        <option key={color.value} value={color.value}>{color.label}</option>
-                      ))}
-                    </select>
-                  </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Farbe
+                  </label>
+                  <select
+                    {...register('color')}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                  >
+                    {colorOptions.map(color => (
+                      <option key={color.value} value={color.value}>{color.label}</option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>

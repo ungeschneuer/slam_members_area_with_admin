@@ -1,35 +1,36 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { useTimetableEvent, useParticipants } from '../hooks/index.js';
+import { useTimetableEvent, useParticipants, usePageTitle } from '../hooks/index.js';
 import LoadingSpinner from './LoadingSpinner';
 import { ErrorMessage, SuccessMessage } from './StatusMessages.jsx';
-import { getParticipantId } from '../utils/participantUtils.js';
 import { formatInstagramUrl } from '../utils/instagramUtils.js';
+import { generateAndDownloadICS } from '../utils/icsUtils.js';
+import { getContentTypeIcon, getContentTypeGradient } from '../utils/detailViewUtils.js';
+import BackButton from './shared/BackButton.jsx';
+import logger from '../services/logger.js';
 
 export default function EventDetail() {
   const { slug } = useParams();
   const navigate = useNavigate();
   const { data: event, isLoading: eventLoading, error: eventError } = useTimetableEvent(slug);
-  const { data: participantsData, isLoading: participantsLoading, error: participantsError } = useParticipants();
-  const [participants, setParticipants] = useState([]);
+  
+  // Set dynamic page title
+  usePageTitle(event?.title || 'Laden...');
+  const { data: participantsResponse = [], isLoading: participantsLoading, error: participantsError } = useParticipants();
+  const participants = participantsResponse?.data || participantsResponse || [];
   const loading = eventLoading || participantsLoading;
   const error = eventError || participantsError;
   const [success, setSuccess] = useState(null);
+  const [icsError, setIcsError] = useState(null);
 
   // Event data is now provided directly by useTimetableEvent hook
   // Check if event has an internal link override
   useEffect(() => {
-    if (event?.internalLink) {
+    if (event?.internal_link) {
       // Redirect to the internal link
-      window.location.href = event.internalLink;
+      window.location.href = event.internal_link;
     }
   }, [event]);
-
-  useEffect(() => {
-    if (participantsData) {
-      setParticipants(Array.isArray(participantsData) ? participantsData : []);
-    }
-  }, [participantsData]);
 
   // Helper function to get event type info
   const getEventTypeInfo = (type) => {
@@ -142,8 +143,33 @@ export default function EventDetail() {
   // Helper function to get participant details
   const getParticipantDetails = (participantId) => {
     if (!participantId || !Array.isArray(participants)) return null;
-    const id = getParticipantId(participantId);
-    return participants.find(p => p.id === parseInt(id));
+    return participants.find(p => p.id === parseInt(participantId));
+  };
+
+  // Handler for adding event to calendar
+  const handleAddToCalendar = async () => {
+    try {
+      // Clear previous errors
+      setIcsError(null);
+      
+      // Check if event exists
+      if (!event) {
+        throw new Error('Event nicht gefunden. Bitte versuchen Sie es später erneut.');
+      }
+      
+      
+      // Validate required fields
+      if (!event.title || !event.date || !event.time) {
+        throw new Error('Event-Daten sind unvollständig. Titel, Datum und Zeit sind erforderlich.');
+      }
+      
+      await generateAndDownloadICS(event);
+      setSuccess('Kalendereintrag wurde heruntergeladen!');
+      logger.info('ICS file generated successfully', { eventSlug: event.slug, eventTitle: event.title });
+    } catch (error) {
+      logger.error('Failed to generate ICS file', { error: error.message, eventSlug: event?.slug });
+      setIcsError(`Fehler beim Erstellen des Kalendereintrags: ${error.message}`);
+    }
   };
 
 
@@ -218,24 +244,24 @@ export default function EventDetail() {
           />
         )}
 
+        {icsError && (
+          <ErrorMessage 
+            error={icsError} 
+            onDismiss={() => setIcsError(null)} 
+            className="mb-6"
+          />
+        )}
+
         {/* Header */}
         <div className="mb-8">
-          <Link 
-            to="/timetable" 
-            className="inline-flex items-center text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 mb-4 transition-colors duration-200"
-          >
-            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
+          <BackButton to="/timetable" className="mb-4">
             Zurück zum Zeitplan
-          </Link>
+          </BackButton>
           
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-8">
             <div className="flex items-start space-x-4">
-              <div className="flex-shrink-0">
-                <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-2xl font-bold">
-                  {eventTypeInfo.icon}
-                </div>
+              <div className={`w-16 h-16 bg-gradient-to-br ${getContentTypeGradient('event')} rounded-full flex items-center justify-center text-white text-2xl font-bold`}>
+                {getContentTypeIcon('event')}
               </div>
               <div className="flex-1">
                 <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
@@ -370,44 +396,41 @@ export default function EventDetail() {
           )}
 
           {/* Detailed Description */}
-          {event.detailedDescription && (
+          {event.detailed_description && (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Details</h2>
               <div className="prose dark:prose-invert max-w-none">
-                <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{event.detailedDescription}</p>
+                <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{event.detailed_description}</p>
               </div>
             </div>
           )}
 
           {/* Participants Section */}
-          {event.participants && Array.isArray(event.participants) && event.participants.length > 0 && (
+          {event.assignments && Array.isArray(event.assignments) && event.assignments.length > 0 && (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Teilnehmer*innen</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {event.participants.map((participant, index) => {
-                  // Handle both object and string participants
-                  const participantId = typeof participant === 'object' ? participant.participantId || participant.id : participant;
-                  const participantDetails = getParticipantDetails(participantId);
-                  const participantName = participantDetails?.name || (typeof participant === 'object' ? participant.name : participant) || 'Unbekannte*r Teilnehmer*in';
-                  const participantRole = participantDetails?.role || (typeof participant === 'object' ? participant.role : '') || '';
-                  const participantRegion = participantDetails?.region || '';
-                  const participantPronouns = participantDetails?.pronouns || '';
-                  const participantInstagram = participantDetails?.instagram || '';
+                {event.assignments.map((assignment, index) => {
+                  // Handle assignment object with participant details
+                  const participantId = assignment.participant_id;
+                  const participantName = assignment.participant_name || 'Unbekannte*r Teilnehmer*in';
+                  const participantRole = assignment.role || '';
+                  const participantRegion = assignment.participant_region || '';
+                  const participantPronouns = assignment.participant_pronouns || '';
+                  const participantInstagram = assignment.participant_instagram || '';
+                  const participantSlug = assignment.participant_slug || '';
                   
                   // Skip if no valid participant ID
                   if (!participantId) return null;
                   
                   return (
                     <div key={`participant-${event.id}-${index}`}>
-                      {participantDetails ? (
+                      {participantSlug ? (
                         <Link
-                          to={`/participants/${participantId}`}
+                          to={`/participants/${participantSlug}`}
                           className="block p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors duration-200 group"
                         >
-                          <div className="flex items-start space-x-3">
-                            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-lg font-bold group-hover:scale-105 transition-transform duration-200 flex-shrink-0">
-                              {participantName.charAt(0).toUpperCase()}
-                            </div>
+                          <div className="flex items-center space-x-3">
                             <div className="flex-1 min-w-0">
                               <p className="font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200 break-words leading-tight">
                                 {participantName}
@@ -448,10 +471,7 @@ export default function EventDetail() {
                           </div>
                         </Link>
                       ) : (
-                        <div className="flex items-start space-x-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                          <div className="w-8 h-8 bg-gradient-to-br from-gray-400 to-gray-600 rounded-full flex items-center justify-center text-white text-sm font-bold">
-                            {participantName.charAt(0).toUpperCase()}
-                          </div>
+                        <div className="flex items-center space-x-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
                           <div className="flex-1 min-w-0">
                             <p className="font-medium text-gray-900 dark:text-white break-words leading-tight">
                               {participantName}
@@ -472,11 +492,11 @@ export default function EventDetail() {
           )}
 
           {/* Additional Links */}
-          {event.additionalLinks && Array.isArray(event.additionalLinks) && event.additionalLinks.length > 0 && (
+          {event.additional_links && Array.isArray(event.additional_links) && event.additional_links.length > 0 && (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Zusätzliche Links</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {event.additionalLinks.map((link, linkIndex) => {
+                {event.additional_links.map((link, linkIndex) => {
                   if (!link || typeof link !== 'object') return null;
                   
                   return (
@@ -507,33 +527,21 @@ export default function EventDetail() {
         {/* Actions */}
         <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
           <div className="flex flex-col sm:flex-row gap-4">
-            <Link 
-              to="/timetable" 
-              className="inline-flex items-center justify-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
-            >
-              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
+            <BackButton to="/timetable">
               Zurück zum Zeitplan
-            </Link>
+            </BackButton>
             
-            {event.additionalLinks && event.additionalLinks.length > 0 && (
-              <button
-                onClick={() => {
-                  // Copy event link to clipboard
-                  const eventUrl = `${window.location.origin}/timetable/event/${event.id}`;
-                  navigator.clipboard.writeText(eventUrl).then(() => {
-                    setSuccess('Event-Link in die Zwischenablage kopiert!');
-                  });
-                }}
-                className="inline-flex items-center justify-center px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors font-semibold"
-              >
-                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                </svg>
-                Link teilen
-              </button>
-            )}
+            <button
+              onClick={handleAddToCalendar}
+              className="inline-flex items-center justify-center px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors font-semibold"
+              aria-label={`Event "${event.title}" zum Kalender hinzufügen`}
+              title="Event als ICS-Datei herunterladen und in Ihren Kalender importieren"
+            >
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              Zu Kalender hinzufügen
+            </button>
           </div>
         </div>
       </div>

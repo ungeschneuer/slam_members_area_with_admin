@@ -69,6 +69,10 @@ function intelligentTruncate(text, maxLength = 50) {
 
 /**
  * Generate a URL-friendly slug from a string with improved logic
+ * 
+ * STANDARDIZED OPTIONS: All admin components use maxLength: 50 and removeStopwords: true
+ * for consistent slug generation across the application.
+ * 
  * @param {string} text - The text to convert to a slug
  * @param {Object} options - Options for slug generation
  * @param {number} options.maxLength - Maximum length of the slug (default: 50)
@@ -126,19 +130,28 @@ export function generateSlug(text, options = {}) {
 
 /**
  * Generate a unique slug by appending a number if needed
- * @param {string} baseSlug - The base slug
- * @param {Array} existingSlugs - Array of existing slugs to check against
+ * @param {string} baseName - The name to slugify
+ * @param {Array<string>} existingSlugs - Array of existing slug strings
  * @returns {string} - The unique slug
  */
-export function generateUniqueSlug(baseSlug, existingSlugs = []) {
-  if (!baseSlug) return '';
+export function generateUniqueSlug(baseName, existingSlugs = []) {
+  if (!baseName) return '';
   
-  let uniqueSlug = baseSlug;
+  // Generate base slug from name
+  const baseSlug = generateSlug(baseName);
+  
+  // Validate generated slug
+  if (!baseSlug || baseSlug.length < 3) {
+    throw new Error(`Cannot generate valid slug from name: ${baseName}`);
+  }
+  
+  // Check if slug already exists and append number if needed
   let counter = 1;
+  let uniqueSlug = baseSlug;
   
   while (existingSlugs.includes(uniqueSlug)) {
-    uniqueSlug = `${baseSlug}-${counter}`;
     counter++;
+    uniqueSlug = `${baseSlug}-${counter}`;
   }
   
   return uniqueSlug;

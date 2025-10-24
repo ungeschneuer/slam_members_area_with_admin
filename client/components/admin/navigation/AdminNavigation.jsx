@@ -18,6 +18,7 @@ const navigationGroups = [
     path: null,
     items: [
       { id: 'participants', label: 'Teilnehmer*innen', icon: '👥', path: '/admin/participants' },
+      { id: 'teams', label: 'Teams', icon: '👥', path: '/admin/teams' },
       { id: 'rounds', label: 'Runden', icon: '🎭', path: '/admin/rounds' },
       { id: 'timetable', label: 'Zeitplan', icon: '📅', path: '/admin/timetable' }
     ]
@@ -44,18 +45,6 @@ const navigationGroups = [
       { id: 'countdown', label: 'Countdown', icon: '⏰', path: '/admin/countdown' }
     ]
   },
-  {
-    id: 'system',
-    label: 'System',
-    icon: '🔧',
-    path: null,
-    items: [
-      { id: 'analytics', label: 'Analytics', icon: '📈', path: '/admin/analytics' },
-      { id: 'performance', label: 'Performance', icon: '⚡', path: '/admin/performance' },
-      { id: 'security', label: 'Sicherheit', icon: '🔐', path: '/admin/security' },
-      { id: 'cache', label: 'Cache', icon: '💾', path: '/admin/cache' }
-    ]
-  }
 ];
 
 export default function AdminNavigation() {
@@ -88,9 +77,9 @@ export default function AdminNavigation() {
   };
 
   return (
-    <nav className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50">
+    <nav className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 sticky top-0 z-[70] overflow-visible">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
+        <div className="flex justify-between h-16 overflow-visible">
           <div className="flex items-center">
             <div className="flex items-center space-x-3">
               <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl flex items-center justify-center">

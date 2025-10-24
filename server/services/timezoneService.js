@@ -77,21 +77,11 @@ export function getCurrentTimeInConfiguredTimezone() {
   const timezone = getConfiguredTimezone();
   const now = new Date();
   
-  const formatter = new Intl.DateTimeFormat('en-CA', {
-    timeZone: timezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false
-  });
+  // Use a simpler approach: get the current time and format it in the target timezone
+  // This gives us the correct local time in the configured timezone
+  const timeInTimezone = new Date(now.toLocaleString("en-US", { timeZone: timezone }));
   
-  const parts = formatter.formatToParts(now);
-  return new Date(
-    `${parts.find(p => p.type === 'year').value}-${parts.find(p => p.type === 'month').value}-${parts.find(p => p.type === 'day').value}T${parts.find(p => p.type === 'hour').value}:${parts.find(p => p.type === 'minute').value}:${parts.find(p => p.type === 'second').value}`
-  );
+  return timeInTimezone;
 }
 
 /**

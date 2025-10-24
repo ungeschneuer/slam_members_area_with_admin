@@ -1,0 +1,210 @@
+---
+alwaysApply: true
+description: Simplified API routes with basic patterns
+---
+
+# API Routes - Simplified
+
+## Simple Route Structure
+
+This project uses **12 focused route files** with basic Express.js patterns.
+
+## Route Organization
+
+```
+server/routes/
+  index.js                 # Main router
+  auth.routes.js          # Authentication
+  participants.routes.js   # Participants CRUD
+  rounds.routes.js        # Rounds CRUD
+  news.routes.js          # News CRUD
+  city-tips.routes.js     # City tips CRUD
+  timetable.routes.js     # Timetable CRUD
+  links.routes.js         # Links CRUD
+  info-pages.routes.js    # Info pages CRUD
+  schnellzugriff.routes.js # Quick access CRUD
+  simplifiedRounds.routes.js # Simplified rounds
+```
+
+## Basic Route Patterns
+
+### CRUD Routes
+```javascript
+// ✅ Simple CRUD pattern
+router.get('/participants', async (req, res) => {
+  try {
+    const participants = await executeQuery('SELECT * FROM participants');
+    res.json({ success: true, data: participants });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+router.post('/participants', ...adminMiddleware(), async (req, res) => {
+  try {
+    const { name, region, instagram } = req.body;
+    const result = await executeQuery(
+      'INSERT INTO participants (name, region, instagram) VALUES ($1, $2, $3) RETURNING *',
+      [name, region, instagram]
+    );
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+```
+
+### Authentication Middleware
+```javascript
+// ✅ Simple JWT authentication
+const adminMiddleware = () => [
+  authenticateCookie,
+  authorize(['admin', 'organizer'])
+];
+
+router.post('/participants', ...adminMiddleware(), handler);
+router.put('/participants/:id', ...adminMiddleware(), handler);
+router.delete('/participants/:id', ...adminMiddleware(), handler);
+```
+
+### Error Handling
+```javascript
+// ✅ Simple error handling
+try {
+  const result = await executeQuery(query, params);
+  res.json({ success: true, data: result.rows });
+} catch (error) {
+  logger.error('Database error:', error);
+  res.status(500).json({ 
+    success: false, 
+    error: 'Internal server error' 
+  });
+}
+```
+
+## Anti-Patterns to Avoid
+
+### ❌ Complex Middleware Chains
+```javascript
+// ❌ DON'T use complex middleware
+router.post('/participants', 
+  rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }),
+  validateSchema(participantSchema),
+  sanitizeInput(),
+  auditLog(),
+  cacheMiddleware(),
+  handler
+);
+```
+
+### ❌ Complex Route Helpers
+```javascript
+// ❌ DON'T use complex route helpers
+const result = await executeCrudOperation(
+  'create',
+  'participants',
+  normalizedData,
+  'CREATE_PARTICIPANT',
+  res
+);
+```
+
+### ❌ WebSocket Emissions
+```javascript
+// ❌ DON'T use WebSocket emissions
+router.post('/participants', async (req, res) => {
+  const result = await createParticipant(req.body);
+  io.emit('participants:updated', result); // ❌ No WebSockets
+  res.json(result);
+});
+```
+
+## Route Patterns
+
+### Public Routes
+```javascript
+// ✅ Simple public routes
+router.get('/participants', getParticipants);
+router.get('/rounds', getRounds);
+router.get('/news', getNews);
+```
+
+### Admin Routes
+```javascript
+// ✅ Simple admin routes
+router.post('/participants', ...adminMiddleware(), createParticipant);
+router.put('/participants/:id', ...adminMiddleware(), updateParticipant);
+router.delete('/participants/:id', ...adminMiddleware(), deleteParticipant);
+```
+
+### Authentication Routes
+```javascript
+// ✅ Simple auth routes
+router.post('/auth/login', login);
+router.post('/auth/logout', logout);
+router.get('/auth/me', authenticateCookie, getCurrentUser);
+```
+
+## Benefits
+
+- **Simple** - Easy to understand and debug
+- **Maintainable** - Easy to modify and extend
+- **Testable** - Simple to test
+- **Performance** - No complex middleware overhead
+- **Reliable** - Fewer points of failure
+
+## Response Format
+
+### Success Response
+```javascript
+{
+  success: true,
+  data: result,
+  meta: {
+    queryType: 'GET_PARTICIPANTS',
+    duration: '45ms'
+  }
+}
+```
+
+### Error Response
+```javascript
+{
+  success: false,
+  error: 'Error message',
+  code: 'VALIDATION_ERROR'
+}
+```
+
+## Database Integration
+
+### Simple Queries
+```javascript
+// ✅ Direct database queries
+const participants = await executeQuery(
+  'SELECT * FROM participants ORDER BY name',
+  []
+);
+
+const participant = await executeQuery(
+  'SELECT * FROM participants WHERE id = $1',
+  [participantId]
+);
+```
+
+### Transaction Handling
+```javascript
+// ✅ Simple transactions
+const client = await pool.connect();
+try {
+  await client.query('BEGIN');
+  const result = await client.query(query, params);
+  await client.query('COMMIT');
+  return result;
+} catch (error) {
+  await client.query('ROLLBACK');
+  throw error;
+} finally {
+  client.release();
+}
+```

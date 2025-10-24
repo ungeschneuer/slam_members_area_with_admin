@@ -101,7 +101,7 @@ export default function NavGroup({ group, isActive, onNavigate }) {
       </button>
 
       {isOpen && (
-        <div className="absolute left-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50">
+        <div className="absolute left-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-[75]">
           {group.items.map((item) => {
             const itemIsActive = location.pathname === item.path;
             return (

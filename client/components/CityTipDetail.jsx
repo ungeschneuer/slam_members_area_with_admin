@@ -1,14 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react';
 import 'leaflet/dist/leaflet.css';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { useCityTipBySlug } from '../hooks/index.js';
+import { useCityTipBySlug, usePageTitle } from '../hooks/index.js';
 import LoadingSpinner from './LoadingSpinner.jsx';
 import { createMap, destroyMap, createDefaultIcon, createMarkerWithPopup, isValidCoordinates } from '../utils/leafletUtils.js';
+import { translateCategory, getCategoryIcon, getCategoryColor } from '../utils/categoryTranslations.js';
+import { getContentTypeGradient } from '../utils/detailViewUtils.js';
+import BackButton from './shared/BackButton.jsx';
 
 const CityTipDetail = () => {
   const { slug } = useParams();
   const navigate = useNavigate();
   const { data: cityTip, isLoading: loading, error } = useCityTipBySlug(slug);
+  
+  // Set dynamic page title
+  usePageTitle(cityTip?.title || 'Laden...');
   
   const [showFullDescription, setShowFullDescription] = useState(false);
   const mapContainerRef = useRef(null);
@@ -65,8 +71,11 @@ const CityTipDetail = () => {
       }
     }
 
+    const address = cityTip?.address;
     if (address) {
       const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+      
       fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`, {
         headers: { 'Accept': 'application/json' },
         signal: controller.signal
@@ -79,12 +88,19 @@ const CityTipDetail = () => {
           }
         })
         .catch((error) => {
-          console.warn('Failed to geocode address:', error);
+          if (error.name === 'AbortError') {
+            console.warn('Geocoding request timed out after 5 seconds');
+          } else {
+            console.warn('Failed to geocode address:', error);
+          }
         })
         .finally(() => {
-          // no-op
+          clearTimeout(timeoutId);
         });
-      return () => controller.abort();
+      return () => {
+        controller.abort();
+        clearTimeout(timeoutId);
+      };
     }
   }, [cityTip]);
 
@@ -104,44 +120,12 @@ const CityTipDetail = () => {
 
   
 
-  const getCategoryIcon = (category) => {
-    const icons = {
-      'restaurant': '🍽️',
-      'cafe': '☕',
-      'bar': '🍺',
-      'landmark': '🏛️',
-      'shopping': '🛍️',
-      'culture': '🎭',
-      'entertainment': '🎭',
-      'transport': '🚇',
-      'accommodation': '🏨',
-      'hotel': '🏨',
-      'nature': '🌳',
-      'leisure': '🏊',
-      'sports': '⚽',
-      'other': '📍'
-    };
-    return icons[category] || '📍';
+  const getCategoryIconLocal = (category) => {
+    return getCategoryIcon(category, 'cityTips');
   };
 
-  const getCategoryLabel = (category) => {
-    const labels = {
-      'restaurant': 'Restaurant',
-      'cafe': 'Café',
-      'bar': 'Bar',
-      'landmark': 'Sehenswürdigkeit',
-      'shopping': 'Einkaufen',
-      'culture': 'Kultur',
-      'entertainment': 'Unterhaltung',
-      'transport': 'Transport',
-      'accommodation': 'Unterkunft',
-      'hotel': 'Hotel',
-      'nature': 'Natur',
-      'leisure': 'Freizeit',
-      'sports': 'Sport',
-      'other': 'Sonstiges'
-    };
-    return labels[category] || 'Stadt-Tipp';
+  const getCategoryLabelLocal = (category) => {
+    return translateCategory(category, 'cityTips');
   };
 
   const getPriceRangeLabel = (priceRange) => {
@@ -250,37 +234,37 @@ const CityTipDetail = () => {
           </ol>
         </nav>
 
+        {/* Top Back Button */}
+        <div className="mb-6">
+          <BackButton to="/city-tips">
+            Zurück zur Übersicht
+          </BackButton>
+        </div>
+
         {/* Hero Section */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden mb-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden mb-6">
           {/* Header with actions */}
-          <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-            <div className="flex items-start justify-between">
-              <div className="flex items-start space-x-4">
-                <div className="flex-shrink-0">
-                  <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-2xl font-bold shadow-lg">
-                    {getCategoryIcon(cityTip.category)}
-                  </div>
-                </div>
-                <div className="flex-1">
-                  {openingStatus && (
-                    <div className="flex items-center space-x-3 mb-2">
-                      <span className={`inline-block px-3 py-1 text-sm font-medium rounded-full ${
-                        openingStatus.status === 'open' 
-                          ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200'
-                          : 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200'
-                      }`}>
-                        {openingStatus.text}
-                      </span>
-                    </div>
-                  )}
-                  <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-                    {cityTip.name}
-                  </h1>
-                  
-                </div>
+          <div className="p-8 border-b border-gray-200 dark:border-gray-700">
+            <div className="flex items-start space-x-4">
+              <div className={`w-16 h-16 bg-gradient-to-br ${getContentTypeGradient('cityTip')} rounded-full flex items-center justify-center text-white text-2xl font-bold shadow-lg`}>
+                {getCategoryIconLocal(cityTip.category)}
               </div>
-              
-              
+              <div className="flex-1">
+                {openingStatus && (
+                  <div className="flex items-center space-x-3 mb-2">
+                    <span className={`inline-block px-3 py-1 text-sm font-medium rounded-full ${
+                      openingStatus.status === 'open' 
+                        ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200'
+                        : 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200'
+                    }`}>
+                      {openingStatus.text}
+                    </span>
+                  </div>
+                )}
+                <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+                  {cityTip.name}
+                </h1>
+              </div>
             </div>
           </div>
 
@@ -341,7 +325,7 @@ const CityTipDetail = () => {
           <div className="lg:col-span-2 space-y-6">
             {/* Description */}
             {cityTip.description && (
-              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                 <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
                   <span className="mr-2">📝</span>
                   Beschreibung
@@ -364,7 +348,7 @@ const CityTipDetail = () => {
             )}
             {/* Leaflet Map in main column */}
             {(cityTip.address || cityTip.coordinates) && (
-              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                 <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
                   <span className="mr-2">🗺️</span>
                   Karte
@@ -376,7 +360,7 @@ const CityTipDetail = () => {
 
             {/* Tips */}
             {cityTip.tips && (
-              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                 <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
                   <span className="mr-2">💡</span>
                   Insider-Tipps
@@ -391,7 +375,7 @@ const CityTipDetail = () => {
 
             {/* Images Gallery */}
             {cityTip.images && cityTip.images.length > 0 && (
-              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                 <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
                   <span className="mr-2">📸</span>
                   Bilder ({cityTip.images.length})
@@ -419,7 +403,7 @@ const CityTipDetail = () => {
           <div className="space-y-6">
             {/* Opening Hours */}
             {cityTip.opening_hours && (
-              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                 <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
                   <span className="mr-2">🕒</span>
                   Öffnungszeiten
@@ -443,7 +427,7 @@ const CityTipDetail = () => {
 
             {/* Contact Information */}
             {cityTip.contact_info && (
-              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                 <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
                   <span className="mr-2">📞</span>
                   Kontakt
@@ -476,12 +460,12 @@ const CityTipDetail = () => {
             )}
 
             {/* Additional Information */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Weitere Informationen</h2>
               <div className="space-y-3">
                 <div>
                   <h3 className="font-medium text-gray-900 dark:text-white mb-1">Kategorie</h3>
-                  <p className="text-gray-600 dark:text-gray-400">{getCategoryLabel(cityTip.category)}</p>
+                  <p className="text-gray-600 dark:text-gray-400">{getCategoryLabelLocal(cityTip.category)}</p>
                 </div>
                 {cityTip.price_range && (
                   <div>
@@ -495,7 +479,7 @@ const CityTipDetail = () => {
 
             {/* Map Navigation */}
             {cityTip.address && (
-              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                 <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
                   <span className="mr-2">🗺️</span>
                   Navigation
@@ -540,17 +524,11 @@ const CityTipDetail = () => {
           </div>
         </div>
 
-        {/* Back Button */}
+        {/* Bottom Back Button */}
         <div className="mt-8">
-          <button
-            onClick={() => navigate('/city-tips')}
-            className="inline-flex items-center px-6 py-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800 transition-colors"
-          >
-            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
+          <BackButton onClick={() => navigate('/city-tips')}>
             Zurück zur Übersicht
-          </button>
+          </BackButton>
         </div>
       </div>
     </div>

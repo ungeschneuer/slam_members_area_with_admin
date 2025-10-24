@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { API_URL } from '../config/api.js';
 import authService from '../services/authService.js';
+import { useEntityData } from './useEntityData.js';
 
 // Query keys for city tips
 export const cityTipsKeys = {
@@ -13,10 +14,10 @@ export const cityTipsKeys = {
 };
 
 // Hook to fetch all city tips
-export function useCityTips(filters = {}) {
-  return useQuery({
-    queryKey: cityTipsKeys.list(filters),
-    queryFn: async () => {
+export function useCityTips(filters = {}, isAdmin = false) {
+  return useEntityData(
+    'city-tips',
+    async () => {
       const response = await fetch(`${API_URL}/city-tips`, {
         credentials: 'include'
       });
@@ -24,11 +25,12 @@ export function useCityTips(filters = {}) {
         throw new Error(`Failed to fetch city tips: ${response.statusText}`);
       }
       const result = await response.json();
-      return result?.data || result || [];
+      // Handle nested data structure or direct array
+      const data = result?.data?.data?.rows || result?.data?.rows || result?.data || result;
+      return Array.isArray(data) ? data : [];
     },
-    staleTime: 10 * 60 * 1000, // 10 minutes (city tips change less frequently)
-    gcTime: 30 * 60 * 1000, // 30 minutes
-  });
+    { filters, staleTime: 10 * 60 * 1000, gcTime: 30 * 60 * 1000, isAdmin }
+  );
 }
 
 // Hook to fetch a single city tip by ID
@@ -58,14 +60,19 @@ export function useCityTipBySlug(slug) {
     queryKey: cityTipsKeys.bySlug(slug),
     queryFn: async () => {
       if (!slug) return null;
-      const response = await fetch(`${API_URL}/city-tips/slug/${slug}`, {
+      const response = await fetch(`${API_URL}/city-tips/${slug}`, {
         credentials: 'include'
       });
       if (!response.ok) {
         throw new Error(`Failed to fetch city tip: ${response.statusText}`);
       }
       const result = await response.json();
-      return result?.data || result || null;
+      // Extract the actual city tip data from the database result
+      const data = result?.data;
+      if (data && data.rows && data.rows.length > 0) {
+        return data.rows[0];
+      }
+      return null;
     },
     enabled: !!slug,
     staleTime: 10 * 60 * 1000,
@@ -79,19 +86,37 @@ export function useCreateCityTip() {
   
   return useMutation({
     mutationFn: async (cityTipData) => {
-      const response = await authService.authenticatedRequest(
-        `${API_URL}/city-tips`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(cityTipData)
+      console.log('[useCreateCityTip] Starting mutation with data:', cityTipData);
+      
+      try {
+        const response = await authService.authenticatedRequest(
+          `${API_URL}/city-tips`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(cityTipData)
+          }
+        );
+        
+        console.log('[useCreateCityTip] Response status:', response.status);
+        console.log('[useCreateCityTip] Response headers:', Object.fromEntries(response.headers.entries()));
+        
+        const result = await response.json();
+        console.log('[useCreateCityTip] Response body:', result);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${result.error || result.message || 'Unknown error'}`);
         }
-      );
-      const result = await response.json();
-      return result?.data || result;
+        
+        return result?.data || result;
+      } catch (error) {
+        console.error('[useCreateCityTip] Mutation error:', error);
+        throw error;
+      }
     },
     onSuccess: (data) => {
-      // Invalidate and refetch city tips list
+      // Invalidate all city-tips-related queries to ensure admin components update
+      queryClient.invalidateQueries({ queryKey: ['city-tips'] });
       queryClient.invalidateQueries({ queryKey: cityTipsKeys.lists() });
       
       // If we have the created city tip data, add it to the cache
@@ -123,7 +148,8 @@ export function useUpdateCityTip() {
       return result?.data || result;
     },
     onSuccess: (data, variables) => {
-      // Invalidate and refetch city tips list
+      // Invalidate all city-tips-related queries to ensure admin components update
+      queryClient.invalidateQueries({ queryKey: ['city-tips'] });
       queryClient.invalidateQueries({ queryKey: cityTipsKeys.lists() });
       
       // Update the specific city tip in cache
@@ -156,7 +182,8 @@ export function useDeleteCityTip() {
       // Remove from cache
       queryClient.removeQueries({ queryKey: cityTipsKeys.detail(id) });
       
-      // Invalidate and refetch city tips list
+      // Invalidate all city-tips-related queries to ensure admin components update
+      queryClient.invalidateQueries({ queryKey: ['city-tips'] });
       queryClient.invalidateQueries({ queryKey: cityTipsKeys.lists() });
     },
   });

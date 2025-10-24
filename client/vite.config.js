@@ -34,13 +34,6 @@ export default defineConfig({
     // Suppress source map errors
     fs: {
       strict: false
-    },
-    // Suppress source map warnings
-    onwarn(warning, warn) {
-      if (warning.code === 'SOURCEMAP_ERROR') {
-        return;
-      }
-      warn(warning);
     }
   },
   build: {
@@ -54,7 +47,7 @@ export default defineConfig({
           vendor: ['react', 'react-dom'],
           router: ['react-router-dom'],
           query: ['@tanstack/react-query'],
-          socketio: ['socket.io-client'],
+          // Socket.io removed - using simple polling instead
           leaflet: ['leaflet']
         }
       }

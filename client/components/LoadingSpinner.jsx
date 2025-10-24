@@ -1,6 +1,6 @@
 import React from 'react';
 
-export default function LoadingSpinner({ size = "md", text = "Loading..." }) {
+export default function LoadingSpinner({ size = "md", text = "Lädt..." }) {
   const sizeClasses = {
     sm: "w-4 h-4",
     md: "w-6 h-6", 
@@ -31,7 +31,7 @@ export default function LoadingSpinner({ size = "md", text = "Loading..." }) {
           d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
         />
       </svg>
-      <p className="text-gray-600 dark:text-gray-400">{text}</p>
+      <p className="text-gray-600 dark:text-gray-300">{text}</p>
     </div>
   );
 }
@@ -39,7 +39,7 @@ export default function LoadingSpinner({ size = "md", text = "Loading..." }) {
 export function LoadingCard({ className = '' }) {
   return (
     <div className={`bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700 ${className}`}>
-      <LoadingSpinner size="lg" text="Loading content..." />
+      <LoadingSpinner size="lg" text="Inhalt wird geladen..." />
     </div>
   );
 }
@@ -47,7 +47,7 @@ export function LoadingCard({ className = '' }) {
 export function LoadingPage({ className = '' }) {
   return (
     <div className={`min-h-screen flex items-center justify-center ${className}`}>
-      <LoadingSpinner size="xl" text="Loading application..." />
+      <LoadingSpinner size="xl" text="Anwendung wird geladen..." />
     </div>
   );
 }

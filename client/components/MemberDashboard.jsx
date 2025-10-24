@@ -1,25 +1,28 @@
 import React, { useState, useEffect, useTransition, useDeferredValue, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { useParticipants, useRounds, useNews, useInfoPages, useCityTips, useSchnellzugriff, useCountdown } from '../hooks/index.js';
-import { useStats, useUpdateStats } from '../stores/useAppStore.js';
+import { useParticipants, useRounds, useNews, useInfoPages, useCityTips, useSchnellzugriff, useCountdown, usePageTitle } from '../hooks/index.js';
+// Stats now handled by React Query data
 import LoadingSpinner from './LoadingSpinner';
 import { FadeIn, StaggeredContainer, AnimateOnScroll } from './Transitions.jsx';
 import { DashboardSkeleton } from './SkeletonLoader.jsx';
 import { ErrorMessage, SuccessMessage } from './StatusMessages.jsx';
 import { createTimezoneAwareCountdown } from '../services/timezoneService.js';
+import { translateRoundStatus, getRoundStatusIcon, getRoundStatusColor } from '../utils/categoryTranslations.js';
+import { getRegionFlag } from '../utils/detailViewUtils.js';
 
 export default function MemberDashboard() {
+  usePageTitle('Dashboard');
   const { data: countdownData, isLoading: countdownLoading, error: countdownError } = useCountdown();
-  const { data: participantsData = [], isLoading: participantsLoading, error: participantsError } = useParticipants();
+  const { data: participantsResponse = [], isLoading: participantsLoading, error: participantsError } = useParticipants();
+  const participantsData = participantsResponse?.data || participantsResponse || [];
   const { data: roundsData = [], isLoading: roundsLoading, error: roundsError } = useRounds();
   const { data: newsData = [], isLoading: newsLoading, error: newsError } = useNews();
   const { data: infoPagesData = [], isLoading: infoPagesLoading, error: infoPagesError } = useInfoPages();
   const { data: cityTipsData = [], isLoading: cityTipsLoading, error: cityTipsError } = useCityTips();
   const { data: schnellzugriffData = [], isLoading: schnellzugriffLoading, error: schnellzugriffError } = useSchnellzugriff();
   
-  // Use consolidated store for stats
-  const stats = useStats();
-  const updateStats = useUpdateStats();
+  // Session-based random seed that changes on page reload but stays stable during session
+  const sessionSeed = useRef(Math.floor(Math.random() * 1000));
   
   const loading = participantsLoading || roundsLoading || newsLoading || infoPagesLoading || cityTipsLoading || schnellzugriffLoading;
   const [isPending, startTransition] = useTransition();
@@ -33,11 +36,6 @@ export default function MemberDashboard() {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
 
-  // Helper function to get region flag emoji
-  const getRegionFlag = (region) => {
-    // Return empty string instead of emojis
-    return '';
-  };
 
   // Use useMemo for computed values instead of manual state synchronization
   const countdownConfig = useMemo(() => {
@@ -52,8 +50,69 @@ export default function MemberDashboard() {
   }, [countdownData]);
 
   const schnellzugriffLinks = useMemo(() => {
-    return Array.isArray(schnellzugriffData) ? schnellzugriffData : [];
+    if (!Array.isArray(schnellzugriffData)) return [];
+    
+    // Client-side deduplication safety net
+    const unique = new Map();
+    schnellzugriffData.forEach(link => {
+      if (!unique.has(link.title)) {
+        unique.set(link.title, link);
+      }
+    });
+    return Array.from(unique.values());
   }, [schnellzugriffData]);
+
+  // Random participants that only change on page reload, not on every render
+  const randomParticipants = useMemo(() => {
+    if (!Array.isArray(participantsData)) return [];
+    // Create a random order that only changes when participantsData changes
+    // Use the session seed for true randomness that changes on page reload
+    return [...participantsData].sort((a, b) => {
+      // Use the session seed to create a varied order
+      const hashA = (a.id * sessionSeed.current) % 1000;
+      const hashB = (b.id * sessionSeed.current) % 1000;
+      return hashA - hashB;
+    });
+  }, [participantsData]);
+
+  // Stable sorted city tips for display (only changes when data changes)
+  const stableCityTips = useMemo(() => {
+    if (!Array.isArray(cityTipsData)) return [];
+    // Create a stable sort by using tip ID as seed for consistent randomization
+    return [...cityTipsData].sort((a, b) => {
+      // Use tip ID to create a deterministic "random" order
+      const seedA = a.id % 5; // Use modulo to create consistent ordering
+      const seedB = b.id % 5;
+      return seedA - seedB;
+    });
+  }, [cityTipsData]);
+
+  // Next 5 upcoming rounds (no past events)
+  const upcomingRounds = useMemo(() => {
+    if (!Array.isArray(roundsData)) return [];
+    
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    
+    return roundsData
+      .filter(round => {
+        // Filter out past events
+        if (!round.date) return false;
+        
+        const roundDate = new Date(round.date);
+        const roundDateOnly = new Date(roundDate.getFullYear(), roundDate.getMonth(), roundDate.getDate());
+        
+        // Only include rounds that are today or in the future
+        return roundDateOnly >= today;
+      })
+      .sort((a, b) => {
+        // Sort by date (earliest first)
+        const dateA = new Date(a.date);
+        const dateB = new Date(b.date);
+        return dateA - dateB;
+      })
+      .slice(0, 5); // Show next 5 upcoming events
+  }, [roundsData]);
 
   const categoryStats = useMemo(() => {
     if (!Array.isArray(cityTipsData)) return {
@@ -80,26 +139,7 @@ export default function MemberDashboard() {
     return stats;
   }, [cityTipsData]);
 
-  // Track previous stats to avoid unnecessary updates
-  const prevStatsRef = useRef({ participants: 0, rounds: 0, news: 0 });
-  
-  // Update stats only when they actually change
-  useEffect(() => {
-    const newStats = {
-      participants: participantsData.length,
-      rounds: roundsData.length,
-      news: newsData.length
-    };
-    
-    // Only update if stats have actually changed
-    const prevStats = prevStatsRef.current;
-    if (prevStats.participants !== newStats.participants || 
-        prevStats.rounds !== newStats.rounds || 
-        prevStats.news !== newStats.news) {
-      updateStats(newStats);
-      prevStatsRef.current = newStats;
-    }
-  }, [participantsData.length, roundsData.length, newsData.length]);
+  // Stats are now handled by React Query data - no manual state management needed
 
 
   // Countdown timer using timezone-aware service
@@ -110,7 +150,7 @@ export default function MemberDashboard() {
       return;
     }
 
-    const targetDate = new Date(countdownConfig.target_date || '2025-10-28T12:00:00+02:00');
+    const targetDate = new Date(countdownConfig.target_date || '2025-10-28T12:00:00');
     
     // Use timezone-aware countdown service
     const cleanup = createTimezoneAwareCountdown(
@@ -150,11 +190,6 @@ export default function MemberDashboard() {
     return round.groups && Array.isArray(round.groups) && round.groups.length > 0;
   };
 
-  // Helper function to get participant name by ID
-  const getParticipantName = (participantId) => {
-    const participant = participantsData.find(p => p.id === participantId);
-    return participant ? participant.name : `Teilnehmer*in ${participantId}`;
-  };
 
   // Helper function to get participant details by ID
   const getParticipantDetails = (participantId) => {
@@ -190,13 +225,13 @@ export default function MemberDashboard() {
         <div className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 rounded-2xl p-8 text-white relative overflow-hidden">
           <div className="absolute inset-0 bg-black opacity-10"></div>
           <div className="relative z-10">
-            <div className="flex items-center mb-4">
-              <div className="w-16 h-16 bg-white bg-opacity-20 rounded-2xl flex items-center justify-center mr-4" aria-hidden="true">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center mb-4">
+              <div className="w-16 h-16 bg-white bg-opacity-20 rounded-2xl flex items-center justify-center mr-4 mb-4 sm:mb-0 flex-shrink-0" aria-hidden="true">
                 <span className="text-3xl">🎭</span>
               </div>
-              <div>
-                <h1 className="text-5xl font-bold mb-2">Willkommen bei SLAM25</h1>
-                <p className="text-xl opacity-90">Dein Poetry Slam Community Hub</p>
+              <div className="flex-1 min-w-0">
+                <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-2 break-words">Willkommen bei SLAM25</h1>
+                <p className="text-lg sm:text-xl opacity-90">Dein Poetry Slam Community Hub</p>
               </div>
             </div>
             <p className="text-lg opacity-80 max-w-2xl">
@@ -288,12 +323,18 @@ export default function MemberDashboard() {
                   return colorMap[color] || colorMap.blue;
                 };
 
+                // Helper function to determine if URL should open in new tab
+                const shouldOpenInNewTab = (url) => {
+                  if (!url) return false;
+                  return url.startsWith('http://') || url.startsWith('https://');
+                };
+
                 return (
                   <a
                     key={link.id}
                     href={link.url}
-                    target={link.is_external ? '_blank' : '_self'}
-                    rel={link.is_external ? 'noopener noreferrer' : undefined}
+                    target={shouldOpenInNewTab(link.url) ? '_blank' : '_self'}
+                    rel={shouldOpenInNewTab(link.url) ? 'noopener noreferrer' : undefined}
                     className={`group p-4 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 ${getColorClasses(link.color)}`}
                     aria-label={`${link.title} - ${link.description || ''}`}
                   >
@@ -324,19 +365,9 @@ export default function MemberDashboard() {
       {/* City Tips Preview Section */}
       <AnimateOnScroll>
         <div className="bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-8 shadow-sm border border-gray-200 dark:border-gray-700">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6 space-y-4 sm:space-y-0">
-            <div>
-              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2">Chemnitz Tipps & Empfehlungen</h2>
-              <p className="text-gray-600 dark:text-gray-400">Entdecke die besten Orte in Chemnitz für deinen SLAM25 Aufenthalt</p>
-            </div>
-            <Link
-              to="/city-tips"
-              className="inline-flex items-center px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-lg font-semibold hover:from-orange-600 hover:to-red-600 transition-all duration-200 shadow-lg hover:shadow-xl text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2"
-              aria-label="Alle Stadt-Tipps anzeigen"
-            >
-              <span className="mr-2" aria-hidden="true">🗺️</span>
-              Alle Tipps anzeigen
-            </Link>
+          <div className="mb-4 sm:mb-6">
+            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2">Chemnitz Tipps & Empfehlungen</h2>
+            <p className="text-gray-600 dark:text-gray-400">Entdecke die besten Orte in Chemnitz für deinen SLAM25 Aufenthalt</p>
           </div>
           
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
@@ -360,16 +391,15 @@ export default function MemberDashboard() {
                 </div>
               ))
             ) : cityTipsData.length > 0 ? (
-              // Display featured tips (select random 3)
-              cityTipsData
+              // Display featured tips (select stable 3)
+              stableCityTips
                 .filter(tip => tip.is_featured && tip.status === 'ACTIVE')
-                .sort(() => Math.random() - 0.5)
                 .slice(0, 3)
                 .map((tip) => (
                 <div
                   key={tip.id}
                   className="bg-gray-50 dark:bg-gray-700 rounded-xl p-4 sm:p-6 hover:shadow-md transition-all duration-200 hover:-translate-y-1 micro-interaction"
-                  tabIndex="0"
+                  tabIndex="meta_description"
                   role="article"
                   aria-label={`${tip.name} - ${tip.description}`}
                 >
@@ -400,6 +430,22 @@ export default function MemberDashboard() {
               </div>
             )}
           </div>
+          
+          {/* Alle Tipps Button */}
+          {cityTipsData.length > 0 && (
+            <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-600">
+              <div className="text-center">
+                <Link
+                  to="/city-tips"
+                  className="inline-flex items-center px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-lg font-semibold hover:from-orange-600 hover:to-red-600 transition-all duration-200 shadow-lg hover:shadow-xl text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2"
+                  aria-label="Alle Stadt-Tipps anzeigen"
+                >
+                  <span className="mr-2" aria-hidden="true">🗺️</span>
+                  Alle Tipps anzeigen
+                </Link>
+              </div>
+            </div>
+          )}
           
           <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-600">
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 text-center">
@@ -454,19 +500,9 @@ export default function MemberDashboard() {
       {infoPagesData.length > 0 && (
         <AnimateOnScroll>
           <div className="bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-8 shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6 space-y-4 sm:space-y-0">
-              <div>
-                <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2">Info & Regeln</h2>
-                <p className="text-gray-600 dark:text-gray-400">Wichtige Informationen und Wettbewerbsregeln</p>
-              </div>
-              <Link
-                to="/info"
-                className="inline-flex items-center px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-lg font-semibold hover:from-orange-600 hover:to-red-600 transition-all duration-200 shadow-lg hover:shadow-xl text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2"
-                aria-label="Alle Info-Seiten anzeigen"
-              >
-                <span className="mr-2" aria-hidden="true">📋</span>
-                Alle Info-Seiten
-              </Link>
+            <div className="mb-4 sm:mb-6">
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2">Info & Regeln</h2>
+              <p className="text-gray-600 dark:text-gray-400">Wichtige Informationen und Wettbewerbsregeln</p>
             </div>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -497,6 +533,20 @@ export default function MemberDashboard() {
                 </Link>
               )) : null}
             </div>
+            
+            {/* Alle Info-Seiten Button */}
+            <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-600">
+              <div className="text-center">
+                <Link
+                  to="/info"
+                  className="inline-flex items-center px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-lg font-semibold hover:from-orange-600 hover:to-red-600 transition-all duration-200 shadow-lg hover:shadow-xl text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2"
+                  aria-label="Alle Info-Seiten anzeigen"
+                >
+                  <span className="mr-2" aria-hidden="true">📋</span>
+                  Alle Info-Seiten
+                </Link>
+              </div>
+            </div>
           </div>
         </AnimateOnScroll>
       )}
@@ -504,69 +554,88 @@ export default function MemberDashboard() {
       {/* Wettbewerbsrunden Section */}
       <AnimateOnScroll>
         <div className="bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-8 shadow-sm border border-gray-200 dark:border-gray-700">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6 space-y-4 sm:space-y-0">
-            <div>
-              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2">Wettbewerbsrunden</h2>
-              <p className="text-gray-600 dark:text-gray-400">Übersicht aller Runden und Teilnehmer*innen</p>
-            </div>
-            <Link
-              to="/rounds"
-              className="inline-flex items-center px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-lg font-semibold hover:from-purple-600 hover:to-blue-600 transition-all duration-200 shadow-lg hover:shadow-xl text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2"
-              aria-label="Alle Runden anzeigen"
-            >
-              <span className="mr-2" aria-hidden="true">🎭</span>
-              Alle Runden anzeigen
-            </Link>
+          <div className="mb-4 sm:mb-6">
+            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2">Wettbewerbsrunden</h2>
+            <p className="text-gray-600 dark:text-gray-400">Übersicht aller Runden und Teilnehmer*innen</p>
           </div>
           
-          <div className="space-y-4">
-            {Array.isArray(roundsData) ? roundsData.slice(0, 3).map((round, index) => (
+          <div className="space-y-3 sm:space-y-4">
+            {upcomingRounds.length > 0 ? upcomingRounds.map((round, index) => (
               <Link
                 key={round.id}
                 to={`/rounds#round-${round.id}`}
-                className="block p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2"
+                className="block p-3 sm:p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2"
                 aria-label={`Runde: ${round.title}`}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
-                    <h3 className="font-semibold text-gray-900 dark:text-white mb-1">{round.title}</h3>
-                    <div className="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-400">
-                      <span>📅 {round.startDateTime ? new Date(round.startDateTime).toLocaleDateString('de-DE', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric',
-                        timeZone: 'Europe/Berlin'
-                      }) : 'Datum nicht gesetzt'}</span>
-                      <span>🕐 {round.startDateTime ? new Date(round.startDateTime).toLocaleTimeString('de-DE', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        timeZone: 'Europe/Berlin'
-                      }) : '--:--'}</span>
+                    <h3 className="font-semibold text-gray-900 dark:text-white mb-1 text-sm sm:text-base">{round.title}</h3>
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-4 space-y-1 sm:space-y-0 text-sm text-gray-600 dark:text-gray-400">
+                      <div className="flex items-center space-x-3">
+                        <span>📅 {round.date ? new Date(round.date).toLocaleDateString('de-DE', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric',
+                          timeZone: 'Europe/Berlin'
+                        }) : 'Datum nicht gesetzt'}</span>
+                        <span>🕐 {round.start_time ? (() => {
+                          // Handle both full datetime and time-only formats
+                          if (round.start_time.includes('T') || round.start_time.includes(' ')) {
+                            // Full datetime format
+                            return new Date(round.start_time).toLocaleTimeString('de-DE', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              timeZone: 'Europe/Berlin'
+                            });
+                          } else {
+                            // Time-only format (HH:MM:SS or HH:MM)
+                            return round.start_time.substring(0, 5);
+                          }
+                        })() : '--:--'}</span>
+                      </div>
                       <span>📍 {round.location || 'Unbekannter Ort'}</span>
                     </div>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      round.status === 'upcoming' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
-                      round.status === 'active' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
-                      'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                    }`}>
-                      {round.status === 'upcoming' ? '⏳ Anstehend' : 
-                       round.status === 'active' ? '🎭 Aktiv' : '✅ Abgeschlossen'}
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getRoundStatusColor(round.calculatedStatus || round.status)}`}>
+                      {getRoundStatusIcon(round.calculatedStatus || round.status)} {translateRoundStatus(round.calculatedStatus || round.status)}
                     </span>
                     <span className="text-gray-400" aria-hidden="true">→</span>
                   </div>
                 </div>
               </Link>
-            )) : null}
+            )) : (
+              <div className="text-center py-8">
+                <div className="text-4xl mb-4">🎭</div>
+                <p className="text-gray-600 dark:text-gray-400 text-lg font-medium mb-2">Keine bevorstehenden Runden</p>
+                <p className="text-gray-500 dark:text-gray-500 text-sm">Es sind derzeit keine zukünftigen Wettbewerbsrunden geplant.</p>
+              </div>
+            )}
           </div>
           
-          {/* Show participants if no rounds have groups */}
-          {Array.isArray(roundsData) && roundsData.length > 0 && !roundsData.some(hasGroups) && (
+          {/* Alle Runden Button */}
+          {upcomingRounds.length > 0 && (
+            <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-600">
+              <div className="text-center">
+                <Link
+                  to="/rounds"
+                  className="inline-flex items-center px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-lg font-semibold hover:from-purple-600 hover:to-blue-600 transition-all duration-200 shadow-lg hover:shadow-xl text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2"
+                  aria-label="Alle Runden anzeigen"
+                >
+                  <span className="mr-2" aria-hidden="true">🎭</span>
+                  Alle Runden anzeigen
+                </Link>
+              </div>
+            </div>
+          )}
+          
+          {/* Show participants if no upcoming rounds have groups */}
+          {upcomingRounds.length > 0 && !upcomingRounds.some(hasGroups) && (
             <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-600">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Alle Teilnehmer*innen</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {Array.isArray(participantsData) ? participantsData.slice(0, 9).map((participant) => (
+                {randomParticipants
+                  .slice(0, 9).map((participant) => (
                   <div
                     key={participant.id}
                     className="flex items-center space-x-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
@@ -574,30 +643,32 @@ export default function MemberDashboard() {
                     role="article"
                     aria-label={`Teilnehmer*in: ${participant.name}`}
                   >
-                    <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-bold" aria-hidden="true">
-                      {participant.name ? participant.name.charAt(0).toUpperCase() : participant.id.toString().charAt(0)}
-                    </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-gray-900 dark:text-white truncate">{participant.name}</p>
                       <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{participant.role}</p>
                     </div>
                     <div className="text-sm text-gray-400" aria-hidden="true">
-                      {participant.region}
+                      {participant.region || '-'}
+                    </div>
+                    {/* Small grey arrow area */}
+                    <div className="w-6 h-6 bg-gray-100 dark:bg-gray-600 rounded-full flex items-center justify-center">
+                      <svg className="w-3 h-3 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path>
+                      </svg>
                     </div>
                   </div>
-                )) : null}
+                ))}
               </div>
-              {Array.isArray(participantsData) && participantsData.length > 9 && (
-                <div className="mt-4 text-center">
-                  <Link
-                    to="/participants"
-                    className="text-blue-600 dark:text-blue-400 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded"
-                    aria-label={`Alle ${participantsData.length} Teilnehmer*innen anzeigen`}
-                  >
-                    Alle {participantsData.length} Teilnehmer*innen anzeigen →
-                  </Link>
-                </div>
-              )}
+              <div className="mt-4 text-center">
+                <Link
+                  to="/participants"
+                  className="inline-flex items-center px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg font-semibold hover:from-blue-600 hover:to-purple-600 transition-all duration-200 shadow-lg hover:shadow-xl text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                  aria-label={`Alle ${randomParticipants.length} Teilnehmer*innen anzeigen`}
+                >
+                  <span className="mr-2" aria-hidden="true">👥</span>
+                  Alle Teilnehmer*innen anzeigen
+                </Link>
+              </div>
             </div>
           )}
         </div>

@@ -91,6 +91,36 @@ export function toBerlinTime(date) {
 }
 
 /**
+ * Get today's date in Berlin timezone as YYYY-MM-DD string
+ * @returns {string} Today's date in YYYY-MM-DD format
+ */
+export function getTodayBerlinDateString() {
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: BERLIN_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  });
+  
+  const parts = formatter.formatToParts(new Date());
+  const year = parts.find(p => p.type === 'year').value;
+  const month = parts.find(p => p.type === 'month').value;
+  const day = parts.find(p => p.type === 'day').value;
+  
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Check if a date string is in the future compared to Berlin timezone
+ * @param {string} dateString - Date string in YYYY-MM-DD format
+ * @returns {boolean} True if date is in the future
+ */
+export function isFutureDateBerlin(dateString) {
+  const todayStr = getTodayBerlinDateString();
+  return dateString > todayStr; // String comparison works for YYYY-MM-DD format
+}
+
+/**
  * Check if a date is in the future (Berlin time)
  * @param {string|Date} date - Date to check
  * @returns {boolean} True if date is in the future
@@ -155,6 +185,8 @@ export default {
   formatFullDateToBerlin,
   getCurrentBerlinTime,
   toBerlinTime,
+  getTodayBerlinDateString,
+  isFutureDateBerlin,
   isFutureDate,
   getTimeDifference,
   formatRelativeTime

@@ -1,0 +1,1 @@
+Test the implentation with the connected browser. Check edge cases. Use the most comprehensive sucess definition for the tests. Do not start a new testserver. the port is 5173.
