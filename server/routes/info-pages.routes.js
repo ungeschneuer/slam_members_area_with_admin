@@ -26,7 +26,7 @@ router.get('/', async (req, res) => {
   try {
     const startTime = startTiming();
     const infoPages = await executeQuery(
-      'SELECT * FROM info_pages ORDER BY title',
+      'SELECT id, title, slug, content, excerpt, category, display_order, status, featured_image_url, meta_description, tags, is_published, published_at, created_at, updated_at FROM info_pages ORDER BY title',
       []
     );
     const duration = endTiming(startTime);
@@ -50,7 +50,7 @@ router.get('/:slug', async (req, res) => {
   
   try {
     const infoPage = await executeQuery(
-      'SELECT * FROM info_pages WHERE slug = $1',
+      'SELECT id, title, slug, content, excerpt, category, display_order, status, featured_image_url, meta_description, tags, is_published, published_at, created_at, updated_at FROM info_pages WHERE slug = $1',
       [slug]
     );
     const duration = endTiming(startTime);

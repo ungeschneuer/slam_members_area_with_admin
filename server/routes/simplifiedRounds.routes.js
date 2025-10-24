@@ -50,7 +50,7 @@ router.get('/:id', async (req, res) => {
       round = await simplifiedRoundsService.getRoundWithAssignments(roundId);
     } else {
       // Try to find by slug
-      const slugQuery = 'SELECT * FROM rounds WHERE slug = $1';
+      const slugQuery = 'SELECT id, title, location, address, description, after_play_report, photos_cloud_url, competition_type, total_jury_members, status, slug, date, start_time, end_time, version, groups, created_at, updated_at FROM rounds WHERE slug = $1';
       const slugResult = await executeQuery(slugQuery, [param]);
       
       if (slugResult.rows.length > 0) {

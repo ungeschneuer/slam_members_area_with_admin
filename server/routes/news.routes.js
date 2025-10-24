@@ -44,7 +44,7 @@ router.get('/', async (req, res) => {
   try {
     const startTime = startTiming();
     const news = await executeQuery(
-      'SELECT * FROM news ORDER BY published_at DESC',
+      'SELECT id, title, content, excerpt, category, priority, tags, status, featured_image_url, published_at, is_breaking_news, breaking_news_until, slug, created_at, updated_at FROM news ORDER BY published_at DESC',
       []
     );
     const duration = endTiming(startTime);
@@ -67,7 +67,7 @@ router.get('/breaking-news', async (req, res) => {
   try {
     const startTime = startTiming();
     const breakingNews = await executeQuery(
-      'SELECT * FROM news WHERE is_breaking_news = true AND (breaking_news_until IS NULL OR breaking_news_until > NOW()) ORDER BY published_at DESC',
+      'SELECT id, title, content, excerpt, category, published_at, featured_image_url, slug, breaking_news_until FROM news WHERE is_breaking_news = true AND (breaking_news_until IS NULL OR breaking_news_until > NOW()) ORDER BY published_at DESC',
       []
     );
     const duration = endTiming(startTime);
@@ -96,7 +96,7 @@ router.get('/:slug', async (req, res) => {
   
   try {
     const result = await executeQuery(
-      'SELECT * FROM news WHERE slug = $1',
+      'SELECT id, title, content, excerpt, category, priority, tags, status, featured_image_url, published_at, is_breaking_news, breaking_news_until, slug, created_at, updated_at FROM news WHERE slug = $1',
       [slug]
     );
     const duration = endTiming(startTime);

@@ -4,12 +4,13 @@ import authService from './services/authService.js';
 import { AdminLayout } from './components/admin/AdminLayout.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { usePageTitle } from './hooks/index.js';
+import logger from './services/logger.js';
 
 // Import all admin components
 import AdminDashboard from './components/admin/AdminDashboard.jsx';
 import AdminParticipants from './components/admin/AdminParticipants';
 import TeamsAdmin from './components/admin/TeamsAdmin.jsx';
-import AdminRounds from './components/admin/AdminRounds';
+import SimplifiedRoundsAdmin from './components/admin/SimplifiedRoundsAdmin.jsx';
 import AdminNews from './components/admin/AdminNews';
 import AdminNewsCreate from './components/admin/AdminNewsCreate.jsx';
 import AdminTimetable from './components/admin/AdminTimetable';
@@ -177,7 +178,7 @@ function AdminPanel() {
         {/* Competition */}
         <Route path="/participants" element={<AdminParticipants />} />
         <Route path="/teams" element={<TeamsAdmin />} />
-        <Route path="/rounds" element={<AdminRounds />} />
+        <Route path="/rounds" element={<SimplifiedRoundsAdmin />} />
         <Route path="/timetable" element={<AdminTimetable />} />
         
         {/* Content */}
@@ -211,7 +212,7 @@ export default function Admin() {
   useEffect(() => {
     const initializeAuth = async () => {
       try {
-        if (import.meta.env.DEV) console.log('Initializing admin authentication with cookies...');
+        logger.debug('Initializing admin authentication with cookies');
         
         // Prefer adminAuthService if available (test/mocked env)
         let adminAuthed = false;
@@ -226,7 +227,7 @@ export default function Admin() {
         } catch {}
 
         if (adminAuthed) {
-          if (import.meta.env.DEV) console.log('AdminAuthService indicates authenticated state');
+          logger.debug('AdminAuthService indicates authenticated state');
           setAuthed(true);
         } else {
           // Initialize the authService and fallback check (only if not already initializing)
@@ -236,15 +237,15 @@ export default function Admin() {
             }
           }
           if (typeof authService.isLoggedIn === 'function' && authService.isLoggedIn()) {
-            if (import.meta.env.DEV) console.log('Authentication successful via service:', authService.getCurrentUserSync?.());
+            logger.debug('Authentication successful via service', { user: authService.getCurrentUserSync?.() });
             setAuthed(true);
           } else {
-            if (import.meta.env.DEV) console.log('No valid authentication found');
+            logger.debug('No valid authentication found');
             setAuthed(false);
           }
         }
       } catch (error) {
-        if (import.meta.env.DEV) console.error('Authentication initialization failed:', error);
+        logger.error('Authentication initialization failed', { error: error.message });
         setAuthed(false);
       } finally {
         setLoading(false);
@@ -261,11 +262,11 @@ export default function Admin() {
         try {
           // Use authService to check authentication
           if (!authService.isLoggedIn()) {
-            if (import.meta.env.DEV) console.log('Authentication expired, logging out');
+            logger.debug('Authentication expired, logging out');
             setAuthed(false);
           }
         } catch (error) {
-          if (import.meta.env.DEV) console.error('Authentication check failed:', error);
+          logger.error('Authentication check failed', { error: error.message });
           setAuthed(false);
         }
       }, 60000); // Check every minute

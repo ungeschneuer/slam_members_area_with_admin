@@ -50,7 +50,7 @@ router.get('/', async (req, res) => {
     };
     
     const data = await executeQuery(
-      'SELECT * FROM city_tips ORDER BY name',
+      'SELECT id, name, category, description, address, latitude, longitude, price_range, opening_hours, contact_info, website, images, tips, status, slug, created_at, updated_at FROM city_tips ORDER BY name',
       []
     );
     
@@ -75,7 +75,7 @@ router.get('/:slug', async (req, res) => {
   
   try {
     const cityTip = await executeQuery(
-      'SELECT * FROM city_tips WHERE slug = $1',
+      'SELECT id, name, category, description, address, latitude, longitude, price_range, opening_hours, contact_info, website, images, tips, status, slug, created_at, updated_at FROM city_tips WHERE slug = $1',
       [slug]
     );
     const duration = endTiming(startTime);

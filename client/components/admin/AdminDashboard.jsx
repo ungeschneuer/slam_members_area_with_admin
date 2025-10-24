@@ -7,6 +7,7 @@ import { useTimetable } from '../../hooks/useTimetable.js';
 import { useCityTips } from '../../hooks/useCityTips.js';
 import { useInfoPages } from '../../hooks/useInfoPages.js';
 import LoadingSpinner from '../LoadingSpinner.jsx';
+import logger from '../../services/logger.js';
 // Service health monitoring removed - using simple polling instead
 
 // Dashboard Components
@@ -43,7 +44,7 @@ export default function AdminDashboard() {
       try {
         await loadDashboardData();
       } catch (error) {
-        if (import.meta.env.DEV) console.warn('AdminDashboard: Data loading failed:', error);
+        logger.warn('AdminDashboard: Data loading failed', { error: error.message });
       }
     };
 
@@ -67,8 +68,7 @@ export default function AdminDashboard() {
       // WebSocket service removed - using simple polling instead
 
       
-      // Debug logging
-      if (import.meta.env.DEV) console.log('AdminDashboard: Loaded data:', {
+      logger.debug('AdminDashboard: Loaded data', {
         participants: participants.length,
         rounds: rounds.length,
         news: news.length,
@@ -76,27 +76,24 @@ export default function AdminDashboard() {
         cityTips: cityTips.length,
         infoPages: infoPages.length
       });
-      if (import.meta.env.DEV) console.log('AdminDashboard: Dashboard data loaded successfully');
     } catch (err) {
       setDashboardError(err.message);
-      if (import.meta.env.DEV) console.error('Error loading dashboard data:', err);
+      logger.error('Error loading dashboard data', { error: err.message });
     } finally {
       setDashboardLoading(false);
     }
   };
 
   useEffect(() => {
-    // Log counts when data changes for debugging
-    if (import.meta.env.DEV) {
-      console.log('AdminDashboard: Current counts', {
-        participants: participants.length,
-        rounds: rounds.length,
-        news: news.length,
-        timetable: timetable.length,
-        cityTips: cityTips.length,
-        infoPages: infoPages.length
-      });
-    }
+    // Log counts when data changes
+    logger.debug('AdminDashboard: Current counts', {
+      participants: participants.length,
+      rounds: rounds.length,
+      news: news.length,
+      timetable: timetable.length,
+      cityTips: cityTips.length,
+      infoPages: infoPages.length
+    });
   }, [participants, rounds, news, timetable, cityTips, infoPages]);
 
 

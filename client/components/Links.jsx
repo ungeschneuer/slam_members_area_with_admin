@@ -110,7 +110,7 @@ const Links = () => {
       window.open(link.url, '_blank', 'noopener,noreferrer');
       
       // Track external link clicks (dev only)
-      if (import.meta.env.DEV) console.log(`External link clicked: ${link.title} -> ${link.url}`);
+      // External link tracking handled by analytics if configured
     }
   };
 

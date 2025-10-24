@@ -159,7 +159,7 @@ router.get('/:slug', async (req, res) => {
   
   try {
     const participant = await executeQuery(
-      'SELECT * FROM participants WHERE slug = $1',
+      'SELECT id, name, role, region, pronouns, instagram, slug, created_at, updated_at FROM participants WHERE slug = $1',
       [slug]
     );
     const duration = endTiming(startTime);
@@ -194,7 +194,7 @@ router.get('/', async (req, res) => {
     
     // Get paginated participants
     const participants = await executeQuery(
-      'SELECT * FROM participants ORDER BY name LIMIT $1 OFFSET $2',
+      'SELECT id, name, role, region, pronouns, instagram, slug, created_at, updated_at FROM participants ORDER BY name LIMIT $1 OFFSET $2',
       [limit, offset]
     );
     
