@@ -63,9 +63,32 @@ if (process.env.NODE_ENV === 'production') {
     logger.warn('JWT_SECRET contains common weak words. Consider using a cryptographically secure random string.');
   }
   
-  // Production-specific validations
-  if (process.env.DB_PASSWORD === 'slam25_secure_password_2025') {
-    throw new Error('DB_PASSWORD is using the default template value. Please set a secure production password.');
+  // Production-specific validations - Check all default secrets
+  const DEFAULT_SECRETS = {
+    JWT_SECRET: 'your_jwt_secret_key_here_change_this_in_production',
+    SESSION_SECRET: 'your_session_secret_here_change_this_in_production',
+    COOKIE_SECRET: 'your_cookie_secret_here_change_this_in_production',
+    DB_PASSWORD: 'slam25_secure_password_2025'
+  };
+
+  const secrets = [
+    { name: 'JWT_SECRET', value: process.env.JWT_SECRET },
+    { name: 'SESSION_SECRET', value: process.env.SESSION_SECRET },
+    { name: 'COOKIE_SECRET', value: process.env.COOKIE_SECRET },
+    { name: 'DB_PASSWORD', value: process.env.DB_PASSWORD }
+  ];
+  
+  const invalidSecrets = secrets.filter(secret => 
+    !secret.value || 
+    secret.value.length < 16 || 
+    secret.value === DEFAULT_SECRETS[secret.name]
+  );
+  
+  if (invalidSecrets.length > 0) {
+    const secretNames = invalidSecrets.map(s => s.name).join(', ');
+    logger.error(`SECURITY CRITICAL: Default or weak secrets detected in production: ${secretNames}`);
+    logger.error('Production requires strong, unique secrets. Please update your .env file.');
+    throw new Error(`Production security check failed: ${secretNames} must be changed from defaults and be at least 16 characters`);
   }
   
   if (process.env.FRONTEND_URL && !process.env.FRONTEND_URL.startsWith('https://')) {

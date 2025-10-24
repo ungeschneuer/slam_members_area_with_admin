@@ -136,7 +136,7 @@ router.put('/:id', ...adminMiddleware(), ...validateCityTipId, ...validateCityTi
   const { id } = req.params;
   try {
     const existing = await executeQuery(
-      'SELECT * FROM city_tips WHERE id = $1',
+      'SELECT id, name, category, description, address, latitude, longitude, price_range, opening_hours, contact_info, website, images, tips, status, slug, created_at, updated_at FROM city_tips WHERE id = $1',
       [parseInt(id)]
     );
     if (!existing) {

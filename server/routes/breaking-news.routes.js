@@ -17,7 +17,7 @@ router.get('/', async (req, res) => {
   try {
     const startTime = startTiming();
     const breakingNews = await executeQuery(
-      'SELECT * FROM news WHERE is_breaking_news = true AND (breaking_news_until IS NULL OR breaking_news_until > NOW()) ORDER BY published_at DESC',
+      'SELECT id, title, content, excerpt, category, published_at, featured_image_url, slug, breaking_news_until FROM news WHERE is_breaking_news = true AND (breaking_news_until IS NULL OR breaking_news_until > NOW()) ORDER BY published_at DESC',
       []
     );
     

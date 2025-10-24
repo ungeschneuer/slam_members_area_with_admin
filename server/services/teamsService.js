@@ -155,7 +155,7 @@ export class TeamsService {
   async updateTeam(teamId, teamData) {
     return await executeTransaction(async (client) => {
       // Get existing team
-      const existingTeam = await client.query('SELECT * FROM teams WHERE id = $1', [teamId]);
+      const existingTeam = await client.query('SELECT id, name, slug, role, instagram, created_at, updated_at FROM teams WHERE id = $1', [teamId]);
       if (existingTeam.rows.length === 0) {
         throw new Error('Team not found');
       }

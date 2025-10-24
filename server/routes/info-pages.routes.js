@@ -157,7 +157,7 @@ router.post('/:id/upload-image', ...adminMiddleware(), uploadInfoPageFile.single
     
     // Check if info page exists
     const pageResult = await executeQuery(
-      'SELECT * FROM info_pages WHERE id = $1',
+      'SELECT id, title, slug, content, excerpt, category, display_order, status, featured_image_url, meta_description, tags, is_published, published_at, created_at, updated_at FROM info_pages WHERE id = $1',
       [parseInt(id)]
     );
     

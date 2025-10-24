@@ -27,7 +27,7 @@ router.get('/:id', async (req, res) => {
   
   try {
     const result = await executeQuery(
-      'SELECT * FROM schnellzugriff_links WHERE id = $1',
+      'SELECT id, title, description, url, icon, color, sort_order, is_active, is_external, created_at, updated_at FROM schnellzugriff_links WHERE id = $1',
       [safeParseInt(req.params.id)]
     );
     const duration = endTiming(startTime);

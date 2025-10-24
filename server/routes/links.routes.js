@@ -23,7 +23,7 @@ router.get('/:id', async (req, res) => {
   
   try {
     const result = await executeQuery(
-      'SELECT * FROM links WHERE id = $1',
+      'SELECT id, title, description, url, icon, category, is_external, color, sort_order, is_active, created_at, updated_at FROM links WHERE id = $1',
       [safeParseInt(req.params.id)]
     );
     const duration = endTiming(startTime);
@@ -50,7 +50,7 @@ router.get('/', async (req, res) => {
   try {
     const startTime = startTiming();
     const result = await executeQuery(
-      'SELECT * FROM links WHERE is_active = true ORDER BY category, sort_order, title'
+      'SELECT id, title, description, url, icon, category, is_external, color, sort_order, is_active, created_at, updated_at FROM links WHERE is_active = true ORDER BY category, sort_order, title'
     );
     const duration = endTiming(startTime);
     

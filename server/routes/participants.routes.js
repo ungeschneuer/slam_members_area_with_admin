@@ -103,7 +103,8 @@ router.get('/search', async (req, res) => {
     
     // Get filtered participants with pagination
     const participantsQuery = `
-      SELECT * FROM participants 
+      SELECT id, name, role, region, pronouns, instagram, slug, created_at, updated_at
+      FROM participants 
       ${whereClause}
       ORDER BY name 
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
@@ -274,7 +275,7 @@ router.put('/:id', ...adminMiddleware(), async (req, res) => { // Optimistic loc
   // Merge current fields when inputs omitted
   try {
     const existing = await executeQuery(
-      'SELECT * FROM participants WHERE id = $1',
+      'SELECT id, name, role, region, pronouns, instagram, slug, created_at, updated_at FROM participants WHERE id = $1',
       [parseInt(id)]
     );
     if (!existing) {

@@ -18,7 +18,7 @@ router.get('/', async (req, res) => {
     const startTime = startTiming();
     
     const result = await executeQuery(
-      'SELECT * FROM countdown_config WHERE is_active = true ORDER BY updated_at DESC LIMIT 1',
+      'SELECT id, title, subtitle, target_date, button_text, button_emoji, button_link, is_active, created_at, updated_at FROM countdown_config WHERE is_active = true ORDER BY updated_at DESC LIMIT 1',
       []
     );
     

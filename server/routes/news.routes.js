@@ -282,7 +282,7 @@ router.post('/:id/upload-image', ...adminMiddleware(), uploadNewsFile.single('im
     
     // Check if news article exists
     const newsResult = await executeQuery(
-      'SELECT * FROM news WHERE id = $1',
+      'SELECT id, title, content, excerpt, category, priority, tags, status, featured_image_url, published_at, is_breaking_news, breaking_news_until, slug, created_at, updated_at FROM news WHERE id = $1',
       [parseInt(id)]
     );
     
