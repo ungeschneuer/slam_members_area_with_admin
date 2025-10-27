@@ -17,19 +17,26 @@ import { adminMiddleware } from '../middleware/simpleAuth.js';
 import logger from '../config/logger.js';
 import { sanitizeEntity } from '../utils/sanitization.js';
 import { uploadInfoPageFile, handleUploadError } from '../middleware/upload.js';
+import { rateLimitConfig } from '../config/security.js';
+import { UPLOAD_ERRORS, UPLOAD_SUCCESS_MESSAGES } from '../utils/uploadConstants.js';
+import { generateSlug, generateUniqueSlug, validateSlugInput } from '../utils/slugUtils.js';
+import { generateUniqueSlugInTransaction, generateRequestIdFromReq } from '../services/slugGenerationService.js';
+import { executeTransaction } from '../config/database.js';
 
 const router = express.Router();
 
 
-// Get info pages with basic information (simplified)
+// Get info pages with basic information (simplified) - ADMIN ONLY (all entries)
 router.get('/', async (req, res) => {
   try {
     const startTime = startTiming();
-    const infoPages = await executeQuery(
-      'SELECT * FROM info_pages ORDER BY title',
+    const result = await executeQuery(
+      'SELECT * FROM info_pages ORDER BY display_order, title',
       []
     );
     const duration = endTiming(startTime);
+    
+    const infoPages = result.rows || result;
     
     logger.info('Optimized info pages query completed', {
       duration: `${Math.round(duration)}ms`,
@@ -37,9 +44,33 @@ router.get('/', async (req, res) => {
       queryType: 'BASIC'
     });
     
-    sendSuccessResponse(res, infoPages.rows || infoPages, 'GET_INFO_PAGES', duration);
+    sendSuccessResponse(res, infoPages, 'GET_INFO_PAGES', duration);
   } catch (error) {
     sendErrorResponse(res, error, 'Failed to fetch info pages');
+  }
+});
+
+// Get published info pages for user view
+router.get('/published', async (req, res) => {
+  try {
+    const startTime = startTiming();
+    const result = await executeQuery(
+      'SELECT * FROM info_pages WHERE status = $1 ORDER BY display_order, title',
+      ['PUBLISHED']
+    );
+    const duration = endTiming(startTime);
+    
+    const infoPages = result.rows || result;
+    
+    logger.info('Published info pages query completed', {
+      duration: `${Math.round(duration)}ms`,
+      pageCount: infoPages.length,
+      queryType: 'PUBLISHED'
+    });
+    
+    sendSuccessResponse(res, infoPages, 'GET_PUBLISHED_INFO_PAGES', duration);
+  } catch (error) {
+    sendErrorResponse(res, error, 'Failed to fetch published info pages');
   }
 });
 
@@ -49,16 +80,18 @@ router.get('/:slug', async (req, res) => {
   const startTime = startTiming();
   
   try {
-    const infoPage = await executeQuery(
-      'SELECT * FROM info_pages WHERE slug = $1',
-      [slug]
+    const result = await executeQuery(
+      'SELECT * FROM info_pages WHERE slug = $1 AND status = $2',
+      [slug, 'PUBLISHED']
     );
     const duration = endTiming(startTime);
     
-    if (!infoPage) {
+    if (!result || result.rows.length === 0) {
       logger.info('Info page not found', { slug, duration: `${Math.round(duration)}ms` });
       return sendNotFoundResponse(res, 'Info page');
     }
+    
+    const infoPage = result.rows[0];
     
     logger.info('Optimized info page by slug query completed', {
       slug,
@@ -73,32 +106,58 @@ router.get('/:slug', async (req, res) => {
 });
 
 // Create info page (admin endpoint)
-router.post('/', ...adminMiddleware(), async (req, res) => { // Idempotency removed
-  // Sanitize input data to prevent XSS
-  const sanitizedData = sanitizeEntity.infoPage(req.body);
-  const { 
-    title, slug, content, excerpt, category, order, status, 
-    featured_image_url, meta_description, tags, is_published, published_at 
-  } = sanitizedData;
-  
-  // Normalize and coerce types
-  const normalizedData = normalizeData(sanitizedData, {
-    order: { type: 'int', fallback: 0 },
-    status: { type: 'string', fallback: 'DRAFT' }
-  });
-  const tagsArray = Array.isArray(tags) ? tags : (typeof tags === 'string' ? [tags] : []);
-  
-  await executeCrudOperation(
-    'create',
-    `INSERT INTO info_pages (title, slug, content, excerpt, category, display_order, status, 
-     featured_image_url, meta_description, tags, is_published, published_at) 
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
-    [title, slug, content, excerpt, category, normalizedData.order, normalizedData.status, 
-     featured_image_url, meta_description, tagsArray, is_published, published_at],
-    'info-pages',
-    'CREATE_INFO_PAGE',
-    res
-  );
+router.post('/', ...adminMiddleware(), async (req, res) => {
+  try {
+    // Sanitize input data to prevent XSS
+    const sanitizedData = sanitizeEntity.infoPage(req.body);
+    const { 
+      title, slug, content, excerpt, category, display_order, status, 
+      file_url, file_type, file_description, additional_links, tags, published_at 
+    } = sanitizedData;
+    
+    // Normalize and coerce types
+    const normalizedData = normalizeData(sanitizedData, {
+      display_order: { type: 'int', fallback: 0 },
+      status: { type: 'string', fallback: 'DRAFT' }
+    });
+    const tagsArray = Array.isArray(tags) ? tags : (typeof tags === 'string' ? [tags] : []);
+    const additionalLinksArray = Array.isArray(additional_links) ? additional_links : [];
+    
+    const startTime = startTiming();
+    
+        // Move slug generation inside transaction for atomicity
+        const infoPage = await executeTransaction(async (client) => {
+          // Generate unique slug using centralized service
+          const requestId = generateRequestIdFromReq(req);
+          const uniqueSlug = await generateUniqueSlugInTransaction(
+            client, 
+            title, 
+            'info_pages', 
+            requestId
+          );
+
+          // Create info page with unique slug
+          const result = await client.query(
+            `INSERT INTO info_pages (title, slug, content, excerpt, category, display_order, status,
+             file_url, file_type, file_description, additional_links, tags, published_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
+            [title, uniqueSlug, content, excerpt, category, normalizedData.display_order, normalizedData.status,
+             file_url, file_type, file_description, JSON.stringify(additionalLinksArray), tagsArray, published_at]
+          );
+
+          return result.rows[0];
+        });
+    
+    const duration = endTiming(startTime);
+    
+    res.status(201).json({
+      success: true,
+      data: infoPage,
+      meta: { queryType: 'CREATE_INFO_PAGE', duration }
+    });
+  } catch (error) {
+    sendErrorResponse(res, error, 'Failed to create info page');
+  }
 });
 
 // Update info page (admin endpoint)
@@ -106,22 +165,30 @@ router.put('/:id', ...adminMiddleware(), async (req, res) => { // Optimistic loc
   const { id } = req.params;
   // Sanitize input data to prevent XSS
   const sanitizedData = sanitizeEntity.infoPage(req.body);
+  
+  // Normalize and coerce types (same as CREATE route)
+  const normalizedData = normalizeData(sanitizedData, {
+    display_order: { type: 'int', fallback: 0 },
+    status: { type: 'string', fallback: 'DRAFT' }
+  });
+  
   const { 
-    title, slug, content, excerpt, category, order, status, 
-    featured_image_url, meta_description, tags, is_published, published_at 
+    title, slug, content, excerpt, category, 
+    file_url, file_type, file_description, additional_links, tags, published_at 
   } = sanitizedData;
   
-  // Coerce tags to text[]
+  // Coerce tags to text[] and additional_links to JSONB
   const tagsArray = Array.isArray(tags) ? tags : (typeof tags === 'string' ? [tags] : []);
+  const additionalLinksArray = Array.isArray(additional_links) ? additional_links : [];
   
   await executeCrudOperation(
     'update',
     `UPDATE info_pages SET title = $1, slug = $2, content = $3, excerpt = $4, 
-     category = $5, display_order = $6, status = $7, featured_image_url = $8, 
-     meta_description = $9, tags = $10, is_published = $11, published_at = $12, 
-     updated_at = NOW() WHERE id = $13 RETURNING *`,
-    [title, slug, content, excerpt, category, order, status, 
-     featured_image_url, meta_description, tagsArray, is_published, published_at, parseInt(id)],
+     category = $5, display_order = $6, status = $7, file_url = $8, 
+     file_type = $9, file_description = $10, additional_links = $11, tags = $12, published_at = $13, 
+     updated_at = NOW() WHERE id = $14 RETURNING *`,
+    [title, slug, content, excerpt, category, normalizedData.display_order, normalizedData.status, 
+     file_url, file_type, file_description, JSON.stringify(additionalLinksArray), tagsArray, published_at, parseInt(id)],
     'info-pages',
     'UPDATE_INFO_PAGE',
     res
@@ -142,16 +209,29 @@ router.delete('/:id', ...adminMiddleware(), async (req, res) => {
   );
 });
 
-// Upload image/PDF for info page (admin endpoint)
-router.post('/:id/upload-image', ...adminMiddleware(), uploadInfoPageFile.single('image'), handleUploadError, async (req, res) => {
+// Universal file upload for info page (admin endpoint)
+router.post('/:id/upload-file', ...adminMiddleware(), uploadInfoPageFile.single('file'), handleUploadError, async (req, res) => {
   try {
     const { id } = req.params;
+    const { description } = req.body; // Custom description from form
     const file = req.file;
     
     if (!file) {
       return res.status(400).json({
         success: false,
-        error: 'No file uploaded'
+        error: UPLOAD_ERRORS.NO_FILE
+      });
+    }
+    
+    // Detect file type based on mimetype
+    const fileType = file.mimetype.startsWith('image/') ? 'image' : 'pdf';
+    
+    // Validate file type
+    if (!['image/', 'application/pdf'].some(t => file.mimetype.includes(t))) {
+      fs.unlinkSync(file.path);
+      return res.status(400).json({
+        success: false,
+        error: 'Only images and PDFs are allowed'
       });
     }
     
@@ -170,30 +250,34 @@ router.post('/:id/upload-image', ...adminMiddleware(), uploadInfoPageFile.single
     const page = pageResult.rows[0];
     
     // Delete old file if it exists
-    if (page.featured_image_url) {
-      const oldFilePath = path.join(process.cwd(), 'public', page.featured_image_url);
+    if (page.file_url) {
+      const oldFilePath = path.join(process.cwd(), 'public', page.file_url);
       if (fs.existsSync(oldFilePath)) {
         fs.unlinkSync(oldFilePath);
       }
     }
     
-    // Update database with new file path
+    // Update database with new file path, type, and description
     const filePath = `/uploads/info-pages/${file.filename}`;
     await executeQuery(
-      'UPDATE info_pages SET featured_image_url = $1, updated_at = NOW() WHERE id = $2',
-      [filePath, parseInt(id)]
+      'UPDATE info_pages SET file_url = $1, file_type = $2, file_description = $3, updated_at = NOW() WHERE id = $4',
+      [filePath, fileType, description || '', parseInt(id)]
     );
     
     logger.info('Info page file uploaded successfully', {
       pageId: id,
       filename: file.filename,
-      filePath
+      filePath,
+      fileType,
+      description
     });
     
     res.json({
       success: true,
-      image: {
-        filePath: filePath
+      message: `File uploaded successfully`,
+      file: {
+        filePath: filePath,
+        fileType: fileType
       }
     });
   } catch (error) {

@@ -9,8 +9,8 @@ import ParticipantAssigner from './ParticipantAssigner.jsx';
 import JuryScoreManager from './JuryScoreManager.jsx';
 import ParticipantDropdown from './ParticipantDropdown.jsx';
 import { roundsService } from '../../services/roundsService.js';
-import { useParticipants } from '../../hooks/useParticipants.js';
-import { useTeams } from '../../hooks/useTeams.js';
+import { useParticipants } from '../../hooks/index.js';
+import { useTeams } from '../../hooks/index.js';
 import { getRoleOptions, CREW_ROLES } from '../../utils/crewRoleUtils.js';
 import { ErrorMessage, SuccessMessage } from '../StatusMessages.jsx';
 import { ADMIN_PARTICIPANTS_LIMIT } from '../../config/api.js';
@@ -250,7 +250,7 @@ export function RoundForm({
         validationErrors={errors}
       >
       {/* Basic Round Information */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
         <FormField
           name="title"
           control={control}
@@ -333,7 +333,7 @@ export function RoundForm({
         <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
           Wettbewerbseinstellungen
         </h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           <FormField
             name="competition_type"
             control={control}
@@ -364,7 +364,7 @@ export function RoundForm({
         <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 mb-4">
           <h5 className="font-medium text-gray-800 dark:text-gray-200 mb-3">Teilnehmer*in hinzufügen</h5>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <ParticipantDropdown
                 items={currentCompetitionType === 'Teamwettbewerb' ? teams : participants}
@@ -408,7 +408,7 @@ export function RoundForm({
                     );
                   }
                 }}
-                className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full sm:w-auto min-h-[44px] px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation active:scale-95"
                 disabled={!inputState.participant}
               >
                 Hinzufügen
@@ -431,7 +431,7 @@ export function RoundForm({
                 return (
                   <button
                     onClick={() => removeAssignment(globalIndex)}
-                    className="text-red-600 hover:text-red-800 text-sm"
+                    className="min-h-[44px] px-3 py-2 text-red-600 hover:text-red-800 text-sm touch-manipulation active:scale-95 rounded"
                   >
                     Entfernen
                   </button>
@@ -453,7 +453,7 @@ export function RoundForm({
         <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 mb-4">
           <h5 className="font-medium text-gray-800 dark:text-gray-200 mb-3">Moderator*in hinzufügen</h5>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <ParticipantDropdown
                 items={participants}
@@ -509,7 +509,7 @@ export function RoundForm({
                 return (
                   <button
                     onClick={() => removeAssignment(globalIndex)}
-                    className="text-red-600 hover:text-red-800 text-sm"
+                    className="min-h-[44px] px-3 py-2 text-red-600 hover:text-red-800 text-sm touch-manipulation active:scale-95 rounded"
                   >
                     Entfernen
                   </button>
@@ -531,7 +531,7 @@ export function RoundForm({
         <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 mb-4">
           <h5 className="font-medium text-gray-800 dark:text-gray-200 mb-3">Feature-Künstler*in hinzufügen</h5>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             <div>
               <ParticipantDropdown
                 items={participants}
@@ -613,7 +613,7 @@ export function RoundForm({
                 return (
                   <button
                     onClick={() => removeAssignment(globalIndex)}
-                    className="text-red-600 hover:text-red-800 text-sm"
+                    className="min-h-[44px] px-3 py-2 text-red-600 hover:text-red-800 text-sm touch-manipulation active:scale-95 rounded"
                   >
                     Entfernen
                   </button>
@@ -635,7 +635,7 @@ export function RoundForm({
         <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 mb-4">
           <h5 className="font-medium text-gray-800 dark:text-gray-200 mb-3">Crew-Mitglied hinzufügen</h5>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             <div>
               <ParticipantDropdown
                 items={participants}
@@ -704,7 +704,7 @@ export function RoundForm({
                     </h6>
                     <button
                       onClick={() => removeAssignment(globalIndex)}
-                      className="text-red-600 hover:text-red-800 text-sm"
+                      className="min-h-[44px] px-3 py-2 text-red-600 hover:text-red-800 text-sm touch-manipulation active:scale-95 rounded"
                     >
                       Alle Rollen entfernen
                     </button>
@@ -722,7 +722,7 @@ export function RoundForm({
                           </span>
                           <button
                             onClick={() => removeRoleFromAssignment(globalIndex, role)}
-                            className="text-red-600 hover:text-red-800 text-xs"
+                            className="min-h-[44px] px-2 py-1 text-red-600 hover:text-red-800 text-xs touch-manipulation active:scale-95 rounded"
                           >
                             Entfernen
                           </button>
@@ -824,16 +824,16 @@ export function RoundsList({
       key: 'actions', 
       label: 'Aktionen', 
       render: (_, round) => (
-        <div className="flex space-x-2">
+        <div className="flex flex-wrap gap-3">
           <button
             onClick={() => onEdit && onEdit(round)}
-            className="text-blue-600 hover:text-blue-800 text-sm"
+            className="min-h-[44px] px-3 py-2 text-blue-600 hover:text-blue-800 text-sm touch-manipulation active:scale-95 rounded"
           >
             Bearbeiten
           </button>
           <button
             onClick={() => onDelete && onDelete(round)}
-            className="text-red-600 hover:text-red-800 text-sm"
+            className="min-h-[44px] px-3 py-2 text-red-600 hover:text-red-800 text-sm touch-manipulation active:scale-95 rounded"
           >
             Löschen
           </button>
@@ -844,13 +844,13 @@ export function RoundsList({
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
           Wettbewerbsrunden
         </h2>
         <button
           onClick={onCreate}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full sm:w-auto min-h-[44px] px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 touch-manipulation active:scale-95"
         >
           Runde erstellen
         </button>

@@ -1,15 +1,15 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParticipants, useCreateParticipant, useUpdateParticipant, useDeleteParticipant, useBulkImportParticipants } from '../../hooks/index.js';
-// WebSocket hooks removed - using simple polling instead
-// WebSocket service removed - using simple polling instead
 import LoadingSpinner from '../LoadingSpinner';
 import { ErrorMessage, SuccessMessage } from '../StatusMessages.jsx';
 import PaginationControls from '../PaginationControls.jsx';
+import ConsolidatedAdminTable from './ConsolidatedAdminTable.jsx';
 import { useForm } from 'react-hook-form';
 import TextInput from '../forms/TextInput.jsx';
 import SelectInput from '../forms/SelectInput.jsx';
 import SearchFilters from '../forms/SearchFilters.jsx';
 import { formatInstagramUrl, normalizeInstagramInput, extractInstagramUsername } from '../../utils/instagramUtils.js';
+import { handleLinkClick } from '../../utils/linkUtils.js';
 import { generateSlug, generateUniqueSlug } from '../../utils/slugUtils.js';
 import { getRegionFlag } from '../../utils/detailViewUtils.js';
 import { downloadParticipantTemplate, downloadParticipantTemplateCSV, parseParticipantFile, checkForDuplicates } from '../../services/excelService.js';
@@ -29,8 +29,7 @@ export default function AdminParticipants() {
   const deleteParticipant = useDeleteParticipant();
   const bulkImport = useBulkImportParticipants();
   
-  // Initialize WebSocket integration for real-time updates
-  // WebSocket hooks removed - using simple polling instead
+  // Initialize real-time updates
   const [editingParticipant, setEditingParticipant] = useState(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [showBulkImport, setShowBulkImport] = useState(false);
@@ -67,7 +66,7 @@ export default function AdminParticipants() {
     defaultValues: {
       name: '',
       region: '',
-      role: 'Teilnehmer*in',
+      role: 'Wettbewerb-Teilnehmer*in',
       pronouns: '',
       instagram: ''
     }
@@ -81,7 +80,7 @@ export default function AdminParticipants() {
       name: '',
       slug: '',
       region: '',
-      role: 'Teilnehmer*in',
+      role: 'Wettbewerb-Teilnehmer*in',
       pronouns: '',
       instagram: ''
     }
@@ -117,7 +116,7 @@ export default function AdminParticipants() {
     'Chemnitz'
   ];
 
-  const roles = ['Teilnehmer*in', 'Supporter*in', 'Crew', 'SLAM-MC'];
+  const roles = ['Wettbewerb-Teilnehmer*in', 'Supporter*in', 'SLAM25-Team', 'SLAM-MC'];
 
   // Pronouns is now a free-form text field
 
@@ -125,9 +124,9 @@ export default function AdminParticipants() {
   useEffect(() => {
     const ensureAdminRoom = async () => {
       try {
-        // WebSocket service removed - using simple polling instead
+        // Real-time updates handled by polling
       } catch (e) {
-        console.warn('AdminParticipants: WebSocket admin room join failed:', e);
+        // Admin room join failed - handled silently
       }
     };
     ensureAdminRoom();
@@ -141,9 +140,9 @@ export default function AdminParticipants() {
     return Array.isArray(allParticipantsResponse) ? allParticipantsResponse : [];
   }, [allParticipantsResponse]);
 
-  // Filter all participants based on search and filters
+  // Filter and sort all participants based on search and filters
   const filteredParticipants = useMemo(() => {
-    return allParticipants.filter(participant => {
+    const filtered = allParticipants.filter(participant => {
       const matchesSearchTerm = (participant.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                                  (participant.region || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                                  (participant.role || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -153,6 +152,13 @@ export default function AdminParticipants() {
       const matchesRegionFilter = regionFilter === 'all' || (regionFilter === 'none' ? !participant.region : participant.region === regionFilter);
 
       return matchesSearchTerm && matchesRoleFilter && matchesRegionFilter;
+    });
+
+    // Sort by first character of name alphabetically
+    return filtered.sort((a, b) => {
+      const nameA = (a.name || '').toLowerCase();
+      const nameB = (b.name || '').toLowerCase();
+      return nameA.localeCompare(nameB);
     });
   }, [allParticipants, searchTerm, roleFilter, regionFilter]);
 
@@ -191,7 +197,7 @@ export default function AdminParticipants() {
             const normalized = normalizeInstagramInput(data.instagram);
             return extractInstagramUsername(normalized) || data.instagram.replace(/^@/, '');
           } catch (error) {
-            console.warn('Instagram normalization failed:', error);
+            // Instagram normalization failed - using original value
             return data.instagram.replace(/^@/, '');
           }
         })() : ''
@@ -204,7 +210,7 @@ export default function AdminParticipants() {
       setTimeout(() => setSuccess(null), 3000);
     } catch (error) {
       setFormError(error.message);
-      console.error('Error adding participant:', error);
+      // Error adding participant - handled by error state
     }
   };
 
@@ -214,7 +220,7 @@ export default function AdminParticipants() {
         name: editingParticipant.name || '',
         slug: editingParticipant.slug || '',
         region: editingParticipant.region || '',
-        role: editingParticipant.role || 'Teilnehmer*in',
+        role: editingParticipant.role || 'Wettbewerb-Teilnehmer*in',
         pronouns: editingParticipant.pronouns || '',
         instagram: editingParticipant.instagram || ''
       });
@@ -231,7 +237,7 @@ export default function AdminParticipants() {
             const normalized = normalizeInstagramInput(data.instagram);
             return extractInstagramUsername(normalized) || data.instagram.replace(/^@/, '');
           } catch (error) {
-            console.warn('Instagram normalization failed:', error);
+            // Instagram normalization failed - using original value
             return data.instagram.replace(/^@/, '');
           }
         })() : ''
@@ -242,7 +248,7 @@ export default function AdminParticipants() {
       setTimeout(() => setSuccess(null), 3000);
     } catch (error) {
       setFormError(error.message);
-      console.error('Error updating participant:', error);
+      // Error updating participant - handled by error state
     }
   };
 
@@ -253,7 +259,7 @@ export default function AdminParticipants() {
         setSuccess('Teilnehmer*innen erfolgreich gelöscht!');
         // Clear success message after 3 seconds
         setTimeout(() => setSuccess(null), 3000);
-        // Data will be automatically updated via WebSocket
+        // Data will be automatically updated via polling
       } catch (error) {
         // If backend returned 404 (already deleted), refresh silently and inform user
         const message = (error && error.message) ? String(error.message) : '';
@@ -264,7 +270,7 @@ export default function AdminParticipants() {
         } else {
           setFormError(error.message);
         }
-        console.error('Error deleting participant:', error);
+        // Error deleting participant - handled by error state
       }
     }
   };
@@ -344,7 +350,7 @@ export default function AdminParticipants() {
       }
       
     } catch (error) {
-      console.error('File validation error:', error);
+      // File validation error - handled by error state
       setImportError(`Validierung fehlgeschlagen: ${error.message}`);
       setImportState(prev => ({ ...prev, isProcessing: false, step: 'upload' }));
     }
@@ -382,7 +388,7 @@ export default function AdminParticipants() {
       }
       
     } catch (error) {
-      console.error('Import error:', error);
+      // Import error - handled by error state
       setImportError(`Import fehlgeschlagen: ${error.message}`);
       setImportState(prev => ({ ...prev, isProcessing: false, step: 'validation' }));
     }
@@ -409,9 +415,9 @@ export default function AdminParticipants() {
 
   const getRoleColor = (role) => {
     switch (role) {
-      case 'Teilnehmer*in': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
+      case 'Wettbewerb-Teilnehmer*in': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
       case 'Supporter*in': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200';
-      case 'Crew': return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200';
+      case 'SLAM25-Team': return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200';
       default: return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200';
     }
   };
@@ -474,22 +480,22 @@ export default function AdminParticipants() {
       )}
 
       {/* Header */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+      <div className="card-base p-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 space-y-4 sm:space-y-0">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Teilnehmer*innen verwalten</h2>
+            <h2 className="heading-primary mb-2">Teilnehmer*innen verwalten</h2>
             <p className="text-gray-600 dark:text-gray-400">Fügen Sie neue Teilnehmer*innen hinzu oder bearbeiten Sie bestehende</p>
           </div>
           <div className="flex flex-col sm:flex-row gap-3">
             <button
               onClick={() => setShowBulkImport(true)}
-              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2"
+              className="w-full sm:w-auto min-h-[44px] px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 touch-manipulation active:scale-95"
             >
               Datei importieren
             </button>
             <button
               onClick={() => setShowAddForm(!showAddForm)}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              className="w-full sm:w-auto min-h-[44px] btn-primary touch-manipulation active:scale-95"
             >
               {showAddForm ? 'Abbrechen' : 'Teilnehmer*innen hinzufügen'}
             </button>
@@ -512,18 +518,18 @@ export default function AdminParticipants() {
                 <TextInput label="" name="pronouns" register={register} errors={errors} placeholder="Pronomen (z.B. er/ihm, sie/ihr, they/them)" />
                 <TextInput label="" name="instagram" register={register} errors={errors} placeholder="Instagram-Benutzername (optional, z. B. @john_doe oder john_doe)" />
               </div>
-              <div className="flex space-x-3">
+              <div className="flex flex-col sm:flex-row gap-3">
                 <button
                   type="submit"
                   disabled={isSubmitting || createParticipant.isPending}
-                  className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-70"
+                  className="w-full sm:w-auto min-h-[44px] px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-70 touch-manipulation active:scale-95"
                 >
                   {isSubmitting || createParticipant.isPending ? 'Hinzufügen...' : 'Hinzufügen'}
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowAddForm(false)}
-                  className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+                  className="w-full sm:w-auto min-h-[44px] px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 touch-manipulation active:scale-95"
                 >
                   Abbrechen
                 </button>
@@ -558,77 +564,84 @@ export default function AdminParticipants() {
         />
 
         {/* Participants Table */}
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-            <thead className="bg-gray-50 dark:bg-gray-700">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Name</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Rolle</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Region</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Pronomen</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Instagram</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Aktionen</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-              {paginatedParticipants.map((participant) => (
-                <tr key={participant.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div className="text-sm font-medium text-gray-900 dark:text-white">{participant.name}</div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRoleColor(participant.role)}`}>
-                      {participant.role}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                    {participant.region ? (
-                      <div className="flex items-center space-x-2">
-                        <span>{getRegionFlag(participant.region)}</span>
-                        <span>{participant.region}</span>
-                      </div>
-                    ) : (
-                      <span className="text-gray-400">-</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                    {participant.pronouns || '-'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                    {participant.instagram ? (
-                      <a
-                        href={formatInstagramUrl(participant.instagram)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-pink-600 hover:text-pink-700 transition-colors"
-                      >
-                        Instagram
-                      </a>
-                    ) : '-'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => setEditingParticipant(participant)}
-                        className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
-                      >
-                        Bearbeiten
-                      </button>
-                      <button
-                        onClick={() => handleDelete(participant.id)}
-                        className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 transition-colors"
-                      >
-                        Löschen
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <ConsolidatedAdminTable
+          columns={[
+            {
+              key: 'name',
+              label: 'Name',
+              render: (value) => (
+                <div className="text-sm font-medium text-gray-900 dark:text-white">{value}</div>
+              )
+            },
+            {
+              key: 'role',
+              label: 'Rolle',
+              render: (value) => (
+                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRoleColor(value)}`}>
+                  {value}
+                </span>
+              )
+            },
+            {
+              key: 'region',
+              label: 'Region',
+              render: (value) => (
+                value ? (
+                  <div className="flex items-center space-x-2">
+                    <span>{getRegionFlag(value)}</span>
+                    <span>{value}</span>
+                  </div>
+                ) : (
+                  <span className="text-gray-400">-</span>
+                )
+              )
+            },
+            {
+              key: 'pronouns',
+              label: 'Pronomen',
+              render: (value) => value || '-'
+            },
+            {
+              key: 'instagram',
+              label: 'Instagram',
+              render: (value) => (
+                value ? (
+                  <a
+                    href={formatInstagramUrl(value)}
+                    onClick={(e) => {
+                      const instagramLink = {
+                        url: formatInstagramUrl(value),
+                        title: `Instagram Profil von ${value}`,
+                        is_external: true
+                      };
+                      handleLinkClick(instagramLink, e);
+                    }}
+                    className="text-pink-600 hover:text-pink-700 transition-colors"
+                  >
+                    Instagram
+                  </a>
+                ) : '-'
+              )
+            }
+          ]}
+          data={paginatedParticipants}
+          actions={(participant) => (
+            <>
+              <button
+                onClick={() => setEditingParticipant(participant)}
+                className="min-h-[44px] min-w-[44px] px-4 py-2 text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 transition-colors touch-manipulation active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-500 rounded"
+              >
+                Bearbeiten
+              </button>
+              <button
+                onClick={() => handleDelete(participant.id)}
+                className="min-h-[44px] min-w-[44px] px-4 py-2 text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 transition-colors touch-manipulation active:scale-95 focus-visible:ring-2 focus-visible:ring-red-500 rounded"
+              >
+                Löschen
+              </button>
+            </>
+          )}
+        />
 
         {paginatedParticipants.length === 0 && (
           <div className="text-center py-12">
@@ -662,7 +675,7 @@ export default function AdminParticipants() {
       {/* Edit Participant Modal */}
       {editingParticipant && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md sm:max-w-lg w-full max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Teilnehmer*innen bearbeiten</h3>
             <form onSubmit={handleEditSubmit(onEditSubmit)} className="space-y-4">
               <div>
@@ -731,18 +744,18 @@ export default function AdminParticipants() {
                 {...registerEdit('instagram')}
                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
               />
-              <div className="flex space-x-3">
+              <div className="flex flex-col sm:flex-row gap-3">
                 <button
                   type="submit"
                   disabled={isEditSubmitting || updateParticipant.isPending}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-70"
+                  className="w-full sm:flex-1 min-h-[44px] btn-primary disabled:opacity-70 touch-manipulation active:scale-95"
                 >
                   {isEditSubmitting || updateParticipant.isPending ? 'Speichern...' : 'Speichern'}
                 </button>
                 <button
                   type="button"
                   onClick={() => setEditingParticipant(null)}
-                  className="flex-1 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+                  className="w-full sm:flex-1 min-h-[44px] px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 touch-manipulation active:scale-95"
                 >
                   Abbrechen
                 </button>
@@ -779,16 +792,16 @@ export default function AdminParticipants() {
                   <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-3">
                     1. Vorlage herunterladen
                   </h4>
-                  <div className="flex gap-3">
+                  <div className="flex flex-col sm:flex-row gap-3">
                     <button
                       onClick={handleDownloadTemplate}
-                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                      className="w-full sm:w-auto min-h-[44px] px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 touch-manipulation active:scale-95"
                     >
                       Excel Vorlage (.xlsx)
                     </button>
                     <button
                       onClick={handleDownloadTemplateCSV}
-                      className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
+                      className="w-full sm:w-auto min-h-[44px] px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 touch-manipulation active:scale-95"
                     >
                       CSV Vorlage (.csv)
                     </button>
@@ -821,7 +834,7 @@ export default function AdminParticipants() {
                         e.stopPropagation();
                         fileInputRef.current?.click();
                       }}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                      className="min-h-[44px] px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 touch-manipulation active:scale-95"
                     >
                       Datei auswählen
                     </button>
@@ -896,10 +909,10 @@ export default function AdminParticipants() {
                 )}
 
                 {/* Action Buttons */}
-                <div className="flex justify-end space-x-3 mt-6">
+                <div className="flex flex-col sm:flex-row gap-3 mt-6">
                   <button
                     onClick={resetImport}
-                    className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+                    className="w-full sm:w-auto min-h-[44px] px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 touch-manipulation active:scale-95"
                   >
                     Abbrechen
                   </button>
@@ -907,7 +920,7 @@ export default function AdminParticipants() {
                     <button
                       onClick={handleConfirmImport}
                       disabled={bulkImport.isPending}
-                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                      className="w-full sm:w-auto min-h-[44px] px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 touch-manipulation active:scale-95"
                     >
                       {importState.validationResults.validRows} Teilnehmer importieren
                     </button>
@@ -975,10 +988,10 @@ export default function AdminParticipants() {
                 )}
 
                 {/* Action Buttons */}
-                <div className="flex justify-end space-x-3">
+                <div className="flex justify-end">
                   <button
                     onClick={handleCloseBulkImport}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                    className="min-h-[44px] px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 touch-manipulation active:scale-95"
                   >
                     Fertig
                   </button>

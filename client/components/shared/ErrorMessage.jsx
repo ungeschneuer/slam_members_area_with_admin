@@ -97,7 +97,7 @@ export function ErrorMessage({
             </details>
           )}
           
-          {context && process.env.NODE_ENV === 'development' && (
+          {context && import.meta.env.DEV && (
             <div className="text-xs opacity-60 mb-2">
               <strong>Kontext:</strong> {JSON.stringify(context)}
             </div>

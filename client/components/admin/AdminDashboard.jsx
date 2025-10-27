@@ -1,11 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { useParticipants } from '../../hooks/useParticipants.js';
-import { useRounds } from '../../hooks/useRounds.js';
-import { useNews } from '../../hooks/useNews.js';
-import { useTimetable } from '../../hooks/useTimetable.js';
-import { useCityTips } from '../../hooks/useCityTips.js';
-import { useInfoPages } from '../../hooks/useInfoPages.js';
+import { useParticipants } from '../../hooks/index.js';
+import { useRounds, useNews, useTimetable, useCityTips, useInfoPages } from '../../hooks/index.js';
 import LoadingSpinner from '../LoadingSpinner.jsx';
 // Service health monitoring removed - using simple polling instead
 
@@ -13,7 +9,6 @@ import LoadingSpinner from '../LoadingSpinner.jsx';
 // QuickStats component removed as part of simplification
 // QuickActions component removed as part of simplification
 
-// WebSocket service removed - using simple polling instead
 
 export default function AdminDashboard() {
   // Use TanStack Query hooks for data fetching with admin flag for immediate updates
@@ -37,13 +32,12 @@ export default function AdminDashboard() {
   const loading = participantsLoading || roundsLoading || newsLoading || timetableLoading || cityTipsLoading || infoPagesLoading;
   const error = participantsError || roundsError || newsError || timetableError || cityTipsError || infoPagesError;
 
-  // WebSocket service removed - using simple polling instead
   useEffect(() => {
     const loadData = async () => {
       try {
         await loadDashboardData();
       } catch (error) {
-        if (import.meta.env.DEV) console.warn('AdminDashboard: Data loading failed:', error);
+        // Data loading failed - handled silently
       }
     };
 
@@ -64,39 +58,19 @@ export default function AdminDashboard() {
     setDashboardLoading(true);
     setDashboardError(null);
     try {
-      // WebSocket service removed - using simple polling instead
 
       
-      // Debug logging
-      if (import.meta.env.DEV) console.log('AdminDashboard: Loaded data:', {
-        participants: participants.length,
-        rounds: rounds.length,
-        news: news.length,
-        timetable: timetable.length,
-        cityTips: cityTips.length,
-        infoPages: infoPages.length
-      });
-      if (import.meta.env.DEV) console.log('AdminDashboard: Dashboard data loaded successfully');
+      // Data loaded successfully
     } catch (err) {
       setDashboardError(err.message);
-      if (import.meta.env.DEV) console.error('Error loading dashboard data:', err);
+      // Error loading dashboard data - handled by error state
     } finally {
       setDashboardLoading(false);
     }
   };
 
   useEffect(() => {
-    // Log counts when data changes for debugging
-    if (import.meta.env.DEV) {
-      console.log('AdminDashboard: Current counts', {
-        participants: participants.length,
-        rounds: rounds.length,
-        news: news.length,
-        timetable: timetable.length,
-        cityTips: cityTips.length,
-        infoPages: infoPages.length
-      });
-    }
+    // Data counts updated
   }, [participants, rounds, news, timetable, cityTips, infoPages]);
 
 
@@ -140,7 +114,7 @@ export default function AdminDashboard() {
 
       {/* Actions */}
       <div className="flex flex-wrap gap-3">
-        <Link to="/admin/news/new" className="inline-flex items-center px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors">
+        <Link to="/admin/news/new" className="inline-flex items-center px-3 py-2 rounded-lg bg-[#185757] dark:bg-[#A2D2B9] hover:bg-[#0f3a3b] dark:hover:bg-[#8BC4A3] text-white dark:text-gray-900 text-sm font-medium transition-colors">
           + Neue Nachricht
         </Link>
         <Link to="/admin/participants" className="inline-flex items-center px-3 py-2 rounded-lg bg-gray-900 hover:bg-black text-white text-sm font-medium transition-colors dark:bg-gray-700 dark:hover:bg-gray-600">

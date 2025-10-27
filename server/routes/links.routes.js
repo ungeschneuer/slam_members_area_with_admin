@@ -60,7 +60,13 @@ router.get('/', async (req, res) => {
       queryType: 'DIRECT'
     });
     
-    sendSuccessResponse(res, result.rows, 'GET_LINKS', duration);
+    // Map database fields to client fields
+    const mappedRows = result.rows.map(row => ({
+      ...row,
+      sortOrder: row.sort_order
+    }));
+    
+    sendSuccessResponse(res, mappedRows, 'GET_LINKS', duration);
   } catch (error) {
     sendErrorResponse(res, error, 'Failed to fetch links');
   }
@@ -79,10 +85,10 @@ router.post('/', ...adminMiddleware(), async (req, res) => { // Idempotency remo
     icon: sanitizedData.icon || '🔗',
     category: sanitizedData.category || 'Sonstiges',
     // Correct boolean handling: treat false/'false' as false, everything else as true if not explicitly false
-    isExternal: sanitizedData.isExternal !== false && sanitizedData.isExternal !== 'false',
+    is_external: sanitizedData.is_external !== false && sanitizedData.is_external !== 'false',
     color: sanitizedData.color || 'blue',
-    sortOrder: parseInt(sanitizedData.sortOrder) || 0,
-    isActive: sanitizedData.isActive !== false && sanitizedData.isActive !== 'false'
+    sort_order: parseInt(sanitizedData.sort_order) || 0,
+    is_active: sanitizedData.is_active !== false && sanitizedData.is_active !== 'false'
   };
   
   await executeCrudOperation(
@@ -91,8 +97,8 @@ router.post('/', ...adminMiddleware(), async (req, res) => { // Idempotency remo
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
      RETURNING *`,
     [normalizedData.title, normalizedData.description, normalizedData.url, 
-     normalizedData.icon, normalizedData.category, normalizedData.isExternal, 
-     normalizedData.color, normalizedData.sortOrder, normalizedData.isActive],
+     normalizedData.icon, normalizedData.category, normalizedData.is_external, 
+     normalizedData.color, normalizedData.sort_order, normalizedData.is_active],
     'links',
     'CREATE_LINK',
     res
@@ -121,18 +127,18 @@ router.put('/:id', ...adminMiddleware(), async (req, res) => { // Optimistic loc
     url: sanitizedData.url,
     icon: sanitizedData.icon || '🔗',
     category: sanitizedData.category || 'Sonstiges',
-    isExternal: sanitizedData.isExternal !== false && sanitizedData.isExternal !== 'false',
+    is_external: sanitizedData.is_external !== false && sanitizedData.is_external !== 'false',
     color: sanitizedData.color || 'blue',
-    sortOrder: parseInt(sanitizedData.sortOrder) || 0,
-    isActive: sanitizedData.isActive !== false && sanitizedData.isActive !== 'false'
+    sort_order: parseInt(sanitizedData.sort_order) || 0,
+    is_active: sanitizedData.is_active !== false && sanitizedData.is_active !== 'false'
   };
   
   // Log normalized data
   logger.info('Links UPDATE normalized data', {
     normalizedData,
     params: [normalizedData.title, normalizedData.description, normalizedData.url, 
-             normalizedData.icon, normalizedData.category, normalizedData.isExternal, 
-             normalizedData.color, normalizedData.sortOrder, normalizedData.isActive, parseInt(id)]
+             normalizedData.icon, normalizedData.category, normalizedData.is_external, 
+             normalizedData.color, normalizedData.sort_order, normalizedData.is_active, parseInt(id)]
   });
   
   await executeCrudOperation(
@@ -143,8 +149,8 @@ router.put('/:id', ...adminMiddleware(), async (req, res) => { // Optimistic loc
      WHERE id = $10
      RETURNING *`,
     [normalizedData.title, normalizedData.description, normalizedData.url, 
-     normalizedData.icon, normalizedData.category, normalizedData.isExternal, 
-     normalizedData.color, normalizedData.sortOrder, normalizedData.isActive, parseInt(id)],
+     normalizedData.icon, normalizedData.category, normalizedData.is_external, 
+     normalizedData.color, normalizedData.sort_order, normalizedData.is_active, parseInt(id)],
     'links',
     'UPDATE_LINK',
     res

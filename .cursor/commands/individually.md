@@ -1,0 +1,1 @@
+Go through every single component individually and check the code. Do not skip any component.

@@ -45,7 +45,7 @@ export default function PaginationControls({
           id="page-size"
           value={pageSize}
           onChange={(e) => handlePageSizeChange(parseInt(e.target.value))}
-          className="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+          className="filter-select"
         >
           {pageSizeOptions.map(size => (
             <option key={size} value={size}>{size}</option>
@@ -76,7 +76,7 @@ export default function PaginationControls({
           <button
             onClick={() => handlePageChange(1)}
             disabled={currentPage === 1}
-            className="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-gray-800 dark:text-white"
+            className="pagination-btn"
             aria-label="Erste Seite"
           >
             ««
@@ -85,7 +85,7 @@ export default function PaginationControls({
           <button
             onClick={() => handlePageChange(currentPage - 1)}
             disabled={currentPage === 1}
-            className="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-gray-800 dark:text-white"
+            className="pagination-btn"
             aria-label="Vorherige Seite"
           >
             ‹
@@ -109,11 +109,7 @@ export default function PaginationControls({
                 <button
                   key={pageNum}
                   onClick={() => handlePageChange(pageNum)}
-                  className={`px-3 py-1 text-sm border rounded-md ${
-                    currentPage === pageNum
-                      ? 'bg-blue-600 text-white border-blue-600'
-                      : 'border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-800 dark:text-white'
-                  }`}
+                  className={currentPage === pageNum ? 'pagination-btn-active' : 'pagination-btn'}
                   aria-label={`Seite ${pageNum}`}
                   aria-current={currentPage === pageNum ? 'page' : undefined}
                 >
@@ -126,7 +122,7 @@ export default function PaginationControls({
           <button
             onClick={() => handlePageChange(currentPage + 1)}
             disabled={currentPage === totalPages}
-            className="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-gray-800 dark:text-white"
+            className="pagination-btn"
             aria-label="Nächste Seite"
           >
             ›
@@ -135,7 +131,7 @@ export default function PaginationControls({
           <button
             onClick={() => handlePageChange(totalPages)}
             disabled={currentPage === totalPages}
-            className="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-gray-800 dark:text-white"
+            className="pagination-btn"
             aria-label="Letzte Seite"
           >
             »»

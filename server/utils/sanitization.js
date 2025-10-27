@@ -88,39 +88,6 @@ export const sanitizeObject = (obj, textFields = [], htmlFields = []) => {
   return sanitized;
 };
 
-/**
- * Normalize incoming object keys to snake_case and warn on camelCase usage
- * - Moves values from camelCase keys to snake_case counterparts if missing
- * - Removes camelCase keys to enforce consistency
- */
-const normalizeKeysToSnakeCase = (data, entityName = 'unknown') => {
-  if (!data || typeof data !== 'object' || Array.isArray(data)) return data;
-  const normalized = { ...data };
-  const camelCaseKeys = [];
-  const toSnake = (key) => key
-    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
-    .replace(/[-\s]+/g, '_')
-    .toLowerCase();
-
-  Object.keys(data).forEach((key) => {
-    if (/.*[A-Z].*/.test(key)) {
-      const snake = toSnake(key);
-      camelCaseKeys.push({ from: key, to: snake });
-      if (normalized[snake] === undefined) {
-        normalized[snake] = data[key];
-      }
-      delete normalized[key];
-    }
-  });
-
-  if (camelCaseKeys.length > 0) {
-    logger.warn('camelCase fields received; normalized to snake_case', {
-      entity: entityName,
-      fields: camelCaseKeys,
-    });
-  }
-  return normalized;
-};
 
 /**
  * Sanitize request body for different entity types
@@ -133,13 +100,10 @@ export const sanitizeEntity = {
   ),
   
   // Sanitize news data
-  news: (data) => {
-    const normalized = normalizeKeysToSnakeCase(data, 'news');
-    return sanitizeObject(normalized,
-      ['title', 'excerpt', 'category', 'slug'],
-      ['content']
-    );
-  },
+  news: (data) => sanitizeObject(data,
+    ['title', 'excerpt', 'category', 'slug'],
+    ['content']
+  ),
   
   // Sanitize city tip data
   cityTip: (data) => sanitizeObject(data,
@@ -148,43 +112,70 @@ export const sanitizeEntity = {
   ),
   
   // Sanitize round data
-  round: (data) => {
-    const normalized = normalizeKeysToSnakeCase(data, 'round');
-    return sanitizeObject(normalized,
-      ['title', 'location', 'address', 'description', 'slug', 'photos_cloud_url'],
-      []
-    );
-  },
-  
-  // Sanitize timetable data
-  timetable: (data) => {
-    const normalized = normalizeKeysToSnakeCase(data, 'timetable');
-    return sanitizeObject(normalized,
-      ['title', 'description', 'location', 'slug'],
-      []
-    );
-  },
-  
-  // Sanitize link data
-  link: (data) => sanitizeObject(data,
-    ['title', 'description', 'url', 'icon', 'category', 'color'],
+  round: (data) => sanitizeObject(data,
+    ['title', 'location', 'address', 'description', 'slug', 'photos_cloud_url'],
     []
   ),
   
+  // Sanitize timetable data
+  timetable: (data) => sanitizeObject(data,
+    ['title', 'description', 'location', 'address', 'slug'],
+    []
+  ),
+  
+  // Sanitize link data
+  link: (data) => {
+    // Preserve boolean and number fields
+    const sanitized = sanitizeObject(data,
+      ['title', 'description', 'url', 'icon', 'category', 'color'],
+      []
+    );
+    
+    // Preserve fields that shouldn't be sanitized
+    if (data.sortOrder !== undefined) sanitized.sortOrder = data.sortOrder;
+    if (data.isActive !== undefined) sanitized.isActive = data.isActive;
+    if (data.isExternal !== undefined) sanitized.isExternal = data.isExternal;
+    if (data.sort_order !== undefined) sanitized.sort_order = data.sort_order;
+    if (data.is_active !== undefined) sanitized.is_active = data.is_active;
+    if (data.is_external !== undefined) sanitized.is_external = data.is_external;
+    
+    return sanitized;
+  },
+  
   // Sanitize info page data
   infoPage: (data) => {
-    const normalized = normalizeKeysToSnakeCase(data, 'infoPage');
-    return sanitizeObject(normalized,
-      ['title', 'content', 'slug'],
+    // Sanitize additional_links array
+    if (data.additional_links && Array.isArray(data.additional_links)) {
+      data.additional_links = data.additional_links.map(link => ({
+        title: sanitizeText(link.title || ''),
+        url: sanitizeUrl(link.url || '')
+      }));
+    }
+    
+    return sanitizeObject(data,
+      ['title', 'content', 'slug', 'file_url', 'file_description'],
       []
     );
   },
   
   // Sanitize schnellzugriff data
-  schnellzugriff: (data) => sanitizeObject(data,
-    ['title', 'description', 'url', 'icon', 'color'],
-    []
-  ),
+  schnellzugriff: (data) => {
+    // Preserve boolean and number fields
+    const sanitized = sanitizeObject(data,
+      ['title', 'description', 'url', 'icon', 'color'],
+      []
+    );
+    
+    // Preserve fields that shouldn't be sanitized
+    if (data.sortOrder !== undefined) sanitized.sortOrder = data.sortOrder;
+    if (data.isActive !== undefined) sanitized.isActive = data.isActive;
+    if (data.isExternal !== undefined) sanitized.isExternal = data.isExternal;
+    if (data.sort_order !== undefined) sanitized.sort_order = data.sort_order;
+    if (data.is_active !== undefined) sanitized.is_active = data.is_active;
+    if (data.is_external !== undefined) sanitized.is_external = data.is_external;
+    
+    return sanitized;
+  },
   
   // Sanitize breaking news data
   breakingNews: (data) => sanitizeObject(data,
@@ -194,7 +185,7 @@ export const sanitizeEntity = {
   
   // Sanitize countdown config data
   countdown: (data) => sanitizeObject(data,
-    ['title', 'subtitle', 'button_text', 'button_emoji', 'button_link'],
-    []
+    ['title', 'subtitle', 'button_text', 'button_emoji', 'button_link', 'target_date'],
+    ['is_active']
   )
 };

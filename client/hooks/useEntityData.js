@@ -9,8 +9,8 @@ import { useQuery } from '@tanstack/react-query';
 export function useEntityData(entityType, fetchFn, options = {}) {
   const { 
     filters = {}, 
-    staleTime = 5 * 60 * 1000, 
-    gcTime = 10 * 60 * 1000, 
+    staleTime = 10 * 60 * 1000,  // 10 minutes (was 5 minutes)
+    gcTime = 20 * 60 * 1000,     // 20 minutes (was 10 minutes)
     enabled = true,
     refetchInterval = false, // No polling by default - let entities opt-in
     isAdmin = false, // Add admin flag for polling configuration

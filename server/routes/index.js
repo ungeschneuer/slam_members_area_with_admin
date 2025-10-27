@@ -11,7 +11,8 @@ import timetableRouter from './timetable.routes.js';
 import linksRouter from './links.routes.js';
 import schnellzugriffRouter from './schnellzugriff.routes.js';
 import infoPagesRouter from './info-pages.routes.js';
-import { settingsRouter } from './settings.routes.js';
+import settingsRouter from './settings.routes.js';
+import userAuthRouter from './userAuth.routes.js';
 // System and bulk routes removed - using simple routes instead
 
 const router = express.Router();
@@ -30,13 +31,14 @@ router.use('/links', linksRouter);
 router.use('/schnellzugriff', schnellzugriffRouter);
 router.use('/info-pages', infoPagesRouter);
 router.use('/settings', settingsRouter);
+router.use('/user-auth', userAuthRouter);
 
 // Direct breaking-news route for backward compatibility
-import { breakingNewsRouter } from './breaking-news.routes.js';
+import breakingNewsRouter from './breaking-news.routes.js';
 router.use('/breaking-news', breakingNewsRouter);
 
 // Countdown config route
-import { countdownConfigRouter } from './countdown-config.routes.js';
+import countdownConfigRouter from './countdown-config.routes.js';
 router.use('/countdown-config', countdownConfigRouter);
 // System and bulk routes removed - using simple routes instead
 

@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { API_URL } from '../config/api.js';
 import authService from '../services/authService.js';
 import { useEntityData } from './useEntityData.js';
+import { getQueryConfig } from '../config/polling.js';
 
 // Query keys for city tips
 export const cityTipsKeys = {
@@ -29,7 +30,7 @@ export function useCityTips(filters = {}, isAdmin = false) {
       const data = result?.data?.data?.rows || result?.data?.rows || result?.data || result;
       return Array.isArray(data) ? data : [];
     },
-    { filters, staleTime: 10 * 60 * 1000, gcTime: 30 * 60 * 1000, isAdmin }
+    { filters, ...getQueryConfig('cityTips', isAdmin), isAdmin }
   );
 }
 
@@ -49,8 +50,7 @@ export function useCityTip(id) {
       return result?.data || result || null;
     },
     enabled: !!id,
-    staleTime: 10 * 60 * 1000,
-    gcTime: 30 * 60 * 1000,
+    ...getQueryConfig('cityTips', false, { refetchInterval: false }), // Detail pages don't need polling
   });
 }
 
@@ -75,8 +75,7 @@ export function useCityTipBySlug(slug) {
       return null;
     },
     enabled: !!slug,
-    staleTime: 10 * 60 * 1000,
-    gcTime: 30 * 60 * 1000,
+    ...getQueryConfig('cityTips', false, { refetchInterval: false }), // Detail pages don't need polling
   });
 }
 

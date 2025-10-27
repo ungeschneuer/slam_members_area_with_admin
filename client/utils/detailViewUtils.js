@@ -6,10 +6,10 @@
 // Role color badges for consistent styling
 export const getRoleColor = (role) => {
   switch (role) {
-    case 'Teilnehmer*in': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300';
+    case 'Wettbewerb-Teilnehmer*in': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300';
     case 'Jury': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300';
     case 'Supporter*in': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
-    case 'Crew': return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300';
+    case 'SLAM25-Team': return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300';
     case 'SLAM-MC': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300';
     case 'Organisator*in': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
     case 'Moderator*in': return 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300';
@@ -107,12 +107,12 @@ export const getContentTypeIcon = (type) => {
 // Get Tailwind gradient classes for content type
 export const getContentTypeGradient = (type) => {
   const gradients = {
-    'participant': 'from-blue-500 to-purple-600',
-    'team': 'from-blue-500 to-blue-600',
-    'round': 'from-purple-500 to-pink-600',
-    'news': 'from-blue-500 to-indigo-600',
-    'cityTip': 'from-blue-500 to-purple-600',
-    'event': 'from-blue-500 to-purple-600'
+    'participant': 'blue-500',
+    'team': 'blue-500',
+    'round': 'purple-500',
+    'news': 'blue-500',
+    'cityTip': 'blue-500',
+    'event': 'blue-500'
   };
-  return gradients[type] || 'from-gray-500 to-gray-600';
+  return gradients[type] || 'gray-500';
 };

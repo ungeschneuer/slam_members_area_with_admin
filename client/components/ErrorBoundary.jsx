@@ -23,12 +23,12 @@ class ErrorBoundary extends React.Component {
     });
 
     // Log error to console in development
-    if (process.env.NODE_ENV === 'development') {
+    if (import.meta.env.DEV) {
       console.error('ErrorBoundary caught an error:', error, errorInfo);
     }
 
     // Log error to external service in production
-    if (process.env.NODE_ENV === 'production') {
+    if (import.meta.env.PROD) {
       this.logErrorToService(error, errorInfo);
     }
   }
@@ -48,18 +48,9 @@ class ErrorBoundary extends React.Component {
       props: this.props
     };
 
-    // Log to console in development
-    if (process.env.NODE_ENV === 'development') {
-      console.error('ErrorBoundary caught error:', errorData);
-    }
-
     // In a real application, you would send this to an error tracking service
     // like Sentry, LogRocket, or Bugsnag
-    console.error('Production error:', errorData);
-
-    // Send to monitoring service if available
-    // Error reporting simplified to console
-    console.error('ErrorBoundary caught error:', errorData);
+    // Error reporting simplified to console for now
   };
 
   handleRetry = () => {
@@ -115,7 +106,7 @@ class ErrorBoundary extends React.Component {
               </button>
             </div>
 
-            {showDetails && process.env.NODE_ENV === 'development' && (
+            {showDetails && import.meta.env.DEV && (
               <details className="mt-8">
                 <summary className="cursor-pointer text-sm font-medium text-gray-700 hover:text-gray-900">
                   Error Details (Development Only)

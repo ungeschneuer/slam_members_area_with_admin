@@ -17,7 +17,7 @@ export function formatDateForInput(dateString) {
     
     // Validate the date
     if (isNaN(date.getTime())) {
-      console.warn('Invalid date string:', dateString);
+      // Invalid date string - using fallback
       return '';
     }
     
@@ -28,7 +28,7 @@ export function formatDateForInput(dateString) {
     
     return `${year}-${month}-${day}`;
   } catch (error) {
-    console.error('Error formatting date for input:', error);
+    // Error formatting date for input - using fallback
     return '';
   }
 }
@@ -52,7 +52,7 @@ export function formatDateForDisplay(date, options = {}) {
     
     return new Date(date).toLocaleDateString('de-DE', { ...defaultOptions, ...options });
   } catch (error) {
-    console.error('Error formatting date for display:', error);
+    // Error formatting date for display - using fallback
     return '';
   }
 }
@@ -77,7 +77,7 @@ export function getTodayBerlinDateString() {
     
     return `${year}-${month}-${day}`;
   } catch (error) {
-    console.error('Error getting today Berlin date:', error);
+    // Error getting today Berlin date - using fallback
     return new Date().toISOString().split('T')[0]; // Fallback to local date
   }
 }
@@ -97,7 +97,7 @@ export function isFutureDateBerlin(dateString) {
     const todayStr = getTodayBerlinDateString();
     return dateString > todayStr; // String comparison works for YYYY-MM-DD format
   } catch (error) {
-    console.error('Error checking future date:', error);
+    // Error checking future date - using fallback
     return false;
   }
 }
@@ -164,7 +164,7 @@ export function createDateTime(date, time) {
     
     return dateTime;
   } catch (error) {
-    console.error('Error creating datetime:', error);
+    // Error creating datetime - using fallback
     return null;
   }
 }
@@ -177,7 +177,7 @@ export function getCurrentBerlinTime() {
   try {
     return new Date().toLocaleString('en-US', { timeZone: BERLIN_TIMEZONE });
   } catch (error) {
-    console.error('Error getting current Berlin time:', error);
+    // Error getting current Berlin time - using fallback
     return new Date(); // Fallback to local time
   }
 }

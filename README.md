@@ -11,6 +11,28 @@ A full-stack Poetry Slam application with React frontend and Express.js backend 
 - **News & Community** - News feed and community features
 - **PWA Support** - Progressive Web App with offline capabilities
 
+## 🌐 Uberspace Deployment
+
+This application is specifically configured for Uberspace hosting with all common issues resolved:
+
+- **bcrypt → bcryptjs**: No native compilation issues
+- **Port Binding**: Server binds to `0.0.0.0` for Uberspace compatibility  
+- **CSP Fixed**: Content Security Policy configured for production
+- **Source Maps**: Disabled in production for security
+- **Database Pooling**: Optimized connection pools for Uberspace limits
+- **Logger Configuration**: Simple console logging to avoid file descriptor issues
+
+### Quick Deployment
+```bash
+# Clean deployment (recommended for production)
+npm run deploy:clean
+
+# Incremental deployment (faster updates)
+npm run deploy:incremental
+```
+
+See [DEPLOYMENT_SECURE.md](./DEPLOYMENT_SECURE.md) for the complete secure deployment guide.
+
 ## 🏗️ Architecture
 
 - **Frontend**: React 19 + Vite + TailwindCSS + React Router v7
@@ -64,7 +86,7 @@ A full-stack Poetry Slam application with React frontend and Express.js backend 
    DB_NAME=slam25_db
    DB_USER=slam_user
    DB_PASSWORD=your_secure_password  # REQUIRED - no fallback
-   JWT_SECRET=your_super_secure_jwt_secret_key  # REQUIRED - no fallback
+   JWT_SECRET=your_super_secure_jwt_secret_key_minimum_64_characters_required  # REQUIRED - no fallback
    NODE_ENV=development
    PORT=3000
    ```
@@ -164,7 +186,7 @@ npm run test:coverage
 - **Backend**: Express.js, PostgreSQL, Winston logging
 - **Testing**: Vitest, Jest, React Testing Library
 - **Database**: PostgreSQL with migrations
-- **Real-time**: Socket.io
+- **Real-time**: Simple polling (30s intervals)
 
 ## 📝 License
 

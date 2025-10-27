@@ -5,7 +5,7 @@
 
 class Logger {
   constructor() {
-    this.logLevel = process.env.NODE_ENV === 'development' ? 'debug' : 'info';
+    this.logLevel = import.meta.env.DEV ? 'debug' : 'info';
     this.logLevels = {
       error: 0,
       warn: 1,
@@ -35,7 +35,7 @@ class Logger {
       console.error(formatted);
       
       // In production, you might want to send errors to a logging service
-      if (process.env.NODE_ENV === 'production') {
+      if (import.meta.env.PROD) {
         this.sendToLoggingService('error', message, data);
       }
     }

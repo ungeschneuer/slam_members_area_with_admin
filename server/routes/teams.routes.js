@@ -13,6 +13,8 @@ import { adminMiddleware } from '../middleware/simpleAuth.js';
 import { sanitizeEntity } from '../utils/sanitization.js';
 import { teamSchema, createTeamSchema, updateTeamSchema, addTeamMemberSchema, removeTeamMemberSchema } from '../../shared/schemas/teamSchema.js';
 import logger from '../config/logger.js';
+import { generateSlug, generateUniqueSlug } from '../utils/slugUtils.js';
+import { executeTransaction } from '../config/database.js';
 
 const router = express.Router();
 

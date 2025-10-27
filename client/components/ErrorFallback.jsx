@@ -1,4 +1,5 @@
 import React from 'react';
+import SupervisorLoadingState from './SupervisorLoadingState.jsx';
 
 /**
  * Error Fallback Component for react-error-boundary
@@ -15,6 +16,22 @@ export default function ErrorFallback({ error, resetErrorBoundary }) {
   const isDatabaseError = error?.message?.includes('database') ||
                         error?.message?.includes('Database') ||
                         error?.message?.includes('connection');
+
+  const isSupervisorBootup = error?.message?.includes('slam25_szene: ERROR (not running)') || 
+                             error?.message?.includes('supervisor') || 
+                             error?.message?.includes('not running') ||
+                             error?.message?.includes('ECONNREFUSED') ||
+                             error?.message?.includes('Connection refused');
+
+  // Show supervisor loading state for boot-up errors
+  if (isSupervisorBootup) {
+    return (
+      <SupervisorLoadingState 
+        onRetry={resetErrorBoundary}
+        retryCount={0}
+      />
+    );
+  }
 
   const handleRetry = () => {
     resetErrorBoundary();

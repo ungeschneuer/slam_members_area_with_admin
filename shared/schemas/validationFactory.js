@@ -93,8 +93,7 @@ export function createCityTipSchema() {
     tips: commonValidations.optionalString(),
     // REMOVED: is_featured field - removed from form
     status: commonValidations.enum(['ACTIVE', 'INACTIVE'], 'Status').optional(),
-    opening_hours: commonValidations.optionalString(),
-    contact_info_email: commonValidations.email()
+    opening_hours: commonValidations.optionalString()
   });
 }
 
@@ -142,15 +141,14 @@ export function createTimetableSchema() {
   return z.object({
     title: commonValidations.requiredString('Titel').max(255, 'Titel ist zu lang'),
     slug: commonValidations.slug(),
-    description: commonValidations.requiredString('Beschreibung'),
+    description: commonValidations.optionalString(),
     detailedDescription: commonValidations.optionalString(),
     date: commonValidations.date('Datum'),
     time: commonValidations.time('Startzeit'),
     endTime: commonValidations.optionalTime(),
-    location: commonValidations.requiredString('Ort'),
-    type: commonValidations.enum(['team-round', 'individual-round', 'workshop', 'fun', 'aftershow', 'panel', 'general', 'technical', 'registration', 'party', 'celebration'], 'Typ'),
-    status: commonValidations.enum(['confirmed', 'tentative', 'upcoming', 'active', 'completed', 'cancelled'], 'Status').optional(),
-    internalLink: commonValidations.url(),
+    location: z.string().min(1, 'Ort ist erforderlich').max(255, 'Ort ist zu lang'),
+    type: z.string().min(1, 'Typ ist erforderlich'),
+    status: z.string().optional(),
     additionalLinks: z.array(z.object({
       type: z.string().min(1, 'Link-Typ ist erforderlich'),
       title: z.string().min(1, 'Link-Titel ist erforderlich'),
@@ -172,13 +170,17 @@ export function createInfoPageSchema() {
     slug: commonValidations.slug(),
     content: commonValidations.requiredString('Inhalt'),
     excerpt: commonValidations.optionalString(),
-    category: commonValidations.enum(['general', 'rules', 'legal', 'help'], 'Kategorie'),
+    category: commonValidations.enum(['general', 'rules', 'chemnitz', 'weiteres'], 'Kategorie'),
     order: commonValidations.nonNegativeNumber('Reihenfolge'),
     status: commonValidations.enum(['DRAFT', 'PUBLISHED', 'ARCHIVED'], 'Status'),
-    featured_image_url: commonValidations.url(),
-    meta_description: commonValidations.optionalString(),
-    tags: commonValidations.array('Tags'),
-    is_published: commonValidations.boolean()
+    fileUrl: z.union([z.string().url('Ungültige URL'), z.literal('')]).optional(),
+    fileType: z.enum(['image', 'pdf']).optional(),
+    fileDescription: commonValidations.optionalString(),
+    additionalLinks: z.array(z.object({
+      title: z.string().min(1, 'Link-Titel ist erforderlich'),
+      url: z.string().url('Ungültige URL')
+    })).optional(),
+    tags: commonValidations.array('Tags')
   });
 }
 
@@ -195,7 +197,7 @@ export function createRoundSchema() {
     location: commonValidations.requiredString('Ort'),
     competition_type: commonValidations.enum(['individual', 'team', 'open'], 'Wettbewerbstyp'),
     total_jury_members: commonValidations.positiveNumber('Jury-Mitglieder'),
-    status: commonValidations.enum(['SCHEDULED', 'ONGOING', 'COMPLETED', 'CANCELLED'], 'Status').optional(),
+    status: commonValidations.enum(['confirmed', 'tentative', 'upcoming', 'active', 'completed', 'cancelled', 'postponed'], 'Status').optional(),
     is_published: commonValidations.boolean()
   });
 }
@@ -244,8 +246,7 @@ export function getDefaultValues(type) {
       tips: '',
       // REMOVED: is_featured field - removed from form
       status: 'ACTIVE',
-      opening_hours: '',
-      contact_info_email: ''
+      opening_hours: ''
     },
     participant: {
       name: '',
@@ -283,7 +284,6 @@ export function getDefaultValues(type) {
       location: '',
       type: 'workshop',
       status: 'confirmed',
-      internalLink: '',
       additionalLinks: [],
       participants: []
     },
@@ -295,10 +295,11 @@ export function getDefaultValues(type) {
       category: 'general',
       order: 0,
       status: 'DRAFT',
-      featured_image_url: '',
-      meta_description: '',
-      tags: [],
-      is_published: false
+      fileUrl: '',
+      fileType: null,
+      fileDescription: '',
+      additionalLinks: [],
+      tags: []
     },
     round: {
       title: '',

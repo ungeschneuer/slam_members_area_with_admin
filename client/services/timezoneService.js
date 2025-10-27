@@ -44,7 +44,7 @@ async function getTimezoneConfig() {
     
     throw new Error('Invalid response format');
   } catch (error) {
-    console.warn('Failed to fetch timezone configuration:', error);
+    // Failed to fetch timezone configuration - using fallback
     
     // Return fallback configuration
     return {
@@ -75,7 +75,7 @@ export async function getCurrentTimeInConfiguredTimezone() {
     // Return a Date object representing the current time in the target timezone
     return new Date(now.getTime() + offset);
   } catch (error) {
-    console.warn('Failed to get timezone configuration, using local time:', error);
+    // Failed to get timezone configuration - using local time
     return new Date();
   }
 }
@@ -90,7 +90,7 @@ export async function formatDateInConfiguredTimezone(date, options = {}) {
   try {
     // Validate input date
     if (!date) {
-      console.warn('Invalid date provided to formatDateInConfiguredTimezone:', date);
+      // Invalid date provided - using fallback
       return '';
     }
     
@@ -98,7 +98,7 @@ export async function formatDateInConfiguredTimezone(date, options = {}) {
     
     // Check if the date is valid
     if (isNaN(dateObj.getTime())) {
-      console.warn('Invalid date value provided to formatDateInConfiguredTimezone:', date);
+      // Invalid date value - using fallback
       return '';
     }
     
@@ -110,7 +110,7 @@ export async function formatDateInConfiguredTimezone(date, options = {}) {
       ...options
     }).format(dateObj);
   } catch (error) {
-    console.warn('Failed to get timezone configuration, using local timezone:', error);
+    // Failed to get timezone configuration - using local timezone
     
     // Validate date before fallback formatting
     if (!date) {
@@ -119,7 +119,7 @@ export async function formatDateInConfiguredTimezone(date, options = {}) {
     
     const dateObj = new Date(date);
     if (isNaN(dateObj.getTime())) {
-      console.warn('Invalid date value in fallback formatting:', date);
+      // Invalid date value in fallback formatting
       return '';
     }
     
@@ -142,7 +142,7 @@ export async function getTimezoneOffset() {
     const targetTime = new Date(utc.toLocaleString("en-US", { timeZone: timezone }));
     return (targetTime.getTime() - utc.getTime()) / 60000;
   } catch (error) {
-    console.warn('Failed to get timezone configuration, using local offset:', error);
+    // Failed to get timezone configuration - using local offset
     return new Date().getTimezoneOffset();
   }
 }
@@ -161,7 +161,7 @@ export async function getTimezoneOffsetFor(dateLike) {
     const targetTime = new Date(utc.toLocaleString('en-US', { timeZone: timezone }));
     return (targetTime.getTime() - utc.getTime()) / 60000;
   } catch (error) {
-    console.warn('Failed to get timezone configuration, using local offset for date:', error);
+    // Failed to get timezone configuration - using local offset for date
     const d = new Date(dateLike);
     return d.getTimezoneOffset();
   }
@@ -179,7 +179,8 @@ export function createTimezoneAwareCountdown(targetDate, updateCallback, interva
   
   const updateCountdown = async () => {
     try {
-      const now = await getCurrentTimeInConfiguredTimezone();
+      // Compare UTC with UTC for accurate countdown calculation
+      const now = new Date(); // Current UTC time
       const difference = target.getTime() - now.getTime();
       
       if (difference > 0) {
@@ -207,9 +208,9 @@ export function createTimezoneAwareCountdown(targetDate, updateCallback, interva
         });
       }
     } catch (error) {
-      console.error('Error updating countdown:', error);
-      // Fallback to local time
-      const now = new Date();
+      // Error updating countdown - handled by error state
+      // Fallback to UTC time comparison
+      const now = new Date(); // Current UTC time
       const difference = target.getTime() - now.getTime();
       
       if (difference > 0) {

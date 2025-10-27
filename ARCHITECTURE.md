@@ -52,7 +52,7 @@ This is a Poetry Slam members area built with React 19, Express.js, and PostgreS
 ### 5. Real-time Updates
 - **Simple Polling**: 30-second intervals
 - **React Query**: Automatic refetching
-- **No WebSockets**: Avoid complexity
+- **Simple Polling**: 30-second intervals for real-time updates
 
 ## Project Structure
 

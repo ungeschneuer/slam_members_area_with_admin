@@ -1,4 +1,5 @@
 import React from 'react';
+import SupervisorLoadingState from './SupervisorLoadingState.jsx';
 
 /**
  * Error message component for displaying user-friendly error messages
@@ -19,6 +20,11 @@ export function ErrorMessage({ error, onRetry, className = '' }) {
 
   const getErrorType = (error) => {
     const message = error.message || error;
+    if (message.includes('slam25_szene: ERROR (not running)') || 
+        message.includes('supervisor') || 
+        message.includes('not running') ||
+        message.includes('ECONNREFUSED') ||
+        message.includes('Connection refused')) return 'supervisor_bootup';
     if (message.includes('fetch') || message.includes('network')) return 'network';
     if (message.includes('database') || message.includes('Database')) return 'database';
     if (message.includes('validation') || message.includes('Validation')) return 'validation';
@@ -27,6 +33,17 @@ export function ErrorMessage({ error, onRetry, className = '' }) {
 
   const errorType = getErrorType(error);
   const errorMessage = getErrorMessage(error);
+
+  // Show supervisor loading state for boot-up errors
+  if (errorType === 'supervisor_bootup') {
+    return (
+      <SupervisorLoadingState 
+        onRetry={onRetry}
+        retryCount={0}
+        className={className}
+      />
+    );
+  }
 
   const errorIcons = {
     network: '🌐',
@@ -47,49 +64,21 @@ export function ErrorMessage({ error, onRetry, className = '' }) {
       <div className="flex items-start space-x-3">
         <span className="text-xl">{errorIcons[errorType]}</span>
         <div className="flex-1">
-          <h3 className="font-medium mb-1">{errorTitles[errorType]}</h3>
-          <p className="error-message">{errorMessage}</p>
+          <h4 className="font-medium text-red-800 dark:text-red-200 mb-2">
+            {errorTitles[errorType]}
+          </h4>
+          <p className="text-sm text-red-700 dark:text-red-300 mb-3">
+            {errorMessage}
+          </p>
           {onRetry && (
             <button
               onClick={onRetry}
-              className="mt-3 px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors"
+              className="text-sm bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200 px-3 py-1 rounded hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
             >
               Erneut versuchen
             </button>
           )}
         </div>
-      </div>
-    </div>
-  );
-}
-
-/**
- * Success message component for displaying success notifications
- * 
- * @param {Object} props - Component props
- * @param {string} props.message - Success message to display
- * @param {Function} props.onDismiss - Optional dismiss function
- * @param {string} props.className - Additional CSS classes
- */
-export function SuccessMessage({ message, onDismiss, className = '' }) {
-  if (!message) return null;
-
-  return (
-    <div className={`success-state rounded-lg p-4 ${className}`}>
-      <div className="flex items-start space-x-3">
-        <span className="text-xl">✅</span>
-        <div className="flex-1">
-          <p className="success-message">{message}</p>
-        </div>
-        {onDismiss && (
-          <button
-            onClick={onDismiss}
-            className="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-200"
-            aria-label="Nachricht schließen"
-          >
-            ✕
-          </button>
-        )}
       </div>
     </div>
   );
@@ -106,7 +95,7 @@ export function LoadingMessage({ message = 'Lädt...', className = '' }) {
   return (
     <div className={`loading-state rounded-lg p-4 ${className}`}>
       <div className="flex items-center space-x-3">
-        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#185757]"></div>
         <p className="loading-message">{message}</p>
       </div>
     </div>
@@ -134,7 +123,7 @@ export function InfoMessage({ message, onDismiss, className = '' }) {
         {onDismiss && (
           <button
             onClick={onDismiss}
-            className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200"
+            className="text-[#185757] dark:text-[#A2D2B9] hover:text-[#0f3a3b] dark:hover:text-[#8BC4A3] focus-contained p-1 rounded min-w-[24px] min-h-[24px] flex items-center justify-center"
             aria-label="Nachricht schließen"
           >
             ✕
@@ -166,7 +155,39 @@ export function WarningMessage({ message, onDismiss, className = '' }) {
         {onDismiss && (
           <button
             onClick={onDismiss}
-            className="text-yellow-600 dark:text-yellow-400 hover:text-yellow-800 dark:hover:text-yellow-200"
+            className="text-yellow-600 dark:text-yellow-400 hover:text-yellow-700 dark:hover:text-yellow-300 focus-contained p-1 rounded min-w-[24px] min-h-[24px] flex items-center justify-center"
+            aria-label="Nachricht schließen"
+          >
+            ✕
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Success message component for displaying success messages
+ * 
+ * @param {Object} props - Component props
+ * @param {string} props.message - Success message to display
+ * @param {Function} props.onDismiss - Optional dismiss function
+ * @param {string} props.className - Additional CSS classes
+ */
+export function SuccessMessage({ message, onDismiss, className = '' }) {
+  if (!message) return null;
+
+  return (
+    <div className={`success-state rounded-lg p-4 ${className}`}>
+      <div className="flex items-start space-x-3">
+        <span className="text-xl">✅</span>
+        <div className="flex-1">
+          <p className="success-message">{message}</p>
+        </div>
+        {onDismiss && (
+          <button
+            onClick={onDismiss}
+            className="text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 focus-contained p-1 rounded min-w-[24px] min-h-[24px] flex items-center justify-center"
             aria-label="Nachricht schließen"
           >
             ✕

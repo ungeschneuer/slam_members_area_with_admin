@@ -161,13 +161,18 @@ router.put('/:id', ...adminMiddleware(), sanitizeBody, async (req, res) => { // 
   const { id } = req.params;
   // Sanitize input data to prevent XSS
   const sanitizedData = sanitizeEntity.news(req.body);
+  
+  // Normalize and coerce types (same as CREATE route)
+  const normalizedData = normalizeData(sanitizedData, {
+    status: { type: 'string', fallback: 'DRAFT' }
+  });
+  const normalizedNews = entityNormalizers.news(sanitizedData);
+  const tagsArray = normalizedNews.tags;
+  
   const { 
     title, content, excerpt, category, priority, featured_image_url,
-    tags, status, published_at, slug
+    published_at, slug
   } = sanitizedData;
-  
-  // Coerce tags to text[]
-  const tagsArray = Array.isArray(tags) ? tags : (typeof tags === 'string' ? [tags] : []);
   
   await executeCrudOperation(
     'update',
@@ -175,7 +180,7 @@ router.put('/:id', ...adminMiddleware(), sanitizeBody, async (req, res) => { // 
      priority = $5, featured_image_url = $6, tags = $7, status = $8, published_at = $9, 
      slug = $10, updated_at = NOW() WHERE id = $11 RETURNING *`,
     [title, content, excerpt, category, priority, featured_image_url, 
-     tagsArray, status, published_at, slug, parseInt(id)],
+     tagsArray, normalizedData.status, published_at, slug, parseInt(id)],
     'news',
     'UPDATE_NEWS',
     res

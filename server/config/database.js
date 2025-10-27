@@ -4,8 +4,9 @@ import path from 'path';
 import logger from './logger.js';
 // Keep pool simple and lean - avoid custom leak trackers and recovery
 
-// Load environment variables from the root directory
-dotenv.config({ path: path.join(process.cwd(), '.env') });
+// Load environment file based on NODE_ENV (same logic as server.js)
+const envFile = process.env.NODE_ENV === 'production' ? '.env.production' : '.env.development';
+dotenv.config({ path: path.join(process.cwd(), envFile) });
 
 // Comprehensive environment variable validation - fail fast if not configured
 const requiredEnvVars = {
@@ -117,7 +118,7 @@ const getPoolConfig = () => {
     database: process.env.DB_NAME || 'slam25_db',
     password: process.env.DB_PASSWORD,
     port: process.env.DB_PORT || 5432,
-    ssl: env === 'production' ? { rejectUnauthorized: false } : false,
+    ssl: false, // Uberspace PostgreSQL doesn't support SSL connections
     idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT) || (isTest ? 10000 : 30000),
     connectionTimeoutMillis: parseInt(process.env.DB_CONNECTION_TIMEOUT) || (isTest ? 5000 : 5000),
     acquireTimeoutMillis: parseInt(process.env.DB_ACQUIRE_TIMEOUT) || (isTest ? 10000 : 10000),
@@ -162,8 +163,8 @@ const getPoolConfig = () => {
     case 'production':
       return {
         ...baseConfig,
-        max: parseInt(process.env.DB_MAX_CONNECTIONS) || 200, // Significantly increased
-        min: parseInt(process.env.DB_MIN_CONNECTIONS) || 20, // Higher minimum
+        max: parseInt(process.env.DB_MAX_CONNECTIONS) || 2, // Uberspace file descriptor limit
+        min: parseInt(process.env.DB_MIN_CONNECTIONS) || 1, // Uberspace optimization
         acquireTimeoutMillis: 60000, // 1 minute
         idleTimeoutMillis: 300000, // 5 minutes
         connectionTimeoutMillis: 20000, // 20 seconds

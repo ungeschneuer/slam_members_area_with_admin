@@ -3,8 +3,9 @@ import InteractiveMap from './InteractiveMap';
 import { useCityTips, usePageTitle } from '../hooks/index.js';
 import LoadingSpinner from './LoadingSpinner';
 import { ErrorMessage } from './StatusMessages.jsx';
-import { translateCategory, getCategoryIcon, getCategoryColor } from '../utils/categoryTranslations.js';
+import { getCategoryOptionsWithAll } from '../../shared/constants/cityTipsCategories.js';
 import { getAvailableContentFilterOptions, validateFilterValue } from '../utils/filterUtils.js';
+import { getCategoryIcon, getCategoryLabel, getCategoryColor } from '../utils/categoryUtils.js';
 
 export default function CityTips() {
   usePageTitle('Stadt-Tipps');
@@ -42,23 +43,18 @@ export default function CityTips() {
     return priceFilter === 'all' || location.priceRange === priceFilter;
   };
   
-  const predefinedCategories = [
-    { id: 'all', name: 'Alle Kategorien', icon: '🗺️', color: 'bg-gray-500' },
-    { id: 'restaurant', name: 'Restaurants', icon: '🍽️', color: 'bg-red-500' },
-    { id: 'cafe', name: 'Cafés', icon: '☕', color: 'bg-yellow-500' },
-    { id: 'bar', name: 'Bars', icon: '🍺', color: 'bg-blue-500' },
-    { id: 'culture', name: 'Kultur', icon: '🎭', color: 'bg-purple-500' },
-    { id: 'shopping', name: 'Shopping', icon: '🛍️', color: 'bg-green-500' },
-    { id: 'hotel', name: 'Hotels', icon: '🏨', color: 'bg-indigo-500' },
-    { id: 'transport', name: 'Transport', icon: '🚇', color: 'bg-orange-500' },
-    { id: 'landmark', name: 'Sehenswürdigkeiten', icon: '🏛️', color: 'bg-red-600' },
-    { id: 'nature', name: 'Natur', icon: '🌳', color: 'bg-green-600' },
-    { id: 'leisure', name: 'Freizeit', icon: '🏊', color: 'bg-cyan-500' },
-    { id: 'sports', name: 'Sport', icon: '⚽', color: 'bg-orange-600' }
-  ];
+  const predefinedCategories = useMemo(() => {
+    return getCategoryOptionsWithAll().map(cat => ({
+      id: cat.value,
+      name: cat.label,
+      icon: cat.icon,
+      color: cat.color
+    }));
+  }, []);
 
   const predefinedPriceRanges = [
     { id: 'all', name: 'Alle Preise', icon: '💰' },
+    { id: 'Kostenlos', name: 'Kostenlos', icon: '🆓' },
     { id: '€', name: 'Günstig', icon: '€' },
     { id: '€€', name: 'Mittel', icon: '€€' },
     { id: '€€€', name: 'Teuer', icon: '€€€' },
@@ -76,7 +72,6 @@ export default function CityTips() {
       description: item.description,
       address: item.address,
       coordinates: { lat: parseFloat(item.latitude), lng: parseFloat(item.longitude) },
-      phone: item.contact_info?.phone || null,
       website: item.website,
       priceRange: item.price_range,
       
@@ -84,8 +79,7 @@ export default function CityTips() {
       featured: item.is_featured || false,
       slug: item.slug,
       images: item.images || [],
-      openingHours: item.opening_hours,
-      contactInfo: item.contact_info
+      openingHours: item.opening_hours
     }));
   }, [cityTipsData]);
 
@@ -204,17 +198,7 @@ export default function CityTips() {
     setCurrentPage(1);
   }, [categoryFilter, searchTerm, priceFilter, sortBy]);
 
-  const getCategoryColorLocal = (category) => {
-    return getCategoryColor(category, 'cityTips');
-  };
-
-  const getCategoryIconLocal = (category) => {
-    return getCategoryIcon(category, 'cityTips');
-  };
-
-  const getCategoryLabelLocal = (category) => {
-    return translateCategory(category, 'cityTips');
-  };
+  // Use centralized category utilities directly
 
   const handleLocationClick = (location) => {
     setSelectedLocation(location);
@@ -241,7 +225,7 @@ export default function CityTips() {
   if (loading) {
     return (
       <div className="text-center py-12">
-        <div className="w-24 h-24 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center mx-auto mb-4">
+        <div className="w-24 h-24 bg-[#A2D2B9]/20 dark:bg-[#185757]/30 rounded-full flex items-center justify-center mx-auto mb-4">
           <span className="text-3xl">🗺️</span>
         </div>
         <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Stadt-Tipps werden geladen...</h3>
@@ -274,7 +258,7 @@ export default function CityTips() {
       )}
       
       {/* Header */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+      <div className="page-header-card">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Chemnitz Tipps & Empfehlungen</h1>
           <p className="text-gray-600 dark:text-gray-400">Entdecke die besten Orte und Aktivitäten in Chemnitz</p>
@@ -303,10 +287,10 @@ export default function CityTips() {
               onChange={(e) => setCategoryFilter(e.target.value)}
               className="px-4 py-3 text-base border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
             >
-              <option value="all">Alle Kategorien</option>
+              <option value="all">{getCategoryLabel('all', 'cityTip')}</option>
               {categories.slice(1).map(category => (
                 <option key={category.id} value={category.id}>
-                  {getCategoryIcon(category.id, 'cityTips')} {translateCategory(category.id, 'cityTips')}
+                  {getCategoryIcon(category.id, 'cityTip')} {getCategoryLabel(category.id, 'cityTip')}
                 </option>
               ))}
             </select>
@@ -336,12 +320,12 @@ export default function CityTips() {
                 onClick={() => setCategoryFilter(category.id)}
                 className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-medium transition-colors ${
                   categoryFilter === category.id
-                    ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200'
+                    ? 'bg-[#A2D2B9]/20 dark:bg-[#185757]/30 text-[#185757] dark:text-[#A2D2B9]'
                     : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
                 }`}
               >
-                <span className="mr-2">{getCategoryIcon(category.id, 'cityTips')}</span>
-                {translateCategory(category.id, 'cityTips')}
+                <span className="mr-2">{getCategoryIcon(category.id, 'cityTip')}</span>
+                {getCategoryLabel(category.id, 'cityTip')}
               </button>
             ))}
           </div>
@@ -357,7 +341,7 @@ export default function CityTips() {
           <div className="flex items-center space-x-2">
             <button
               onClick={() => setViewMode('grid')}
-              className={`p-2 rounded-lg ${viewMode === 'grid' ? 'bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}
+              className={`p-2 rounded-lg ${viewMode === 'grid' ? 'bg-[#A2D2B9]/20 dark:bg-[#185757]/30 text-[#185757] dark:text-[#A2D2B9]' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}
             >
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                 <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
@@ -365,7 +349,7 @@ export default function CityTips() {
             </button>
             <button
               onClick={() => setViewMode('list')}
-              className={`p-2 rounded-lg ${viewMode === 'list' ? 'bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}
+              className={`p-2 rounded-lg ${viewMode === 'list' ? 'bg-[#A2D2B9]/20 dark:bg-[#185757]/30 text-[#185757] dark:text-[#A2D2B9]' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}
             >
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
@@ -376,19 +360,20 @@ export default function CityTips() {
       </div>
 
       {/* Map Section */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+      <div className="page-header-card">
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">Karte</h2>
-        <div className="h-[45vh] sm:h-[50vh] lg:h-[55vh] min-h-[320px] max-h-[560px] relative overflow-hidden">
+        <div className="h-[55vh] sm:h-[50vh] lg:h-[55vh] min-h-[400px] max-h-[560px] relative overflow-hidden">
           <InteractiveMap 
             locations={filteredAndSortedLocations}
             onLocationClick={handleLocationClick}
             selectedLocation={selectedLocation}
+            availableCategories={categories}
           />
         </div>
       </div>
 
       {/* Results Section */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+      <div className="page-header-card">
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">
           Empfohlene Orte
         </h2>
@@ -413,12 +398,12 @@ export default function CityTips() {
                   <div className="flex items-start justify-between">
                     <div className="flex items-start space-x-3 flex-1">
                       <div className="flex-shrink-0">
-                        <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white text-lg font-bold shadow-md ${getCategoryColorLocal(location.category)}`}>
-                          {getCategoryIconLocal(location.category)}
+                        <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white text-lg font-bold shadow-md ${getCategoryColor(location.category, 'cityTip')}`}>
+                          {getCategoryIcon(location.category, 'cityTip')}
                         </div>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-gray-900 dark:text-white mb-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors text-sm leading-tight" title={location.name}>
+                        <h3 className="font-semibold text-gray-900 dark:text-white mb-1 group-hover:text-[#185757] dark:group-hover:text-[#A2D2B9] transition-colors text-sm leading-tight" title={location.name}>
                           {location.name}
                         </h3>
                         <p className="text-sm text-gray-600 dark:text-gray-400 mb-2 overflow-hidden" style={{
@@ -440,8 +425,8 @@ export default function CityTips() {
                   
                   {/* Metadata */}
                   <div className="flex flex-wrap items-center gap-2 text-xs">
-                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getCategoryColorLocal(location.category)} text-white`}>
-                      {getCategoryIconLocal(location.category)} {getCategoryLabelLocal(location.category)}
+                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getCategoryColor(location.category, 'cityTip')} text-white`}>
+                      {getCategoryIcon(location.category, 'cityTip')} {getCategoryLabel(location.category, 'cityTip')}
                     </span>
                     
                     {location.priceRange && (
@@ -465,7 +450,7 @@ export default function CityTips() {
                         e.stopPropagation();
                         handleDetailsClick(location);
                       }}
-                      className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200 text-sm font-medium"
+                      className="text-[#185757] dark:text-[#A2D2B9] hover:text-[#0f3a3b] dark:hover:text-[#8BC4A3] text-sm font-medium"
                     >
                       Details anzeigen →
                     </button>
@@ -477,13 +462,13 @@ export default function CityTips() {
                 // List View
                 <div className="flex items-center space-x-4 w-full">
                   <div className="flex-shrink-0">
-                    <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white text-lg font-bold shadow-md ${getCategoryColorLocal(location.category)}`}>
-                      {getCategoryIconLocal(location.category)}
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white text-lg font-bold shadow-md ${getCategoryColor(location.category, 'cityTip')}`}>
+                      {getCategoryIcon(location.category, 'cityTip')}
                     </div>
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
-                      <h3 className="font-semibold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors text-sm leading-tight" title={location.name}>
+                      <h3 className="font-semibold text-gray-900 dark:text-white group-hover:text-[#185757] dark:group-hover:text-[#A2D2B9] transition-colors text-sm leading-tight" title={location.name}>
                         {location.name}
                       </h3>
                       <div className="flex items-center space-x-2">
@@ -510,7 +495,7 @@ export default function CityTips() {
                   <div className="flex items-center space-x-2">
                     <button
                       onClick={() => handleDetailsClick(location)}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                      className="px-4 py-2 bg-[#185757] text-white rounded-lg hover:bg-[#0f3a3b] transition-colors text-sm"
                     >
                       Details
                     </button>
@@ -548,10 +533,10 @@ export default function CityTips() {
           <div className="text-center py-12">
             <div className="text-4xl mb-4">🏙️</div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-              Keine Orte gefunden
+              Stadt-Tipps kommt bald :)
             </h3>
             <p className="text-gray-600 dark:text-gray-400">
-              Versuchen Sie andere Suchkriterien oder schauen Sie später wieder vorbei.
+              Bald gibt es hier tolle Empfehlungen für Berlin!
             </p>
           </div>
         )}

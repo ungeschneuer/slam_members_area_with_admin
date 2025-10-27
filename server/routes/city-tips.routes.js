@@ -6,7 +6,6 @@ import {
   sendSuccessResponse, 
   sendErrorResponse, 
   sendNotFoundResponse,
-  executeCrudOperation,
   normalizeData,
   executeQuery
 } from '../utils/simpleRouteHelpers.js';
@@ -21,6 +20,9 @@ import {
 import { sanitizeEntity } from '../utils/sanitization.js';
 import { entityNormalizers } from '../utils/normalizers.js';
 import { cityTipSchema } from '../../shared/schemas/cityTipSchema.js';
+import { generateSlug, generateUniqueSlug, validateSlugInput } from '../utils/slugUtils.js';
+import { generateUniqueSlugInTransaction, generateRequestIdFromReq } from '../services/slugGenerationService.js';
+import { executeTransaction } from '../config/database.js';
 
 const router = express.Router();
 
@@ -98,37 +100,62 @@ router.get('/:slug', async (req, res) => {
 });
 
 // Create city tip (admin endpoint)
-router.post('/', ...adminMiddleware(), ...validateCityTip, async (req, res) => { // Idempotency removed
+router.post('/', ...adminMiddleware(), ...validateCityTip, async (req, res) => {
   if (!req.body?.name || !req.body?.category) {
     return sendErrorResponse(res, new Error('Missing required fields'), 'Missing required fields', 400);
   }
-  // Sanitize input data to prevent XSS
-  const sanitizedData = sanitizeEntity.cityTip(req.body);
-  const { 
-    name, category, description, address, latitude, longitude,
-    price_range, opening_hours, contact_info, website, images, slug,
-    tips, status = 'ACTIVE'
-    // REMOVED: phone field - database table doesn't have this column
-  } = sanitizedData;
   
-  // Normalize data using schema
-  const normalizedData = normalizeData(sanitizedData, {
-    status: { type: 'string', fallback: 'ACTIVE' }
-  });
-  const normalizedCityTip = entityNormalizers.cityTip(sanitizedData);
-  
-  await executeCrudOperation(
-    'create',
-    `INSERT INTO city_tips (name, category, description, address, latitude, longitude, 
-     price_range, opening_hours, contact_info, website, images, slug, tips, status) 
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
-    [name, category, description, address, latitude, longitude, 
-     price_range, normalizedCityTip.opening_hours, normalizedCityTip.contact_info, 
-     normalizedCityTip.website, normalizedCityTip.images, normalizedCityTip.slug, tips, normalizedData.status],
-    'city-tips',
-    'CREATE_CITY_TIP',
-    res
-  );
+  try {
+    // Sanitize input data to prevent XSS
+    const sanitizedData = sanitizeEntity.cityTip(req.body);
+    const { 
+      name, category, description, address, latitude, longitude,
+      price_range, opening_hours, website, images, slug,
+      tips, status = 'ACTIVE'
+    } = sanitizedData;
+    
+    // Normalize data using schema
+    const normalizedData = normalizeData(sanitizedData, {
+      status: { type: 'string', fallback: 'ACTIVE' }
+    });
+    const normalizedCityTip = entityNormalizers.cityTip(sanitizedData);
+    
+    const startTime = startTiming();
+    
+        // Move slug generation inside transaction for atomicity
+        const cityTip = await executeTransaction(async (client) => {
+          // Generate unique slug using centralized service
+          const requestId = generateRequestIdFromReq(req);
+          const uniqueSlug = await generateUniqueSlugInTransaction(
+            client, 
+            name, 
+            'city_tips', 
+            requestId
+          );
+
+          // Create city tip with unique slug
+          const result = await client.query(
+            `INSERT INTO city_tips (name, category, description, address, latitude, longitude,
+             price_range, opening_hours, website, images, slug, tips, status)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
+            [name, category, description, address, latitude, longitude,
+             price_range, normalizedCityTip.opening_hours,
+             normalizedCityTip.website, normalizedCityTip.images, uniqueSlug, tips, normalizedData.status]
+          );
+
+          return result.rows[0];
+        });
+    
+    const duration = endTiming(startTime);
+    
+    res.status(201).json({
+      success: true,
+      data: cityTip,
+      meta: { queryType: 'CREATE_CITY_TIP', duration }
+    });
+  } catch (error) {
+    sendErrorResponse(res, error, 'Failed to create city tip');
+  }
 });
 
 // Update city tip (admin endpoint)
@@ -153,24 +180,39 @@ router.put('/:id', ...adminMiddleware(), ...validateCityTipId, ...validateCityTi
     const price_range = req.body.price_range !== undefined ? req.body.price_range : existing.price_range;
 
     const normalizedData = normalizeData(req.body, {
-      opening_hours: { type: 'json', fallback: {} },
-      contact_info: { type: 'json', fallback: {} },
+      opening_hours: { type: 'string', fallback: '' },
       images: { type: 'json', fallback: [] }
     });
 
-    await executeCrudOperation(
-      'update',
-      `UPDATE city_tips SET name = $1, category = $2, description = $3, 
-       address = $4, latitude = $5, longitude = $6, price_range = $7, 
-       opening_hours = $8, contact_info = $9, website = $10, images = $11, 
-       updated_at = NOW() WHERE id = $12 RETURNING *`,
-      [name, category, description, address, latitude, longitude, 
-       price_range, normalizedData.opening_hours, normalizedData.contact_info, 
-       req.body.website !== undefined ? req.body.website : existing.website, normalizedData.images, parseInt(id)],
-      'city-tips',
-      'UPDATE_CITY_TIP',
-      res
-    );
+    // Normalize status field (same as CREATE route)
+    const normalizedStatus = normalizeData(req.body, {
+      status: { type: 'string', fallback: 'ACTIVE' }
+    });
+    const status = req.body.status !== undefined ? normalizedStatus.status : existing.status;
+    
+    const startTime = startTiming();
+    
+    const result = await executeTransaction(async (client) => {
+      const updateResult = await client.query(
+        `UPDATE city_tips SET name = $1, category = $2, description = $3, 
+         address = $4, latitude = $5, longitude = $6, price_range = $7, 
+         opening_hours = $8, website = $9, images = $10, status = $11,
+         updated_at = NOW() WHERE id = $12 RETURNING *`,
+        [name, category, description, address, latitude, longitude, 
+         price_range, normalizedData.opening_hours, 
+         req.body.website !== undefined ? req.body.website : existing.website, normalizedData.images, status, parseInt(id)]
+      );
+      
+      return updateResult.rows[0];
+    });
+    
+    const duration = endTiming(startTime);
+    
+    res.json({
+      success: true,
+      data: result,
+      meta: { queryType: 'UPDATE_CITY_TIP', duration }
+    });
   } catch (error) {
     return sendErrorResponse(res, error, 'Failed to update city tip');
   }
@@ -180,14 +222,28 @@ router.put('/:id', ...adminMiddleware(), ...validateCityTipId, ...validateCityTi
 router.delete('/:id', ...adminMiddleware(), ...validateCityTipId, async (req, res) => {
   const { id } = req.params;
   
-  await executeCrudOperation(
-    'delete',
-    'DELETE FROM city_tips WHERE id = $1 RETURNING *',
-    [parseInt(id)],
-    'city-tips',
-    'DELETE_CITY_TIP',
-    res
-  );
+  try {
+    const startTime = startTiming();
+    
+    const result = await executeTransaction(async (client) => {
+      const deleteResult = await client.query(
+        'DELETE FROM city_tips WHERE id = $1 RETURNING *',
+        [parseInt(id)]
+      );
+      
+      return deleteResult.rows[0];
+    });
+    
+    const duration = endTiming(startTime);
+    
+    res.json({
+      success: true,
+      data: result,
+      meta: { queryType: 'DELETE_CITY_TIP', duration }
+    });
+  } catch (error) {
+    sendErrorResponse(res, error, 'Failed to delete city tip');
+  }
 });
 
 export default router;

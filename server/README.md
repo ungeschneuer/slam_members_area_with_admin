@@ -70,7 +70,7 @@ DB_USER=slam_user
 DB_PASSWORD=slam25_secure_password_2025
 
 # Security
-JWT_SECRET=your-secure-jwt-secret
+JWT_SECRET=your-secure-jwt-secret-minimum-64-characters-required-for-security
 ENCRYPTION_KEY=your-secure-encryption-key
 
 # Backup Configuration
@@ -266,7 +266,7 @@ NODE_ENV=production
 PORT=3005
 DB_HOST=your-db-host
 DB_PASSWORD=your-secure-password
-JWT_SECRET=your-secure-jwt-secret
+JWT_SECRET=your-secure-jwt-secret-minimum-64-characters-required-for-security
 ```
 
 ### Process Management

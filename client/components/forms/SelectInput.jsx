@@ -22,7 +22,7 @@ export default function SelectInput({
     return (
       <div>
         {label && (
-          <label htmlFor={name} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          <label htmlFor={name} className="label-base">
             {label}
             {required && <span className="text-red-500 ml-1">*</span>}
           </label>
@@ -38,7 +38,7 @@ export default function SelectInput({
               id={name}
               disabled={disabled}
               aria-invalid={hasError ? 'true' : 'false'}
-              className={`w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white ${hasError ? 'border-red-500 focus:ring-red-500' : ''} ${className}`}
+              className={`select-base ${hasError ? 'border-red-500 focus:ring-red-500' : 'focus:ring-[#A2D2B9] focus:border-[#185757]'} ${className}`}
             >
               <option value="">{placeholder}</option>
               {options.map((opt) => (
@@ -60,7 +60,7 @@ export default function SelectInput({
   return (
     <div>
       {label && (
-        <label htmlFor={name} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+        <label htmlFor={name} className="label-base">
           {label}
           {required && <span className="text-red-500 ml-1">*</span>}
         </label>
@@ -71,7 +71,7 @@ export default function SelectInput({
         aria-invalid={hasError ? 'true' : 'false'}
         {...(register ? register(name, rules) : {})}
         disabled={disabled}
-        className={`w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white ${hasError ? 'border-red-500 focus:ring-red-500' : ''} ${className}`}
+        className={`select-base ${hasError ? 'border-red-500 focus:ring-red-500' : 'focus:ring-[#A2D2B9] focus:border-[#185757]'} ${className}`}
       >
         <option value="">{placeholder}</option>
         {options.map((opt) => (

@@ -1,14 +1,16 @@
 import React, { useState, useEffect, useTransition, useDeferredValue, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { useParticipants, useRounds, useNews, useInfoPages, useCityTips, useSchnellzugriff, useCountdown, usePageTitle } from '../hooks/index.js';
+import { useParticipants, useRounds, useNews, usePublishedInfoPages, useCityTips, useSchnellzugriff, useCountdown, useDashboardSettings, usePageTitle } from '../hooks/index.js';
 // Stats now handled by React Query data
 import LoadingSpinner from './LoadingSpinner';
-import { FadeIn, StaggeredContainer, AnimateOnScroll } from './Transitions.jsx';
+import { FadeIn, StaggeredContainer } from './Transitions.jsx';
 import { DashboardSkeleton } from './SkeletonLoader.jsx';
 import { ErrorMessage, SuccessMessage } from './StatusMessages.jsx';
 import { createTimezoneAwareCountdown } from '../services/timezoneService.js';
 import { translateRoundStatus, getRoundStatusIcon, getRoundStatusColor } from '../utils/categoryTranslations.js';
+import { getLinkProps, handleLinkClick } from '../utils/linkUtils.js';
 import { getRegionFlag } from '../utils/detailViewUtils.js';
+import { getCategoryColor } from '../utils/categoryUtils.js';
 
 export default function MemberDashboard() {
   usePageTitle('Dashboard');
@@ -17,9 +19,10 @@ export default function MemberDashboard() {
   const participantsData = participantsResponse?.data || participantsResponse || [];
   const { data: roundsData = [], isLoading: roundsLoading, error: roundsError } = useRounds();
   const { data: newsData = [], isLoading: newsLoading, error: newsError } = useNews();
-  const { data: infoPagesData = [], isLoading: infoPagesLoading, error: infoPagesError } = useInfoPages();
+  const { data: infoPagesData = [], isLoading: infoPagesLoading, error: infoPagesError } = usePublishedInfoPages();
   const { data: cityTipsData = [], isLoading: cityTipsLoading, error: cityTipsError } = useCityTips();
   const { data: schnellzugriffData = [], isLoading: schnellzugriffLoading, error: schnellzugriffError } = useSchnellzugriff();
+  const { data: dashboardSettings } = useDashboardSettings();
   
   // Session-based random seed that changes on page reload but stays stable during session
   const sessionSeed = useRef(Math.floor(Math.random() * 1000));
@@ -42,10 +45,10 @@ export default function MemberDashboard() {
     return countdownData || {
       title: 'Countdown zum SLAM25',
       subtitle: '28. Oktober 2025 • 12:00 Uhr (Berlin Zeit)',
-      buttonText: 'Zum Zeitplan',
-      buttonEmoji: '📅',
-      buttonLink: '/timetable',
-      isActive: false  // Don't show countdown when database is unavailable
+      button_text: 'Zum Zeitplan',
+      button_emoji: '📅',
+      button_link: '/timetable',
+      is_active: false  // Don't show countdown when database is unavailable
     };
   }, [countdownData]);
 
@@ -144,7 +147,7 @@ export default function MemberDashboard() {
 
   // Countdown timer using timezone-aware service
   useEffect(() => {
-    if (!countdownConfig.isActive) {
+    if (!countdownConfig.is_active) {
       setCountdown({ days: 0, hours: 0, minutes: 0, seconds: 0 });
       setCountdownExpired(false);
       return;
@@ -171,19 +174,6 @@ export default function MemberDashboard() {
   }, [countdownConfig]);
 
 
-
-  const getCategoryColor = (category) => {
-    const colors = {
-      cafe: 'bg-yellow-500',
-      restaurant: 'bg-red-500',
-      bar: 'bg-blue-500',
-      culture: 'bg-purple-500',
-      shopping: 'bg-green-500',
-      hotel: 'bg-indigo-500',
-      transport: 'bg-orange-500'
-    };
-    return colors[category] || 'bg-gray-500';
-  };
 
   // Helper function to check if any round has groups
   const hasGroups = (round) => {
@@ -221,30 +211,31 @@ export default function MemberDashboard() {
       )}
 
       {/* Hero Section */}
-      <AnimateOnScroll>
-        <div className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 rounded-2xl p-8 text-white relative overflow-hidden">
-          <div className="absolute inset-0 bg-black opacity-10"></div>
-          <div className="relative z-10">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center mb-4">
-              <div className="w-16 h-16 bg-white bg-opacity-20 rounded-2xl flex items-center justify-center mr-4 mb-4 sm:mb-0 flex-shrink-0" aria-hidden="true">
-                <span className="text-3xl">🎭</span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-2 break-words">Willkommen bei SLAM25</h1>
-                <p className="text-lg sm:text-xl opacity-90">Dein Poetry Slam Community Hub</p>
-              </div>
+      <div className="bg-[#185757] dark:bg-[#A2D2B9] rounded-2xl p-8 text-white dark:text-gray-900 relative overflow-hidden">
+        <div className="absolute inset-0 bg-black opacity-10"></div>
+        <div className="relative z-10">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center mb-4">
+            <div className="w-16 h-16 bg-white bg-opacity-20 rounded-2xl flex items-center justify-center mr-4 mb-4 sm:mb-0 flex-shrink-0" aria-hidden="true">
+              <span className="text-3xl">🎭</span>
             </div>
-            <p className="text-lg opacity-80 max-w-2xl">
-              Entdecke Teilnehmer*innen, verfolge Runden, lies Tipps und bleibe mit der Poetry Slam Community verbunden.
-            </p>
+            <div className="flex-1 min-w-0">
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-2 break-words">
+                {dashboardSettings?.heading || 'Willkommen bei SLAM25'}
+              </h1>
+              <p className="text-lg sm:text-xl opacity-90">
+                {dashboardSettings?.subtitle || 'Dein Poetry Slam Community Hub'}
+              </p>
+            </div>
           </div>
+          <p className="text-lg opacity-80 max-w-2xl">
+            {dashboardSettings?.description || 'Entdecke Teilnehmer*innen, verfolge Runden, lies Tipps und bleibe mit der Poetry Slam Community verbunden.'}
+          </p>
         </div>
-      </AnimateOnScroll>
+      </div>
 
       {/* Countdown Section */}
-      {countdownConfig.isActive && !countdownExpired && (
-        <AnimateOnScroll>
-          <div className="bg-gradient-to-r from-red-600 to-orange-600 rounded-2xl p-4 sm:p-8 text-white relative overflow-hidden">
+      {countdownConfig.is_active && !countdownExpired && (
+        <div className="bg-[#185757] dark:bg-[#A2D2B9] rounded-2xl p-4 sm:p-8 text-white dark:text-gray-900 relative overflow-hidden">
             <div className="absolute inset-0 bg-black opacity-10"></div>
             <div className="relative z-10 text-center">
               <h2 className="text-2xl sm:text-3xl font-bold mb-2">{countdownConfig.title}</h2>
@@ -271,21 +262,19 @@ export default function MemberDashboard() {
               
               <div className="mt-6">
                 <Link
-                  to={countdownConfig.buttonLink}
-                  className="inline-flex items-center px-6 py-3 bg-white text-red-600 rounded-lg font-semibold hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-red-600"
-                  aria-label={`${countdownConfig.buttonText} navigieren`}
+                  to={countdownConfig.button_link}
+                  className="inline-flex items-center px-6 py-3 bg-white dark:bg-gray-900 text-[#185757] dark:text-[#A2D2B9] rounded-lg font-semibold hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors focus:outline-none focus:ring-2 focus:ring-white dark:focus:ring-gray-900 focus:ring-offset-2 focus:ring-offset-[#185757] dark:focus:ring-offset-[#A2D2B9]"
+                  aria-label={`${countdownConfig.button_text} navigieren`}
                 >
-                  <span className="mr-2" aria-hidden="true">{countdownConfig.buttonEmoji}</span>
-                  {countdownConfig.buttonText}
+                  <span className="mr-2" aria-hidden="true">{countdownConfig.button_emoji}</span>
+                  {countdownConfig.button_text}
                 </Link>
               </div>
             </div>
           </div>
-        </AnimateOnScroll>
       )}
 
       {/* Quick Actions - Schnellzugriff */}
-      <AnimateOnScroll>
         <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Schnellzugriff</h2>
           {schnellzugriffLinks.length > 0 ? (
@@ -293,48 +282,33 @@ export default function MemberDashboard() {
               {schnellzugriffLinks.map((link) => {
                 const getColorClasses = (color) => {
                   const colorMap = {
-                    blue: 'bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 focus:ring-blue-500',
+                    teal: 'bg-[#A2D2B9]/20 hover:bg-[#A2D2B9]/30 focus:ring-[#185757]',
                     purple: 'bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/40 focus:ring-purple-500',
                     green: 'bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/40 focus:ring-green-500',
                     red: 'bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 focus:ring-red-500',
                     yellow: 'bg-yellow-50 dark:bg-yellow-900/20 hover:bg-yellow-100 dark:hover:bg-yellow-900/40 focus:ring-yellow-500',
-                    indigo: 'bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 focus:ring-indigo-500',
-                    pink: 'bg-pink-50 dark:bg-pink-900/20 hover:bg-pink-100 dark:hover:bg-pink-900/40 focus:ring-pink-500',
-                    orange: 'bg-orange-50 dark:bg-orange-900/20 hover:bg-orange-100 dark:hover:bg-orange-900/40 focus:ring-orange-500',
-                    teal: 'bg-teal-50 dark:bg-teal-900/20 hover:bg-teal-100 dark:hover:bg-teal-900/40 focus:ring-teal-500',
-                    cyan: 'bg-cyan-50 dark:bg-cyan-900/20 hover:bg-cyan-100 dark:hover:bg-cyan-900/40 focus:ring-cyan-500'
+                    orange: 'bg-orange-50 dark:bg-orange-900/20 hover:bg-orange-100 dark:hover:bg-orange-900/40 focus:ring-orange-500'
                   };
-                  return colorMap[color] || colorMap.blue;
+                  return colorMap[color] || colorMap.teal;
                 };
 
                 const getIconBgColor = (color) => {
                   const colorMap = {
-                    blue: 'bg-blue-600',
+                    teal: 'bg-[#185757]',
                     purple: 'bg-purple-600',
                     green: 'bg-green-600',
                     red: 'bg-red-600',
                     yellow: 'bg-yellow-600',
-                    indigo: 'bg-indigo-600',
-                    pink: 'bg-pink-600',
-                    orange: 'bg-orange-600',
-                    teal: 'bg-teal-600',
-                    cyan: 'bg-cyan-600'
+                    orange: 'bg-orange-600'
                   };
-                  return colorMap[color] || colorMap.blue;
-                };
-
-                // Helper function to determine if URL should open in new tab
-                const shouldOpenInNewTab = (url) => {
-                  if (!url) return false;
-                  return url.startsWith('http://') || url.startsWith('https://');
+                  return colorMap[color] || colorMap.teal;
                 };
 
                 return (
                   <a
                     key={link.id}
                     href={link.url}
-                    target={shouldOpenInNewTab(link.url) ? '_blank' : '_self'}
-                    rel={shouldOpenInNewTab(link.url) ? 'noopener noreferrer' : undefined}
+                    onClick={(e) => handleLinkClick(link, e)}
                     className={`group p-4 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 ${getColorClasses(link.color)}`}
                     aria-label={`${link.title} - ${link.description || ''}`}
                   >
@@ -356,14 +330,11 @@ export default function MemberDashboard() {
           ) : (
             <div className="text-center py-8">
               <div className="text-4xl mb-4">⚡</div>
-              <p className="text-gray-600 dark:text-gray-400">Keine Schnellzugriff Links verfügbar</p>
+              <p className="text-gray-600 dark:text-gray-400">Schnellzugriff kommt bald :)</p>
             </div>
           )}
         </div>
-      </AnimateOnScroll>
-
       {/* City Tips Preview Section */}
-      <AnimateOnScroll>
         <div className="bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-8 shadow-sm border border-gray-200 dark:border-gray-700">
           <div className="mb-4 sm:mb-6">
             <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2">Chemnitz Tipps & Empfehlungen</h2>
@@ -399,12 +370,12 @@ export default function MemberDashboard() {
                 <div
                   key={tip.id}
                   className="bg-gray-50 dark:bg-gray-700 rounded-xl p-4 sm:p-6 hover:shadow-md transition-all duration-200 hover:-translate-y-1 micro-interaction"
-                  tabIndex="meta_description"
+                  tabIndex="0"
                   role="article"
                   aria-label={`${tip.name} - ${tip.description}`}
                 >
                   <div className="flex items-center space-x-3 mb-3">
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-white text-lg ${getCategoryColor(tip.category)}`} aria-hidden="true">
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-white text-lg ${getCategoryColor(tip.category, 'cityTip')}`} aria-hidden="true">
                       {tip.icon}
                     </div>
                     <div>
@@ -422,10 +393,10 @@ export default function MemberDashboard() {
               <div className="col-span-full text-center py-8">
                 <div className="text-4xl mb-4" aria-hidden="true">🗺️</div>
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                  Keine Tipps verfügbar
+                  Stadt-Tipps kommt bald :)
                 </h3>
                 <p className="text-gray-600 dark:text-gray-400">
-                  Besuche die Stadt-Tipps Seite für alle Empfehlungen.
+                  Bald gibt es hier tolle Empfehlungen für Berlin!
                 </p>
               </div>
             )}
@@ -437,7 +408,7 @@ export default function MemberDashboard() {
               <div className="text-center">
                 <Link
                   to="/city-tips"
-                  className="inline-flex items-center px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-lg font-semibold hover:from-orange-600 hover:to-red-600 transition-all duration-200 shadow-lg hover:shadow-xl text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2"
+                  className="inline-flex items-center px-4 sm:px-6 py-2 sm:py-3 bg-[#185757] dark:bg-[#A2D2B9] text-white dark:text-gray-900 rounded-lg font-semibold hover:bg-[#0f3a3b] dark:hover:bg-[#8BC4A3] transition-all duration-200 shadow-lg hover:shadow-xl text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-[#A2D2B9] dark:focus:ring-[#185757] focus:ring-offset-2"
                   aria-label="Alle Stadt-Tipps anzeigen"
                 >
                   <span className="mr-2" aria-hidden="true">🗺️</span>
@@ -450,7 +421,7 @@ export default function MemberDashboard() {
           <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-600">
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 text-center">
               <div className="text-center">
-                <div className="w-12 h-12 bg-red-100 dark:bg-red-900 rounded-xl flex items-center justify-center mx-auto mb-2" aria-hidden="true">
+                <div className="w-12 h-12 bg-[#A2D2B9]/20 dark:bg-[#185757]/30 rounded-xl flex items-center justify-center mx-auto mb-2" aria-hidden="true">
                   <span className="text-xl">🍽️</span>
                 </div>
                 <p className="text-sm font-medium text-gray-900 dark:text-white">Restaurants</p>
@@ -464,7 +435,7 @@ export default function MemberDashboard() {
                 <p className="text-xs text-gray-500 dark:text-gray-400">{categoryStats.cafe} Empfehlungen</p>
               </div>
               <div className="text-center">
-                <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-xl flex items-center justify-center mx-auto mb-2" aria-hidden="true">
+                <div className="w-12 h-12 bg-[#A2D2B9]/20 dark:bg-[#185757]/30 rounded-xl flex items-center justify-center mx-auto mb-2" aria-hidden="true">
                   <span className="text-xl">🎭</span>
                 </div>
                 <p className="text-sm font-medium text-gray-900 dark:text-white">Kultur</p>
@@ -478,14 +449,14 @@ export default function MemberDashboard() {
                 <p className="text-xs text-gray-500 dark:text-gray-400">{categoryStats.shopping} Empfehlungen</p>
               </div>
               <div className="text-center">
-                <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-xl flex items-center justify-center mx-auto mb-2" aria-hidden="true">
+                <div className="w-12 h-12 bg-[#A2D2B9]/20 dark:bg-[#185757]/30 rounded-xl flex items-center justify-center mx-auto mb-2" aria-hidden="true">
                   <span className="text-xl">🍺</span>
                 </div>
                 <p className="text-sm font-medium text-gray-900 dark:text-white">Bars</p>
                 <p className="text-xs text-gray-500 dark:text-gray-400">{categoryStats.bar} Empfehlungen</p>
               </div>
               <div className="text-center">
-                <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-900 rounded-xl flex items-center justify-center mx-auto mb-2" aria-hidden="true">
+                <div className="w-12 h-12 bg-[#A2D2B9]/20 dark:bg-[#185757]/30 rounded-xl flex items-center justify-center mx-auto mb-2" aria-hidden="true">
                   <span className="text-xl">🏨</span>
                 </div>
                 <p className="text-sm font-medium text-gray-900 dark:text-white">Hotels</p>
@@ -494,11 +465,8 @@ export default function MemberDashboard() {
             </div>
           </div>
         </div>
-      </AnimateOnScroll>
-
       {/* Info Pages Section */}
       {infoPagesData.length > 0 && (
-        <AnimateOnScroll>
           <div className="bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-8 shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
             <div className="mb-4 sm:mb-6">
               <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2">Info & Regeln</h2>
@@ -510,11 +478,11 @@ export default function MemberDashboard() {
                 <Link
                   key={page.id}
                   to={`/info/${page.slug}`}
-                  className="block p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2"
+                  className="block p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors focus:outline-none focus:ring-2 focus:ring-[#A2D2B9] focus:ring-offset-2"
                   aria-label={`Info-Seite: ${page.title}`}
                 >
                   <div className="flex items-center space-x-3 mb-3">
-                    <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-500 rounded-lg flex items-center justify-center text-white text-lg" aria-hidden="true">
+                    <div className="w-10 h-10 bg-[#185757] rounded-lg flex items-center justify-center text-white text-lg" aria-hidden="true">
                       📋
                     </div>
                     <div className="flex-1">
@@ -539,7 +507,7 @@ export default function MemberDashboard() {
               <div className="text-center">
                 <Link
                   to="/info"
-                  className="inline-flex items-center px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-lg font-semibold hover:from-orange-600 hover:to-red-600 transition-all duration-200 shadow-lg hover:shadow-xl text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2"
+                  className="inline-flex items-center px-4 sm:px-6 py-2 sm:py-3 bg-[#185757] dark:bg-[#A2D2B9] text-white dark:text-gray-900 rounded-lg font-semibold hover:bg-[#0f3a3b] dark:hover:bg-[#8BC4A3] transition-all duration-200 shadow-lg hover:shadow-xl text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-[#A2D2B9] dark:focus:ring-[#185757] focus:ring-offset-2"
                   aria-label="Alle Info-Seiten anzeigen"
                 >
                   <span className="mr-2" aria-hidden="true">📋</span>
@@ -548,11 +516,9 @@ export default function MemberDashboard() {
               </div>
             </div>
           </div>
-        </AnimateOnScroll>
       )}
 
       {/* Wettbewerbsrunden Section */}
-      <AnimateOnScroll>
         <div className="bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-8 shadow-sm border border-gray-200 dark:border-gray-700">
           <div className="mb-4 sm:mb-6">
             <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2">Wettbewerbsrunden</h2>
@@ -563,7 +529,7 @@ export default function MemberDashboard() {
             {upcomingRounds.length > 0 ? upcomingRounds.map((round, index) => (
               <Link
                 key={round.id}
-                to={`/rounds#round-${round.id}`}
+                to={`/rounds/${round.slug}`}
                 className="block p-3 sm:p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2"
                 aria-label={`Runde: ${round.title}`}
               >
@@ -607,8 +573,8 @@ export default function MemberDashboard() {
             )) : (
               <div className="text-center py-8">
                 <div className="text-4xl mb-4">🎭</div>
-                <p className="text-gray-600 dark:text-gray-400 text-lg font-medium mb-2">Keine bevorstehenden Runden</p>
-                <p className="text-gray-500 dark:text-gray-500 text-sm">Es sind derzeit keine zukünftigen Wettbewerbsrunden geplant.</p>
+                <p className="text-gray-600 dark:text-gray-400 text-lg font-medium mb-2">Runden kommt bald :)</p>
+                <p className="text-gray-500 dark:text-gray-500 text-sm">Bald werden hier alle Poetry Slam Runden zu sehen sein!</p>
               </div>
             )}
           </div>
@@ -619,7 +585,7 @@ export default function MemberDashboard() {
               <div className="text-center">
                 <Link
                   to="/rounds"
-                  className="inline-flex items-center px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-lg font-semibold hover:from-purple-600 hover:to-blue-600 transition-all duration-200 shadow-lg hover:shadow-xl text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2"
+                  className="inline-flex items-center px-4 sm:px-6 py-2 sm:py-3 bg-[#185757] dark:bg-[#A2D2B9] text-white dark:text-gray-900 rounded-lg font-semibold hover:bg-[#0f3a3b] dark:hover:bg-[#8BC4A3] transition-all duration-200 shadow-lg hover:shadow-xl text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-[#A2D2B9] dark:focus:ring-[#185757] focus:ring-offset-2"
                   aria-label="Alle Runden anzeigen"
                 >
                   <span className="mr-2" aria-hidden="true">🎭</span>
@@ -636,10 +602,10 @@ export default function MemberDashboard() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {randomParticipants
                   .slice(0, 9).map((participant) => (
-                  <div
+                  <Link
                     key={participant.id}
-                    className="flex items-center space-x-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
-                    tabIndex="0"
+                    to={`/participants/${participant.slug}`}
+                    className="flex items-center space-x-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                     role="article"
                     aria-label={`Teilnehmer*in: ${participant.name}`}
                   >
@@ -656,13 +622,13 @@ export default function MemberDashboard() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path>
                       </svg>
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
               <div className="mt-4 text-center">
                 <Link
                   to="/participants"
-                  className="inline-flex items-center px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg font-semibold hover:from-blue-600 hover:to-purple-600 transition-all duration-200 shadow-lg hover:shadow-xl text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                  className="inline-flex items-center px-4 sm:px-6 py-2 sm:py-3 bg-[#185757] dark:bg-[#A2D2B9] text-white dark:text-gray-900 rounded-lg font-semibold hover:bg-[#0f3a3b] dark:hover:bg-[#8BC4A3] transition-all duration-200 shadow-lg hover:shadow-xl text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-[#A2D2B9] dark:focus:ring-[#185757] focus:ring-offset-2"
                   aria-label={`Alle ${randomParticipants.length} Teilnehmer*innen anzeigen`}
                 >
                   <span className="mr-2" aria-hidden="true">👥</span>
@@ -672,7 +638,6 @@ export default function MemberDashboard() {
             </div>
           )}
         </div>
-      </AnimateOnScroll>
     </div>
   );
 }

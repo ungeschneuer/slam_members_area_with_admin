@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { API_URL } from '../config/api.js';
 import authService from '../services/authService.js';
 import { useEntityData } from './useEntityData.js';
+import { getQueryConfig } from '../config/polling.js';
 
 // Query keys for info pages
 export const infoPagesKeys = {
@@ -13,7 +14,7 @@ export const infoPagesKeys = {
   bySlug: (slug) => [...infoPagesKeys.details(), 'slug', slug],
 };
 
-// Hook to fetch all info pages
+// Hook to fetch all info pages (ADMIN ONLY - includes drafts)
 export function useInfoPages(filters = {}, isAdmin = false) {
   return useEntityData(
     'info-pages',
@@ -29,7 +30,27 @@ export function useInfoPages(filters = {}, isAdmin = false) {
       const data = result?.data?.rows || result?.data || result || [];
       return Array.isArray(data) ? data : [];
     },
-    { filters, staleTime: 15 * 60 * 1000, gcTime: 60 * 60 * 1000, isAdmin }
+    { filters, ...getQueryConfig('infoPages', isAdmin), isAdmin }
+  );
+}
+
+// Hook to fetch only published info pages (USER VIEW)
+export function usePublishedInfoPages(filters = {}) {
+  return useEntityData(
+    'info-pages-published',
+    async () => {
+      const response = await fetch(`${API_URL}/info-pages/published`, {
+        credentials: 'include'
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to fetch published info pages: ${response.statusText}`);
+      }
+      const result = await response.json();
+      // Handle nested data structure or direct array
+      const data = result?.data?.rows || result?.data || result || [];
+      return Array.isArray(data) ? data : [];
+    },
+    { filters, ...getQueryConfig('infoPages', false), isAdmin: false }
   );
 }
 
@@ -49,8 +70,7 @@ export function useInfoPage(id) {
       return result?.data || result || null;
     },
     enabled: !!id,
-    staleTime: 15 * 60 * 1000,
-    gcTime: 60 * 60 * 1000,
+    ...getQueryConfig('infoPages', false, { refetchInterval: false }), // Detail pages don't need polling
   });
 }
 
@@ -71,8 +91,7 @@ export function useInfoPageBySlug(slug) {
       return data;
     },
     enabled: !!slug,
-    staleTime: 15 * 60 * 1000,
-    gcTime: 60 * 60 * 1000,
+    ...getQueryConfig('infoPages', false, { refetchInterval: false }), // Detail pages don't need polling
   });
 }
 
@@ -97,6 +116,10 @@ export function useCreateInfoPage() {
       // Invalidate all info-pages-related queries to ensure admin components update
       queryClient.invalidateQueries({ queryKey: ['info-pages'] });
       queryClient.invalidateQueries({ queryKey: infoPagesKeys.lists() });
+      // Also invalidate the specific query used by useEntityData
+      queryClient.invalidateQueries({ queryKey: ['info-pages', {}] });
+      // Invalidate ALL queries that start with 'info-pages' (more aggressive)
+      queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] === 'info-pages' });
       
       // If we have the created info page data, add it to the cache
       if (data?.data) {
@@ -130,6 +153,8 @@ export function useUpdateInfoPage() {
       // Invalidate all info-pages-related queries to ensure admin components update
       queryClient.invalidateQueries({ queryKey: ['info-pages'] });
       queryClient.invalidateQueries({ queryKey: infoPagesKeys.lists() });
+      // Also invalidate the specific query used by useEntityData
+      queryClient.invalidateQueries({ queryKey: ['info-pages', {}] });
       
       // Update the specific info page in cache
       if (data?.data) {
@@ -164,6 +189,8 @@ export function useDeleteInfoPage() {
       // Invalidate all info-pages-related queries to ensure admin components update
       queryClient.invalidateQueries({ queryKey: ['info-pages'] });
       queryClient.invalidateQueries({ queryKey: infoPagesKeys.lists() });
+      // Also invalidate the specific query used by useEntityData
+      queryClient.invalidateQueries({ queryKey: ['info-pages', {}] });
     },
   });
 }

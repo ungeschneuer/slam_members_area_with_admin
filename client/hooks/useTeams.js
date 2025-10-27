@@ -3,7 +3,7 @@ import { API_URL } from '../config/api.js';
 import { getQueryConfig } from '../config/polling.js';
 
 // Fetch all teams
-export const useTeams = () => {
+export const useTeams = (isAdmin = false) => {
   return useQuery({
     queryKey: ['teams'],
     queryFn: async () => {
@@ -16,7 +16,7 @@ export const useTeams = () => {
       const result = await response.json();
       return result?.data || result || [];
     },
-    ...getQueryConfig('teams', false),
+    ...getQueryConfig('teams', isAdmin),
   });
 };
 

@@ -86,15 +86,27 @@ router.get('/admin/all', ...adminMiddleware(), async (req, res) => {
 router.post('/', ...adminMiddleware(), ...validateSchnellzugriff, async (req, res) => { // Idempotency removed
   // Sanitize input data to prevent XSS
   const sanitizedData = sanitizeEntity.schnellzugriff(req.body);
-  const { title, description, url, icon, color, sortOrder, isActive, isExternal } = sanitizedData;
+  
+  // Proper boolean and number normalization
+  const normalizedData = {
+    title: sanitizedData.title,
+    description: sanitizedData.description || '',
+    url: sanitizedData.url,
+    icon: sanitizedData.icon || '🔗',
+    color: sanitizedData.color || 'blue',
+    sort_order: parseInt(sanitizedData.sort_order) || 0,
+    is_active: sanitizedData.is_active !== false && sanitizedData.is_active !== 'false',
+    is_external: sanitizedData.is_external !== false && sanitizedData.is_external !== 'false'
+  };
   
   await executeCrudOperation(
     'create',
     `INSERT INTO schnellzugriff_links (title, description, url, icon, color, sort_order, is_active, is_external)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
      RETURNING *`,
-    [title, description, url, icon || '🔗', color || 'blue', 
-     sortOrder || 0, isActive !== false, isExternal !== false],
+    [normalizedData.title, normalizedData.description, normalizedData.url, 
+     normalizedData.icon, normalizedData.color, normalizedData.sort_order,
+     normalizedData.is_active, normalizedData.is_external],
     'schnellzugriff',
     'CREATE_SCHNELLZUGRIFF',
     res
@@ -108,7 +120,18 @@ router.put('/:id', ...adminMiddleware(), ...validateSchnellzugriffId, ...validat
   const { id } = req.params;
   // Sanitize input data to prevent XSS
   const sanitizedData = sanitizeEntity.schnellzugriff(req.body);
-  const { title, description, url, icon, color, sortOrder, isActive, isExternal } = sanitizedData;
+  
+  // Proper boolean and number normalization
+  const normalizedData = {
+    title: sanitizedData.title,
+    description: sanitizedData.description || '',
+    url: sanitizedData.url,
+    icon: sanitizedData.icon || '🔗',
+    color: sanitizedData.color || 'blue',
+    sort_order: parseInt(sanitizedData.sort_order) || 0,
+    is_active: sanitizedData.is_active !== false && sanitizedData.is_active !== 'false',
+    is_external: sanitizedData.is_external !== false && sanitizedData.is_external !== 'false'
+  };
   
   await executeCrudOperation(
     'update',
@@ -117,7 +140,9 @@ router.put('/:id', ...adminMiddleware(), ...validateSchnellzugriffId, ...validat
          sort_order = $6, is_active = $7, is_external = $8, updated_at = CURRENT_TIMESTAMP
      WHERE id = $9
      RETURNING *`,
-    [title, description, url, icon, color, sortOrder, isActive, isExternal, parseInt(id)],
+    [normalizedData.title, normalizedData.description, normalizedData.url,
+     normalizedData.icon, normalizedData.color, normalizedData.sort_order,
+     normalizedData.is_active, normalizedData.is_external, parseInt(id)],
     'schnellzugriff',
     'UPDATE_SCHNELLZUGRIFF',
     res

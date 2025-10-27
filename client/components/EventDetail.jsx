@@ -6,6 +6,7 @@ import { ErrorMessage, SuccessMessage } from './StatusMessages.jsx';
 import { formatInstagramUrl } from '../utils/instagramUtils.js';
 import { generateAndDownloadICS } from '../utils/icsUtils.js';
 import { getContentTypeIcon, getContentTypeGradient } from '../utils/detailViewUtils.js';
+import { handleLinkClick } from '../utils/linkUtils.js';
 import BackButton from './shared/BackButton.jsx';
 import logger from '../services/logger.js';
 
@@ -24,13 +25,6 @@ export default function EventDetail() {
   const [icsError, setIcsError] = useState(null);
 
   // Event data is now provided directly by useTimetableEvent hook
-  // Check if event has an internal link override
-  useEffect(() => {
-    if (event?.internal_link) {
-      // Redirect to the internal link
-      window.location.href = event.internal_link;
-    }
-  }, [event]);
 
   // Helper function to get event type info
   const getEventTypeInfo = (type) => {
@@ -45,6 +39,10 @@ export default function EventDetail() {
         return { icon: '🎉', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300', label: 'Fun' };
       case 'aftershow':
         return { icon: '🎭', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300', label: 'Aftershow' };
+      case 'panel':
+        return { icon: '🎤', color: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300', label: 'Panel' };
+      case 'networking':
+        return { icon: '🤝', color: 'bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-300', label: 'Netzwerktreffen' };
       default:
         return { icon: '📅', color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300', label: 'Event' };
     }
@@ -260,7 +258,7 @@ export default function EventDetail() {
           
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-8">
             <div className="flex items-start space-x-4">
-              <div className={`w-16 h-16 bg-gradient-to-br ${getContentTypeGradient('event')} rounded-full flex items-center justify-center text-white text-2xl font-bold`}>
+              <div className={`w-16 h-16 bg-${getContentTypeGradient('event')} rounded-full flex items-center justify-center text-white text-2xl font-bold`}>
                 {getContentTypeIcon('event')}
               </div>
               <div className="flex-1">
@@ -321,67 +319,54 @@ export default function EventDetail() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
-                <div>
+                <div className="flex-1">
                   <div className="font-medium text-gray-900 dark:text-white">{event.location || 'Unbekannter Ort'}</div>
                   {event.address && (
                     <div className="text-gray-600 dark:text-gray-400 mt-1">{event.address}</div>
                   )}
+                  
+                  {/* Map Buttons - Only show if we have an address */}
+                  {event.address && event.address.trim() && (
+                    <div className="flex space-x-2 mt-3">
+                      <button
+                        onClick={() => {
+                          const encodedAddress = encodeURIComponent(event.address);
+                          const googleMapsLink = {
+                            url: `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`,
+                            title: 'Öffnen in Google Maps',
+                            is_external: true
+                          };
+                          handleLinkClick(googleMapsLink, new Event('click'));
+                        }}
+                        className="flex items-center px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                      >
+                        <svg className="w-4 h-4 mr-1" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                        </svg>
+                        Öffnen in Google Maps
+                      </button>
+                      <button
+                        onClick={() => {
+                          const encodedAddress = encodeURIComponent(event.address);
+                          const appleMapsLink = {
+                            url: `https://maps.apple.com/?q=${encodedAddress}`,
+                            title: 'Öffnen in Apple Maps',
+                            is_external: true
+                          };
+                          handleLinkClick(appleMapsLink, new Event('click'));
+                        }}
+                        className="flex items-center px-3 py-1.5 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors text-sm font-medium"
+                      >
+                        <svg className="w-4 h-4 mr-1" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                        </svg>
+                        Öffnen in Apple Maps
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
               
-              {/* Map Section - Only show if we have a full address */}
-              {event.address && event.address.trim() && (
-                <div className="mt-4">
-                  <div className="bg-gray-100 dark:bg-gray-700 rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="text-lg font-semibold text-gray-900 dark:text-white">Karte</h4>
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => {
-                            const encodedAddress = encodeURIComponent(event.address);
-                            window.open(`https://www.google.com/maps/search/?api=1&query=${encodedAddress}`, '_blank');
-                          }}
-                          className="flex items-center px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
-                        >
-                          <svg className="w-4 h-4 mr-1" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-                          </svg>
-                          Google Maps
-                        </button>
-                        <button
-                          onClick={() => {
-                            const encodedAddress = encodeURIComponent(event.address);
-                            window.open(`https://maps.apple.com/?q=${encodedAddress}`, '_blank');
-                          }}
-                          className="flex items-center px-3 py-1.5 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors text-sm font-medium"
-                        >
-                          <svg className="w-4 h-4 mr-1" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-                          </svg>
-                          Apple Maps
-                        </button>
-                      </div>
-                    </div>
-                    
-                    {/* Static Map Preview */}
-                    <div className="relative bg-gray-200 dark:bg-gray-600 rounded-lg overflow-hidden">
-                      <div className="aspect-video bg-gradient-to-br from-blue-100 to-green-100 dark:from-blue-900 dark:to-green-900 flex items-center justify-center">
-                        <div className="text-center">
-                          <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center text-white text-2xl mx-auto mb-3 shadow-lg">
-                            📍
-                          </div>
-                          <p className="text-gray-700 dark:text-gray-300 font-medium">
-                            {event.address}
-                          </p>
-                          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                            Klicken Sie auf die Buttons oben, um die Karte zu öffnen
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
 
@@ -396,7 +381,7 @@ export default function EventDetail() {
           )}
 
           {/* Detailed Description */}
-          {event.detailed_description && (
+          {event.detailed_description?.trim() && (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Details</h2>
               <div className="prose dark:prose-invert max-w-none">
@@ -455,7 +440,12 @@ export default function EventDetail() {
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      window.open(formatInstagramUrl(participantInstagram), '_blank', 'noopener,noreferrer');
+                                      const instagramLink = {
+                                        url: formatInstagramUrl(participantInstagram),
+                                        title: 'Instagram',
+                                        is_external: true
+                                      };
+                                      handleLinkClick(instagramLink, e);
                                     }}
                                     className="inline-flex items-center text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 cursor-pointer bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded-lg transition-colors"
                                   >
@@ -499,12 +489,17 @@ export default function EventDetail() {
                 {event.additional_links.map((link, linkIndex) => {
                   if (!link || typeof link !== 'object') return null;
                   
+                  const additionalLink = {
+                    url: link.url || '#',
+                    title: link.title || 'Link',
+                    is_external: true // Timetable additional links are always external
+                  };
+                  
                   return (
                     <a
                       key={`link-${event.id}-${linkIndex}`}
                       href={link.url || '#'}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                      onClick={(e) => handleLinkClick(additionalLink, e)}
                       className="flex items-center space-x-3 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600 hover:shadow-md transition-all duration-200"
                     >
                       <span className="text-2xl">{getLinkIcon(link.type)}</span>

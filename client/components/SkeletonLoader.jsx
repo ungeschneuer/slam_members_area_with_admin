@@ -5,14 +5,14 @@ export function DashboardSkeleton() {
   return (
     <div className="space-y-8">
       {/* Hero Section Skeleton */}
-      <div className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 rounded-2xl p-8 text-white">
+      <div className="bg-[#185757] rounded-2xl p-8 text-white">
         <div className="skeleton h-12 w-1/2 mb-4 bg-white/20"></div>
         <div className="skeleton h-6 w-3/4 mb-6 bg-white/20"></div>
         <div className="skeleton h-4 w-2/3 bg-white/20"></div>
       </div>
       
       {/* Countdown Skeleton */}
-      <div className="bg-gradient-to-r from-red-600 to-orange-600 rounded-2xl p-8 text-white">
+      <div className="bg-red-500 rounded-2xl p-8 text-white">
         <div className="skeleton h-8 w-1/3 mx-auto mb-6 bg-white/20"></div>
         <div className="grid grid-cols-4 gap-4">
           {Array.from({ length: 4 }).map((_, index) => (

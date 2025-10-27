@@ -29,8 +29,8 @@ export class SimplifiedTimetableService {
         LEFT JOIN timetable_participants tp ON t.id = tp.timetable_entry_id
         LEFT JOIN participants p ON tp.participant_id = p.id
         GROUP BY t.id, t.title, t.description, t.detailed_description, t.location, 
-                 t.date, t.time, t.end_time, t.type, t.status, t.additional_links, 
-                 t.slug, t.internal_link, t.created_at, t.updated_at
+                 t.address, t.date, t.time, t.end_time, t.type, t.status, 
+                 t.additional_links, t.slug, t.created_at, t.updated_at
         ORDER BY t.date, t.time
       `;
       const result = await executeQuery(query, []);
@@ -72,8 +72,8 @@ export class SimplifiedTimetableService {
         LEFT JOIN participants p ON tp.participant_id = p.id
         WHERE t.id = $1
         GROUP BY t.id, t.title, t.description, t.detailed_description, t.location, 
-                 t.date, t.time, t.end_time, t.type, t.status, t.additional_links, 
-                 t.slug, t.internal_link, t.created_at, t.updated_at
+                 t.address, t.date, t.time, t.end_time, t.type, t.status, 
+                 t.additional_links, t.slug, t.created_at, t.updated_at
       `;
 
       const result = await executeQuery(query, [entryId]);
@@ -126,8 +126,8 @@ export class SimplifiedTimetableService {
         LEFT JOIN participants p ON tp.participant_id = p.id
         WHERE t.slug = $1
         GROUP BY t.id, t.title, t.description, t.detailed_description, t.location, 
-                 t.date, t.time, t.end_time, t.type, t.status, t.additional_links, 
-                 t.slug, t.internal_link, t.created_at, t.updated_at
+                 t.address, t.date, t.time, t.end_time, t.type, t.status, 
+                 t.additional_links, t.slug, t.created_at, t.updated_at
       `;
 
       const result = await executeQuery(query, [slug]);
@@ -155,8 +155,8 @@ export class SimplifiedTimetableService {
     const result = await executeTransaction(async (client) => {
       const entryQuery = `
         INSERT INTO timetables (title, description, detailed_description, location, 
-         date, time, type, status, additional_links, slug, end_time, internal_link, round_id) 
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *
+         date, time, type, status, additional_links, slug, end_time, round_id) 
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *
       `;
       const entryResult = await client.query(entryQuery, [
         entryData.title,
@@ -170,7 +170,6 @@ export class SimplifiedTimetableService {
         JSON.stringify(entryData.additional_links || []),
         entryData.slug,
         entryData.end_time,
-        entryData.internal_link,
         entryData.round_id
       ]);
       const entry = entryResult.rows[0];
@@ -224,6 +223,145 @@ export class SimplifiedTimetableService {
       [entryId, participantId]
     );
     return result.rows[0];
+  }
+
+  // Create timetable entry with participant assignments
+  async createTimetableWithAssignments(entryData, participants = [], client = null) {
+    // If client is provided, use it directly (for nested transactions)
+    if (client) {
+      const entryQuery = `
+        INSERT INTO timetable_entries (title, description, detailed_description, location, 
+          date, "time", end_time, type, status, additional_links, slug)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        RETURNING *
+      `;
+      
+      const params = [
+        entryData.title,
+        entryData.description,
+        entryData.detailed_description,
+        entryData.location,
+        entryData.date,
+        entryData.time,
+        entryData.end_time || null,
+        entryData.type || 'general',
+        entryData.status || 'confirmed',
+        JSON.stringify(entryData.additional_links || []),
+        entryData.slug
+      ];
+      
+      console.log('INSERT with client - params:', params);
+      console.log('INSERT with client - entryData:', entryData);
+      
+      const entryResult = await client.query(entryQuery, params);
+      const entry = entryResult.rows[0];
+      
+      // Insert participants (no duplicate check needed for new entries)
+      for (const participant of participants) {
+        if (participant.participant_id) {
+          await client.query(
+            'INSERT INTO timetable_participants (timetable_entry_id, participant_id, role) VALUES ($1, $2, $3)',
+            [entry.id, participant.participant_id, participant.role || 'Teilnehmer*in']
+          );
+        }
+      }
+      
+      return entry;
+    }
+    
+    // If no client provided, use executeTransaction (for standalone calls)
+    const result = await executeTransaction(async (client) => {
+      const entryQuery = `
+        INSERT INTO timetable_entries (title, description, detailed_description, location, 
+          date, "time", end_time, type, status, additional_links, slug)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        RETURNING *
+      `;
+      
+      const params = [
+        entryData.title,
+        entryData.description,
+        entryData.detailed_description,
+        entryData.location,
+        entryData.date,
+        entryData.time,
+        entryData.end_time || null,
+        entryData.type || 'general',
+        entryData.status || 'confirmed',
+        JSON.stringify(entryData.additional_links || []),
+        entryData.slug
+      ];
+      
+      console.log('INSERT standalone - params:', params);
+      console.log('INSERT standalone - entryData:', entryData);
+      
+      const entryResult = await client.query(entryQuery, params);
+      const entry = entryResult.rows[0];
+      
+      // Insert participants (no duplicate check needed for new entries)
+      for (const participant of participants) {
+        if (participant.participant_id) {
+          await client.query(
+            'INSERT INTO timetable_participants (timetable_entry_id, participant_id, role) VALUES ($1, $2, $3)',
+            [entry.id, participant.participant_id, participant.role || 'Teilnehmer*in']
+          );
+        }
+      }
+      
+      return entry;
+    });
+    
+    return result;
+  }
+
+  // Update timetable entry with participant assignments
+  async updateTimetableWithAssignments(entryId, entryData, participants = []) {
+    return await executeTransaction(async (client) => {
+      // Update the timetable entry
+      const updateQuery = `
+        UPDATE timetable_entries 
+        SET title = $1, description = $2, detailed_description = $3, 
+            location = $4, date = $5, "time" = $6, end_time = $7, 
+            type = $8, status = $9, additional_links = $10, slug = $11, updated_at = NOW()
+        WHERE id = $12
+        RETURNING *
+      `;
+      const updateResult = await client.query(updateQuery, [
+        entryData.title,
+        entryData.description,
+        entryData.detailed_description,
+        entryData.location,
+        entryData.date,
+        entryData.time,
+        entryData.end_time || null,
+        entryData.type || 'general',
+        entryData.status || 'confirmed',
+        JSON.stringify(entryData.additional_links || []),
+        entryData.slug,
+        entryId
+      ]);
+      
+      if (updateResult.rows.length === 0) {
+        throw new Error(`Timetable entry not found: ${entryId}`);
+      }
+      
+      const entry = updateResult.rows[0];
+      
+      // Delete existing participants
+      await client.query('DELETE FROM timetable_participants WHERE timetable_entry_id = $1', [entryId]);
+      
+      // Insert new participants
+      for (const participant of participants) {
+        if (participant.participant_id) {
+          await client.query(
+            'INSERT INTO timetable_participants (timetable_entry_id, participant_id, role) VALUES ($1, $2, $3)',
+            [entryId, participant.participant_id, participant.role || 'Teilnehmer*in']
+          );
+        }
+      }
+      
+      return entry;
+    });
   }
 }
 

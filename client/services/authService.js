@@ -63,7 +63,7 @@ class AuthService {
       
       // Only log if it's not an expected authentication failure
       if (!error.message.includes('Not authenticated')) {
-        console.warn('Auth initialization failed:', error.message);
+        // Auth initialization failed - handled silently
       }
       
       return false;
@@ -71,9 +71,9 @@ class AuthService {
   }
 
   /**
-   * Login with email and password
+   * Login with username/email and password
    */
-  async login(email, password, rememberMe = false) {
+  async login(identifier, password, rememberMe = false) {
     try {
       const response = await fetch(`${this.baseURL}/auth/login`, {
         method: 'POST',
@@ -82,7 +82,7 @@ class AuthService {
         },
         credentials: 'include', // Important: Include cookies in requests
         body: JSON.stringify({
-          email,
+          identifier,
           password,
           rememberMe
         })
@@ -94,7 +94,7 @@ class AuthService {
         this.user = data.user;
         this.isAuthenticated = true;
         
-        console.log('Login successful:', { user: this.user });
+        // Login successful
         
         // Dispatch auth change event
         this.dispatchAuthEvent(true, this.user);
@@ -104,7 +104,7 @@ class AuthService {
         return { success: false, error: data.error || 'Login failed' };
       }
     } catch (error) {
-      console.error('Login error:', error);
+      // Login error - handled by error state
       return { success: false, error: 'Network error' };
     }
   }
@@ -120,20 +120,20 @@ class AuthService {
         credentials: 'include'
       });
     } catch (error) {
-      console.error('Logout error:', error);
+      // Logout error - handled by error state
     } finally {
       // Clear local state
       this.user = null;
       this.isAuthenticated = false;
       
-      console.log('Logged out successfully');
+      // Logged out successfully
       
       // Dispatch auth change event
       this.dispatchAuthEvent(false, null);
 
       // Auto-refresh the page on logout (avoid in tests)
       try {
-        const isTest = typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'test';
+        const isTest = import.meta.env.MODE === 'test';
         if (!isTest) {
           setTimeout(() => window.location.reload(), 50);
         }
@@ -167,7 +167,7 @@ class AuthService {
         throw new Error('Not authenticated');
       } else {
         // Other errors should be logged
-        console.error('Authentication error:', response.status, response.statusText);
+        // Authentication error - handled by error state
         this.user = null;
         this.isAuthenticated = false;
         throw new Error('Authentication failed');
@@ -175,7 +175,7 @@ class AuthService {
     } catch (error) {
       // Only log network errors, not expected 401s
       if (error.name !== 'TypeError' && !error.message.includes('Not authenticated')) {
-        console.error('Get current user error:', error);
+        // Get current user error - handled by error state
       }
       this.user = null;
       this.isAuthenticated = false;
@@ -321,7 +321,7 @@ if (typeof window !== 'undefined' && import.meta && import.meta.env && import.me
   window.authDebug = {
     service: authService,
     getState: () => authService.getAuthState(),
-    testLogin: (email, password) => authService.login(email, password),
+    testLogin: (identifier, password) => authService.login(identifier, password),
     testLogout: () => authService.logout(),
     testMe: () => authService.getCurrentUser()
   };

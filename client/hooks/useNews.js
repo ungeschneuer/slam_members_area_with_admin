@@ -50,8 +50,7 @@ export function useNewsItem(slug) {
       return result?.data || result || null;
     },
     enabled: !!slug,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
+    ...getQueryConfig('news', false, { refetchInterval: false }), // Detail pages don't need polling
   });
 }
 
@@ -71,8 +70,7 @@ export function useBreakingNews() {
       // Return the first breaking news item or null if none
       return Array.isArray(data) ? data[0] || null : data;
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes (same as default)
-    gcTime: 10 * 60 * 1000, // 10 minutes (same as default)
+    ...getQueryConfig('breakingNews', false),
   });
 }
 

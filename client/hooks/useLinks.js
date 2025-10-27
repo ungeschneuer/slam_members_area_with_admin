@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { API_URL } from '../config/api.js';
 import authService from '../services/authService.js';
 import { useEntityData } from './useEntityData.js';
+import { getQueryConfig } from '../config/polling.js';
 
 // Query keys for links
 export const linksKeys = {
@@ -26,7 +27,7 @@ export function useLinks(filters = {}, isAdmin = false) {
       const result = await response.json();
       return result?.data || result || [];
     },
-    { filters, staleTime: 10 * 60 * 1000, gcTime: 30 * 60 * 1000, isAdmin }
+    { filters, ...getQueryConfig('links', isAdmin), isAdmin }
   );
 }
 
@@ -46,8 +47,7 @@ export function useLink(id) {
       return result?.data || result || null;
     },
     enabled: !!id,
-    staleTime: 10 * 60 * 1000,
-    gcTime: 30 * 60 * 1000,
+    ...getQueryConfig('links', false, { refetchInterval: false }), // Detail pages don't need polling
   });
 }
 

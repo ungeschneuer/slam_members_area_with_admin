@@ -5,13 +5,11 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import compression from 'compression';
 import path from 'path';
-import caseMonitor from './middleware/caseMonitor.js';
 // Rate limiting configuration
-import { rateLimitConfig } from './config/security.js';
+import { rateLimitConfig, cspConfig } from './config/security.js';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import { createServer } from 'http';
-// Socket.io removed - using simple polling instead
 
 // Import database connection with optimizations
 import { pool, checkDatabaseHealth } from './config/database.js';
@@ -22,8 +20,14 @@ import apiRoutes from './routes/index.js';
 // Authentication routes moved to middleware pattern
 import correlationIdMiddleware from './middleware/correlationId.js';
 
-// Load environment variables from root directory
-dotenv.config();
+// Load environment file based on NODE_ENV
+// nodemon.json sets NODE_ENV=development for local dev
+// supervisord sets NODE_ENV=production on Uberspace
+const envFile = process.env.NODE_ENV === 'production' ? '.env.production' : '.env.development';
+dotenv.config({ path: envFile });
+
+// Log which env file was loaded (for debugging)
+console.log(`Loaded environment from: ${envFile} (NODE_ENV=${process.env.NODE_ENV})`);
 
 // Warn if using development secrets in production
 if (process.env.NODE_ENV === 'production') {
@@ -120,27 +124,12 @@ const getCorsConfig = () => {
   };
 };
 
-// Socket.io origins function removed - using simple polling instead
-
-// Socket.io server removed - using simple polling instead
 
 const PORT = process.env.PORT || 3005;
 
 // Security middleware
 app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrc: ["'self'"],
-      imgSrc: ["'self'", "data:", "https:"],
-      connectSrc: ["'self'", "ws:", "wss:"],
-      fontSrc: ["'self'", "https:"],
-      objectSrc: ["'none'"],
-      mediaSrc: ["'self'"],
-      frameSrc: ["'none'"],
-    },
-  },
+  contentSecurityPolicy: cspConfig,
   frameguard: { action: 'deny' },
   crossOriginEmbedderPolicy: false,
   hsts: {
@@ -167,14 +156,7 @@ app.use((req, res, next) => {
 });
 
 // Centralized rate limiting (CORS handled by cors middleware)
-app.use('/api/', (req, res, next) => {
-  // Use development rate limiting in development mode
-  const rateLimiter = process.env.NODE_ENV === 'development' 
-    ? rateLimitConfig.development 
-    : rateLimitConfig.general;
-  
-  rateLimiter(req, res, next);
-});
+app.use('/api/', rateLimitConfig.general);
 
 // Body parsing middleware with security limits
 app.use(express.json({ 
@@ -191,8 +173,6 @@ app.use(express.json({
 }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Monitor for camelCase keys in request bodies
-app.use(caseMonitor);
 
 // Cookie parsing middleware
 app.use(cookieParser());
@@ -265,15 +245,47 @@ app.get('/ready', async (req, res) => {
 // Authentication handled through middleware in individual routes
 
 // Static file serving for uploads with crawler protection
-app.use('/uploads', (req, res, next) => {
-  res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive, nosnippet, noimageindex, notranslate, noyaca');
-  next();
-}, express.static(path.join(process.cwd(), 'public/uploads')));
+app.use('/uploads', 
+  (req, res, next) => {
+    res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive, nosnippet, noimageindex, notranslate, noyaca');
+    res.setHeader('Cache-Control', 'public, max-age=3600'); // 1 hour cache
+    next();
+  }, 
+  express.static(path.join(process.cwd(), 'public/uploads')),
+  // Explicit 404 handler for missing uploads (prevents catch-all from serving HTML)
+  (req, res) => {
+    res.status(404).json({ success: false, error: 'File not found' });
+  }
+);
+
+// Serve static assets with aggressive caching (hashed filenames enable long cache)
+app.use(express.static(path.join(process.cwd(), 'dist'), {
+  maxAge: '1y', // 1 year for hashed assets
+  immutable: true, // Supported in Express 4.21.2+
+  setHeaders: (res, filePath) => {
+    // Don't cache HTML files - always fetch fresh
+    if (filePath.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    } else {
+      // Ensure immutable flag is set for non-HTML files
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    }
+  }
+}));
 
 // Use new modular routes as the primary API endpoints
 app.use('/api', apiRoutes);
 
-// WebSocket service removed - using simple polling instead
+// Catch-all handler: send back React's index.html with no-cache headers
+app.get('*', (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.sendFile(path.join(process.cwd(), 'dist', 'index.html'));
+});
+
 
 // Graceful shutdown
 const gracefulShutdown = async (signal) => {
@@ -312,13 +324,16 @@ process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 // Start server with error handling (skip listening in test)
 if (process.env.NODE_ENV !== 'test') {
-  server.listen(PORT, () => {
+  // In production, bind to 0.0.0.0 for Uberspace compatibility (web backend handles external traffic)
+  // CRITICAL: Uberspace requires 0.0.0.0 binding, not 127.0.0.1, for web backend proxy to work
+  const bindAddress = process.env.NODE_ENV === 'production' ? '0.0.0.0' : undefined;
+  
+  server.listen(PORT, bindAddress, () => {
     logger.info(`✅ SLAM25 API Server running on port ${PORT}`);
     logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
     logger.info(`Database: ${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}`);
     logger.info(`Max DB Connections: ${process.env.DB_MAX_CONNECTIONS || 'default'}`);
     logger.info(`Health check: http://localhost:${PORT}/health`);
-    logger.info(`Simple polling enabled`);
     logger.info(`Database connection pooling optimized`);
   });
 

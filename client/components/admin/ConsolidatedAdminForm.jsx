@@ -57,14 +57,21 @@ function FormField({
         render={({ field, fieldState }) => (
           <>
             {type === 'textarea' ? (
-              <textarea
-                {...field}
-                {...props}
-                placeholder={placeholder}
-                disabled={disabled}
-                className={getInputClasses()}
-                rows={3}
-              />
+              <>
+                <textarea
+                  {...field}
+                  {...props}
+                  placeholder={placeholder}
+                  disabled={disabled}
+                  className={getInputClasses()}
+                  rows={3}
+                />
+                {props.maxLength && (
+                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    {field.value?.length || 0}/{props.maxLength} Zeichen
+                  </p>
+                )}
+              </>
             ) : type === 'select' ? (
               <select
                 {...field}
@@ -255,7 +262,7 @@ export default function ConsolidatedAdminForm({
         <button
           type="submit"
           disabled={loading}
-          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+          className="px-4 py-2 text-sm font-medium text-white bg-[#185757] border border-transparent rounded-md hover:bg-[#0f3a3b] focus:outline-none focus:ring-2 focus:ring-[#A2D2B9] disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
         >
           {loading && (
             <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">

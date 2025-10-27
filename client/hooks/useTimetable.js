@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { API_URL } from '../config/api.js';
 import authService from '../services/authService.js';
 import { useEntityData } from './useEntityData.js';
+import { getQueryConfig } from '../config/polling.js';
 
 // Query keys for timetable
 export const timetableKeys = {
@@ -28,7 +29,7 @@ export function useTimetable(filters = {}, isAdmin = false) {
       const data = result?.data?.data?.rows || result?.data?.rows || result?.data || result;
       return Array.isArray(data) ? data : [];
     },
-    { filters, staleTime: 5 * 60 * 1000, gcTime: 10 * 60 * 1000, isAdmin }
+    { filters, ...getQueryConfig('timetable', isAdmin), isAdmin }
   );
 }
 
@@ -48,8 +49,7 @@ export function useTimetableEvent(slug) {
       return result?.data || result || null;
     },
     enabled: !!slug,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
+    ...getQueryConfig('timetable', false, { refetchInterval: false }), // Detail pages don't need polling
     // Avoid repeated refetches that can spam 404s during navigation or focus
     retry: false,
     refetchOnWindowFocus: false,
@@ -162,6 +162,52 @@ export function useUpdateTimetableParticipantRole() {
     },
     onSuccess: () => {
       // Invalidate all timetable-related queries to ensure participant detail pages show current information
+      queryClient.invalidateQueries({ queryKey: timetableKeys.all });
+      queryClient.invalidateQueries({ queryKey: timetableKeys.lists() });
+    }
+  });
+}
+
+// Hook to add participant to timetable entry
+export function useAddTimetableParticipant() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ entryId, participantId }) => {
+      const response = await authService.authenticatedRequest(
+        `${API_URL}/timetable/${entryId}/participants`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ participantId })
+        }
+      );
+      const result = await response.json();
+      return result?.data || result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: timetableKeys.all });
+      queryClient.invalidateQueries({ queryKey: timetableKeys.lists() });
+    }
+  });
+}
+
+// Hook to remove participant from timetable entry
+export function useRemoveTimetableParticipant() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ entryId, participantId }) => {
+      const response = await authService.authenticatedRequest(
+        `${API_URL}/timetable/${entryId}/participants/${participantId}`,
+        {
+          method: 'DELETE'
+        }
+      );
+      const result = await response.json();
+      return result?.data || result;
+    },
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: timetableKeys.all });
       queryClient.invalidateQueries({ queryKey: timetableKeys.lists() });
     }

@@ -1,17 +1,6 @@
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
-// Suppress Leaflet deprecation warnings
-const originalWarn = console.warn;
-console.warn = (...args) => {
-  const message = args[0];
-  if (typeof message === 'string' && 
-      (message.includes('mozPressure') || message.includes('mozInputSource'))) {
-    // Suppress these specific Leaflet deprecation warnings
-    return;
-  }
-  originalWarn.apply(console, args);
-};
 
 // Fix for default markers in Leaflet (guarded for non-browser/test env)
 try {
@@ -38,11 +27,19 @@ export const createMapConfig = (options = {}) => ({
 
 // Standardized tile layer configuration
 export const createTileLayer = (url = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', options = {}) => {
-  return L.tileLayer(url, {
+  const tileLayer = L.tileLayer(url, {
     attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     maxZoom: 19,
+    errorTileUrl: '', // Show blank tiles on error instead of broken image
     ...options
   });
+
+  // Add simple console warning for tile errors
+  tileLayer.on('tileerror', (error) => {
+    console.warn('Kartenkachel konnte nicht geladen werden:', error.tile?.src || 'unknown');
+  });
+
+  return tileLayer;
 };
 
 // Standardized marker icon
@@ -59,36 +56,14 @@ export const createDefaultIcon = (options = {}) => {
   });
 };
 
+// Import shared constants for consistency
+import { getCategoryByValue, getCategoryHexColor } from '../../shared/constants/cityTipsCategories.js';
+
 // Custom marker icons for different categories
 export const createCustomIcon = (category) => {
-  const colors = {
-    restaurant: '#ef4444',
-    cafe: '#f59e0b',
-    bar: '#8b5cf6',
-    shopping: '#10b981',
-    culture: '#3b82f6',
-    nightlife: '#ec4899',
-    default: '#6b7280'
-  };
-
-  const color = colors[category] || colors.default;
-  const emojiMap = {
-    restaurant: '🍽️',
-    cafe: '☕',
-    bar: '🍺',
-    landmark: '🏛️',
-    shopping: '🛍️',
-    culture: '🎭',
-    entertainment: '🎭',
-    transport: '🚇',
-    accommodation: '🏨',
-    hotel: '🏨',
-    nature: '🌳',
-    leisure: '🏊',
-    sports: '⚽',
-    other: '📍'
-  };
-  const emoji = emojiMap[category] || '📍';
+  const categoryData = getCategoryByValue(category);
+  const color = getCategoryHexColor(category);
+  const emoji = categoryData?.icon || '📍';
 
   return L.divIcon({
     className: 'custom-marker',
@@ -112,7 +87,7 @@ export const createCustomIcon = (category) => {
     `,
     iconSize: [32, 32],
     iconAnchor: [16, 32],
-    popupAnchor: [0, -32]
+    popupAnchor: [0, -40]
   });
 };
 
@@ -130,7 +105,7 @@ export const createMap = (container, options = {}) => {
     const tileLayer = createTileLayer();
     tileLayer.addTo(map);
     
-    return { map, tileLayer };
+    return { map, tileLayer }; // Return both map and tileLayer
   } catch (error) {
     console.error('Error creating map:', error);
     throw error;

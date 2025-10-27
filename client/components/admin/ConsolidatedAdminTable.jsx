@@ -123,20 +123,64 @@ export default function ConsolidatedAdminTable({
     <div className={`bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 ${className}`}>
       {/* Bulk Actions */}
       {bulkActions && selectedRows.length > 0 && (
-        <div className="px-4 py-3 bg-blue-50 dark:bg-blue-900/20 border-b border-blue-200 dark:border-blue-800">
+        <div className="px-4 py-3 bg-[#A2D2B9]/20 dark:bg-[#185757]/30 border-b border-[#185757]/30 dark:border-[#185757]/50">
           <div className="flex items-center justify-between">
-            <span className="text-sm text-blue-700 dark:text-blue-300">
+            <span className="text-sm text-[#185757] dark:text-[#A2D2B9]">
               {selectedRows.length} Element(e) ausgewählt
             </span>
-            <div className="flex space-x-2">
+            <div className="flex flex-wrap gap-3">
               {bulkActions}
             </div>
           </div>
         </div>
       )}
 
-      {/* Table */}
-      <div className="overflow-x-auto">
+      {/* Mobile: Card view */}
+      <div className="block md:hidden space-y-4 p-4">
+        {sortedData.map((row, index) => (
+          <div
+            key={row.id || row.slug || `row-${index}`}
+            className={`bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 space-y-3 ${
+              selectedRows.includes(index) ? 'ring-2 ring-[#185757] dark:ring-[#A2D2B9]' : ''
+            }`}
+          >
+            {/* Selection checkbox for mobile */}
+            {onSelectionChange && (
+              <div className="flex items-center space-x-2 pb-3 border-b border-gray-200 dark:border-gray-700">
+                <input
+                  type="checkbox"
+                  checked={selectedRows.includes(index)}
+                  onChange={(e) => handleSelectRow(index, e.target.checked)}
+                  className="h-4 w-4 text-[#185757] focus:ring-[#A2D2B9] border-gray-300 rounded"
+                />
+                <span className="text-sm text-gray-600 dark:text-gray-400">Auswählen</span>
+              </div>
+            )}
+            
+            {/* Card content */}
+            {columns.map((column) => (
+              <div key={column.key}>
+                <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  {column.label}
+                </span>
+                <div className="mt-1 text-sm text-gray-900 dark:text-gray-100">
+                  {column.render ? column.render(row[column.key], row, index) : row[column.key]}
+                </div>
+              </div>
+            ))}
+            
+            {/* Actions for mobile */}
+            {actions && (
+              <div className="flex flex-wrap gap-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                {actions(row, index)}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Desktop: Table view */}
+      <div className="hidden md:block overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
           {/* Header */}
           {showHeader && (
@@ -148,7 +192,7 @@ export default function ConsolidatedAdminTable({
                       type="checkbox"
                       checked={selectedRows.length === data.length && data.length > 0}
                       onChange={(e) => handleSelectAll(e.target.checked)}
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      className="h-4 w-4 text-[#185757] focus:ring-[#A2D2B9] border-gray-300 rounded"
                     />
                   </th>
                 )}
@@ -190,7 +234,7 @@ export default function ConsolidatedAdminTable({
                 key={row.id || row.slug || `row-${index}`}
                 className={`${
                   onRowClick ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700' : ''
-                } ${selectedRows.includes(index) ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}
+                } ${selectedRows.includes(index) ? 'bg-[#A2D2B9]/20 dark:bg-[#185757]/30' : ''}`}
                 onClick={() => onRowClick && onRowClick(row, index)}
               >
                 {onSelectionChange && (
@@ -199,7 +243,7 @@ export default function ConsolidatedAdminTable({
                       type="checkbox"
                       checked={selectedRows.includes(index)}
                       onChange={(e) => handleSelectRow(index, e.target.checked)}
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      className="h-4 w-4 text-[#185757] focus:ring-[#A2D2B9] border-gray-300 rounded"
                       onClick={(e) => e.stopPropagation()}
                     />
                   </td>
@@ -211,7 +255,9 @@ export default function ConsolidatedAdminTable({
                 ))}
                 {actions && (
                   <td className="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    {actions(row, index)}
+                    <div className="flex flex-wrap gap-3 justify-end">
+                      {actions(row, index)}
+                    </div>
                   </td>
                 )}
               </tr>

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { 
   createMap, 
   destroyMap, 
@@ -8,20 +8,51 @@ import {
   createMarkerWithPopup,
   isValidCoordinates 
 } from '../utils/leafletUtils.js';
+import { getCategoryByValue, getCategoryHexColor } from '../../shared/constants/cityTipsCategories.js';
 
-export default function InteractiveMap({ locations, onLocationClick, selectedLocation }) {
+export default function InteractiveMap({ locations, onLocationClick, selectedLocation, availableCategories = [] }) {
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersRef = useRef([]);
   const [isMapReady, setIsMapReady] = useState(false);
+  const [showTileError, setShowTileError] = useState(false);
+  const tileLayerRef = useRef(null);
 
   // Initialize map
   const initializeMap = useCallback(() => {
     if (!mapRef.current || mapInstanceRef.current) return;
 
     try {
-      const { map } = createMap(mapRef.current);
+      const { map, tileLayer } = createMap(mapRef.current);
       map.setView([50.8275, 12.9247], 14);
+      
+      // Store tileLayer reference for cleanup
+      tileLayerRef.current = tileLayer;
+      
+      // Track tile errors with debouncing
+      let errorCount = 0;
+      let errorTimeout = null;
+      
+      const handleTileError = () => {
+        errorCount++;
+        
+        // Clear existing timeout
+        if (errorTimeout) clearTimeout(errorTimeout);
+        
+        // Show error after 5 failed tiles
+        if (errorCount >= 5) {
+          setShowTileError(true);
+        }
+        
+        // Reset error count after 5 seconds of no errors
+        errorTimeout = setTimeout(() => {
+          errorCount = 0;
+          setShowTileError(false);
+        }, 5000);
+      };
+      
+      tileLayer.on('tileerror', handleTileError);
+      
       mapInstanceRef.current = map;
       setIsMapReady(true);
     } catch (error) {
@@ -39,10 +70,17 @@ export default function InteractiveMap({ locations, onLocationClick, selectedLoc
         });
         markersRef.current = [];
 
+        // Remove tile layer listeners
+        if (tileLayerRef.current) {
+          tileLayerRef.current.off('tileerror');
+          tileLayerRef.current = null;
+        }
+
         // Remove map instance
         destroyMap(mapInstanceRef.current);
         mapInstanceRef.current = null;
         setIsMapReady(false);
+        setShowTileError(false);
       } catch (error) {
         console.error('Error cleaning up map:', error);
       }
@@ -91,32 +129,29 @@ export default function InteractiveMap({ locations, onLocationClick, selectedLoc
 
         // Add popup with location info
         const popupContent = `
-          <div style="min-width: 200px;">
-            <h3 style="margin: 0 0 8px 0; font-weight: bold; color: #1f2937;">${location.name || 'Unbekannter Ort'}</h3>
-            <p style="margin: 0 0 4px 0; color: #6b7280; font-size: 14px;">${location.address || ''}</p>
-            <p style="margin: 0 0 8px 0; color: #374151; font-size: 14px;">${location.description || ''}</p>
-            <div style="display: flex; justify-content: flex-end; align-items: center; margin-top: 8px;">
-              <span style="color: #6b7280; font-size: 12px;">${location.priceRange || ''}</span>
+          <div style="min-width: 160px; max-width: 220px;">
+            <h3 style="margin: 0 0 6px 0; font-weight: bold; color: #1f2937; font-size: 16px;">${location.name || 'Unbekannter Ort'}</h3>
+            <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 13px;">${location.address || ''}</p>
+            <div style="display: flex; justify-content: flex-end; align-items: center;">
+              <button 
+                onclick="window.location.href='/city-tips/${location.slug || location.id}'"
+                style="
+                  padding: 4px 8px;
+                  background-color: #3b82f6;
+                  color: white;
+                  border: none;
+                  border-radius: 4px;
+                  cursor: pointer;
+                  font-size: 11px;
+                  font-weight: 500;
+                  transition: background-color 0.2s;
+                "
+                onmouseover="this.style.backgroundColor='#2563eb'"
+                onmouseout="this.style.backgroundColor='#3b82f6'"
+              >
+                Details
+              </button>
             </div>
-            <button 
-              onclick="window.location.href='/city-tips/${location.slug || location.id}'"
-              style="
-                margin-top: 8px;
-                padding: 6px 12px;
-                background-color: #3b82f6;
-                color: white;
-                border: none;
-                border-radius: 6px;
-                cursor: pointer;
-                font-size: 12px;
-                font-weight: 500;
-                transition: background-color 0.2s;
-              "
-              onmouseover="this.style.backgroundColor='#2563eb'"
-              onmouseout="this.style.backgroundColor='#3b82f6'"
-            >
-              Details anzeigen
-            </button>
           </div>
         `;
 
@@ -165,34 +200,47 @@ export default function InteractiveMap({ locations, onLocationClick, selectedLoc
               const mapContainer = map.getContainer();
               const mapRect = mapContainer.getBoundingClientRect();
               
-              // Calculate if popup extends beyond map bounds
-              const popupRight = popupRect.right;
-              const popupBottom = popupRect.bottom;
-              const mapRight = mapRect.right;
-              const mapBottom = mapRect.bottom;
+              // Calculate popup center and map center
+              const popupCenterX = popupRect.left + popupRect.width / 2;
+              const popupCenterY = popupRect.top + popupRect.height / 2;
+              const mapCenterX = mapRect.left + mapRect.width / 2;
+              const mapCenterY = mapRect.top + mapRect.height / 2;
               
-              // If popup extends beyond map, adjust the view
-              if (popupRight > mapRight || popupBottom > mapBottom) {
-                // Calculate offset to center the popup
-                const offsetX = Math.max(0, popupRight - mapRight);
-                const offsetY = Math.max(0, popupBottom - mapBottom);
+              // Calculate if popup extends beyond map bounds
+              const popupLeft = popupRect.left;
+              const popupRight = popupRect.right;
+              const popupTop = popupRect.top;
+              const popupBottom = popupRect.bottom;
+              
+              // Check if popup is outside map bounds
+              const isOutsideLeft = popupLeft < mapRect.left;
+              const isOutsideRight = popupRight > mapRect.right;
+              const isOutsideTop = popupTop < mapRect.top;
+              const isOutsideBottom = popupBottom > mapRect.bottom;
+              
+              if (isOutsideLeft || isOutsideRight || isOutsideTop || isOutsideBottom) {
+                // Calculate offset to center the popup in the map view
+                const offsetX = isOutsideLeft ? (mapRect.left - popupLeft) : 
+                               isOutsideRight ? (mapRect.right - popupRight) : 0;
+                const offsetY = isOutsideTop ? (mapRect.top - popupTop) : 
+                               isOutsideBottom ? (mapRect.bottom - popupBottom) : 0;
                 
                 // Convert pixel offset to lat/lng offset
                 const point = map.latLngToContainerPoint(markerLatLng);
-                const newPoint = L.point(point.x - offsetX/2, point.y - offsetY/2);
+                const newPoint = L.point(point.x - offsetX, point.y - offsetY);
                 const newLatLng = map.containerPointToLatLng(newPoint);
                 
                 // Set view with adjusted position
-                map.setView(newLatLng, 16);
+                map.setView(newLatLng, map.getZoom());
               } else {
                 // Popup is fully visible, just center on marker
-                map.setView(markerLatLng, 16);
+                map.setView(markerLatLng, map.getZoom());
               }
             } else {
               // Fallback: just center on marker
-              map.setView(markerLatLng, 16);
+              map.setView(markerLatLng, map.getZoom());
             }
-          }, 100); // Small delay to ensure popup is rendered
+          }, 150); // Slightly longer delay to ensure popup is fully rendered
         }
       }
     } catch (error) {
@@ -220,6 +268,19 @@ export default function InteractiveMap({ locations, onLocationClick, selectedLoc
 
   return (
     <div className="relative w-full h-full">
+      {showTileError && (
+        <div 
+          className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-yellow-50 border border-yellow-400 rounded-lg px-4 py-2 shadow-lg z-[1000] max-w-md"
+          role="alert"
+          aria-live="polite"
+        >
+          <p className="text-sm text-yellow-800 flex items-center gap-2">
+            <span>ℹ️</span>
+            <span>Kartenkacheln vorübergehend nicht verfügbar. Standorte sind weiterhin sichtbar.</span>
+          </p>
+        </div>
+      )}
+      
       <div 
         ref={mapRef} 
         className="w-full h-full rounded-lg overflow-hidden border-2 border-gray-200 dark:border-gray-600"
@@ -233,8 +294,8 @@ export default function InteractiveMap({ locations, onLocationClick, selectedLoc
         aria-label="Interaktive Karte von Chemnitz mit Standorten"
       />
       
-      {/* Map Legend - Collapsible */}
-      <div className="absolute top-4 left-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg z-10 border border-gray-200 dark:border-gray-600 max-w-xs">
+      {/* Map Legend - Collapsible - Hidden on mobile */}
+      <div className="absolute top-4 left-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg z-10 border border-gray-200 dark:border-gray-600 max-w-xs hidden sm:block">
         <div className="p-3">
           <h3 className="font-semibold text-gray-900 dark:text-white mb-2 flex items-center justify-between">
             <span>Legende</span>
@@ -246,29 +307,27 @@ export default function InteractiveMap({ locations, onLocationClick, selectedLoc
             </button>
           </h3>
           <div className="space-y-1 max-h-48 overflow-y-auto">
-            {[
-              { id: 'restaurant', name: 'Restaurants', color: '#ef4444', icon: '🍽️' },
-              { id: 'cafe', name: 'Cafés', color: '#eab308', icon: '☕' },
-              { id: 'bar', name: 'Bars', color: '#3b82f6', icon: '🍺' },
-              { id: 'culture', name: 'Kultur', color: '#8b5cf6', icon: '🎭' },
-              { id: 'shopping', name: 'Shopping', color: '#10b981', icon: '🛍️' },
-              { id: 'hotel', name: 'Hotels', color: '#6366f1', icon: '🏨' },
-              { id: 'transport', name: 'Transport', color: '#f97316', icon: '🚇' },
-              { id: 'landmark', name: 'Sehenswürdigkeiten', color: '#dc2626', icon: '🏛️' },
-              { id: 'neighborhood', name: 'Viertel', color: '#7c3aed', icon: '🏘️' },
-              { id: 'nature', name: 'Natur', color: '#059669', icon: '🌳' },
-              { id: 'leisure', name: 'Freizeit', color: '#0891b2', icon: '🏊' },
-              { id: 'sports', name: 'Sport', color: '#ea580c', icon: '⚽' }
-            ].map(category => (
-              <div key={category.id} className="flex items-center gap-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 p-1 rounded">
-                <span className="text-sm">{category.icon}</span>
-                <div 
-                  className="w-3 h-3 rounded-full flex-shrink-0"
-                  style={{ backgroundColor: category.color }}
-                ></div>
-                <span className="text-gray-700 dark:text-gray-300 truncate">{category.name}</span>
-              </div>
-            ))}
+            {useMemo(() => {
+              return availableCategories
+                .filter(cat => cat.id !== 'all') // Exclude "all" option
+                .map(category => {
+                  const categoryData = getCategoryByValue(category.id);
+                  const hexColor = getCategoryHexColor(category.id);
+                  
+                  return (
+                    <div key={category.id} className="flex items-center gap-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 p-1 rounded">
+                      <span className="text-sm">{categoryData?.icon || '📍'}</span>
+                      <div 
+                        className="w-3 h-3 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: hexColor }}
+                      ></div>
+                      <span className="text-gray-700 dark:text-gray-300 truncate">
+                        {categoryData?.label || category.name}
+                      </span>
+                    </div>
+                  );
+                });
+            }, [availableCategories])}
           </div>
         </div>
       </div>

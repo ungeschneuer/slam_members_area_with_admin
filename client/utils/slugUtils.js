@@ -21,6 +21,49 @@ const STOPWORDS = new Set([
 ]);
 
 /**
+ * Generate a unique request ID for tracking and collision resistance
+ * @param {Object} req - Express request object
+ * @returns {string} - Unique request ID
+ */
+export function generateRequestId(req) {
+  return req.headers['x-request-id'] || `req-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+}
+
+/**
+ * Validate and sanitize input for slug generation
+ * @param {any} input - The input to validate
+ * @param {string} fallback - Fallback value if input is invalid
+ * @returns {string} - Validated and sanitized input
+ */
+export function validateSlugInput(input, fallback = 'untitled') {
+  if (!input || typeof input !== 'string') return fallback;
+  
+  // Enhanced sanitization to prevent XSS
+  const sanitized = input
+    .replace(/[<>]/g, '') // Remove potential HTML tags
+    .replace(/['"]/g, '') // Remove quotes
+    .replace(/on\w+\s*=/gi, '') // Remove event handlers (onclick, onload, etc.)
+    .replace(/javascript:/gi, '') // Remove javascript: protocol
+    .replace(/data:/gi, '') // Remove data: protocol
+    .replace(/vbscript:/gi, '') // Remove vbscript: protocol
+    .trim();
+  
+  if (sanitized.length === 0) return fallback;
+  
+  // Add length validation to prevent memory issues
+  if (sanitized.length > 1000) {
+    // Use console.warn as fallback since logger might not be available in client context
+    console.warn('Input too long, truncating', { 
+      originalLength: sanitized.length,
+      context: 'slug_validation'
+    });
+    return sanitized.substring(0, 1000).trim();
+  }
+  
+  return sanitized;
+}
+
+/**
  * Normalize German characters to their ASCII equivalents
  * @param {string} text - The text to normalize
  * @returns {string} - The normalized text
@@ -99,7 +142,7 @@ export function generateSlug(text, options = {}) {
   
   // Remove or replace special characters
   slug = slug
-    .replace(/[^\w\s-]/g, ' ') // Replace special chars with spaces
+    .replace(/[^a-z0-9\s-]/g, ' ') // Replace special chars with spaces (including underscores)
     .replace(/\s+/g, ' ') // Replace multiple spaces with single space
     .trim();
   
@@ -132,24 +175,53 @@ export function generateSlug(text, options = {}) {
  * Generate a unique slug by appending a number if needed
  * @param {string} baseName - The name to slugify
  * @param {Array<string>} existingSlugs - Array of existing slug strings
+ * @param {string} requestId - Optional request ID for collision resistance
  * @returns {string} - The unique slug
  */
-export function generateUniqueSlug(baseName, existingSlugs = []) {
-  if (!baseName) return '';
+export function generateUniqueSlug(baseName, existingSlugs = [], requestId = null) {
+  // Validate input first
+  const validatedName = validateSlugInput(baseName, 'untitled');
   
-  // Generate base slug from name
-  const baseSlug = generateSlug(baseName);
+  // Generate base slug from validated name
+  const baseSlug = generateSlug(validatedName);
   
-  // Validate generated slug
-  if (!baseSlug || baseSlug.length < 3) {
-    throw new Error(`Cannot generate valid slug from name: ${baseName}`);
+  // Graceful fallback for invalid slugs with collision resistance
+  if (!baseSlug || baseSlug.length < 1) {
+    const fallbackSlug = generateCollisionResistantFallback(existingSlugs, requestId);
+    return fallbackSlug;
   }
   
-  // Check if slug already exists and append number if needed
+  return ensureUniqueSlug(baseSlug, existingSlugs);
+}
+
+/**
+ * Generate collision-resistant fallback slug
+ * @param {Array<string>} existingSlugs - Array of existing slug strings
+ * @param {string} requestId - Optional request ID for additional uniqueness
+ * @returns {string} - Collision-resistant fallback slug
+ */
+function generateCollisionResistantFallback(existingSlugs = [], requestId = null) {
+  const timestamp = Date.now();
+  const random = Math.random().toString(36).substr(2, 9);
+  const requestSuffix = requestId ? `-${requestId}` : '';
+  const fallbackSlug = `untitled-${timestamp}-${random}${requestSuffix}`;
+  
+  return ensureUniqueSlug(fallbackSlug, existingSlugs);
+}
+
+/**
+ * Ensure slug uniqueness by appending number if needed
+ * @param {string} baseSlug - The base slug to make unique
+ * @param {Array<string>} existingSlugs - Array of existing slug strings
+ * @returns {string} - The unique slug
+ */
+function ensureUniqueSlug(baseSlug, existingSlugs) {
+  // Use Set for O(1) lookup performance
+  const existingSet = new Set(existingSlugs);
   let counter = 1;
   let uniqueSlug = baseSlug;
   
-  while (existingSlugs.includes(uniqueSlug)) {
+  while (existingSet.has(uniqueSlug)) {
     counter++;
     uniqueSlug = `${baseSlug}-${counter}`;
   }

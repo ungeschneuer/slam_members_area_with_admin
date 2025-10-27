@@ -370,7 +370,7 @@ DB_PORT=5432
 DB_NAME=slam25_db
 DB_USER=slam_user
 DB_PASSWORD=your_password
-JWT_SECRET=your_secret
+JWT_SECRET=your_secret_minimum_64_characters_required_for_security
 
 # Optional
 PORT=3005

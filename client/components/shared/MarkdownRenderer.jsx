@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { handleLinkClick } from '../../utils/linkUtils.js';
 
 /**
  * MarkdownRenderer - Renders markdown content with automatic link conversion
@@ -71,16 +72,23 @@ export default function MarkdownRenderer({ content, className = '' }) {
           ),
           
           // Links with security attributes
-          a: ({ href, children }) => (
-            <a
-              href={href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline"
-            >
-              {children}
-            </a>
-          ),
+          a: ({ href, children }) => {
+            const markdownLink = {
+              url: href,
+              title: typeof children === 'string' ? children : 'Link',
+              is_external: true
+            };
+            
+            return (
+              <a
+                href={href}
+                onClick={(e) => handleLinkClick(markdownLink, e)}
+                className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline break-words"
+              >
+                {children}
+              </a>
+            );
+          },
           
           // Text formatting
           strong: ({ children }) => (

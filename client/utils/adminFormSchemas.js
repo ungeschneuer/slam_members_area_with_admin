@@ -125,6 +125,7 @@ export const timetableSchema = baseEventSchema.extend({
   date: z.string().min(1, 'Datum ist erforderlich'),
   time: z.string().min(1, 'Startzeit ist erforderlich'),
   end_time: z.string().min(1, 'Endzeit ist erforderlich'),
+  address: z.string().max(500, 'Adresse ist zu lang').optional(),
   type: z.string().min(1),
   detailed_description: z.string().optional(),
   internal_link: z.string().url().optional().or(z.literal('')),
@@ -166,6 +167,7 @@ export const getDefaultValues = (type) => {
         date: new Date().toISOString().split('T')[0],
         time: '10:00',
         end_time: '11:00',
+        address: '',
         type: 'individual-round',
         detailed_description: '',
         internal_link: '',
@@ -182,8 +184,7 @@ export const getDefaultValues = (type) => {
         latitude: null,
         longitude: null,
         price_range: '€',
-        opening_hours: {},
-        contact_info: {},
+        opening_hours: '',
         website: '',
         images: [],
         tips: '',
@@ -233,9 +234,13 @@ export const getStatusOptions = (type) => {
   switch (type) {
     case 'round':
       return [
+        { value: 'confirmed', label: 'Bestätigt' },
+        { value: 'tentative', label: 'Vorläufig' },
         { value: 'upcoming', label: 'Anstehend' },
         { value: 'active', label: 'Aktiv' },
-        { value: 'completed', label: 'Abgeschlossen' }
+        { value: 'completed', label: 'Abgeschlossen' },
+        { value: 'cancelled', label: 'Abgesagt' },
+        { value: 'postponed', label: 'Verschoben' }
       ];
     
     case 'timetable':

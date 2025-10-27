@@ -40,7 +40,7 @@ export default function AdminCountdown() {
           setTimezoneName(timezoneNames[timezone] || `${timezone} Zeit`);
         }
       } catch (error) {
-        console.warn('Failed to fetch timezone configuration:', error);
+        // Failed to fetch timezone configuration - using fallback
       }
     };
     
@@ -50,60 +50,88 @@ export default function AdminCountdown() {
   const schema = z.object({
     title: z.string().min(1, 'Titel ist erforderlich'),
     subtitle: z.string().min(1, 'Untertitel ist erforderlich'),
-    targetDate: z.string().min(1, 'Ziel-Datum ist erforderlich'),
-    buttonText: z.string().min(1, 'Button-Text ist erforderlich'),
-    buttonEmoji: z.string().min(1, 'Button-Emoji ist erforderlich'),
-    buttonLink: z.string().min(1, 'Button-Link ist erforderlich'),
-    isActive: z.boolean()
+    target_date: z.string().min(1, 'Ziel-Datum ist erforderlich'),
+    button_text: z.string().min(1, 'Button-Text ist erforderlich'),
+    button_emoji: z.string().min(1, 'Button-Emoji ist erforderlich'),
+    button_link: z.string().min(1, 'Button-Link ist erforderlich'),
+    is_active: z.boolean()
   });
 
-  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm({
+  const { register, handleSubmit, reset, control, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(schema),
     defaultValues: {
       title: 'Countdown zum SLAM25',
       subtitle: `28. Oktober 2025 • 12:00 Uhr (${timezoneName})`,
-      targetDate: '2025-10-28T12:00',
-      buttonText: 'Zum Zeitplan',
-      buttonEmoji: '📅',
-      buttonLink: '/timetable',
-      isActive: true
+      target_date: '2025-10-28T12:00',
+      button_text: 'Zum Zeitplan',
+      button_emoji: '📅',
+      button_link: '/timetable',
+      is_active: true
     }
   });
 
   // Update form when countdownData changes
   useEffect(() => {
-    if (countdownData) {
-      // Map backend snake_case fields to frontend camelCase
-      const mapped = {
-        title: countdownData.title ?? 'Countdown zum SLAM25',
-        subtitle: countdownData.subtitle ?? `28. Oktober 2025 • 12:00 Uhr (${timezoneName})`,
-        targetDate: countdownData.targetDate || countdownData.target_date,
-        buttonText: countdownData.buttonText || countdownData.button_text || 'Zum Zeitplan',
-        buttonEmoji: countdownData.buttonEmoji || countdownData.button_emoji || '📅',
-        buttonLink: countdownData.buttonLink || countdownData.button_link || '/timetable',
-        isActive: typeof countdownData.isActive === 'boolean' ? countdownData.isActive : (countdownData.is_active ?? true)
-      };
-
-      // Convert targetDate to local datetime format for input if valid
-      const rawDate = mapped.targetDate;
-      const parsed = rawDate ? new Date(rawDate) : null;
-      const isValidDate = parsed && !isNaN(parsed.getTime());
-      
-      // Fix timezone conversion: display the time as entered, not adjusted for timezone
-      const localDateTime = isValidDate
-        ? `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}T${String(parsed.getHours()).padStart(2, '0')}:${String(parsed.getMinutes()).padStart(2, '0')}`
-        : '2025-10-28T12:00';
-
-      reset({
-        title: mapped.title,
-        subtitle: mapped.subtitle,
-        targetDate: localDateTime,
-        buttonText: mapped.buttonText,
-        buttonEmoji: mapped.buttonEmoji,
-        buttonLink: mapped.buttonLink,
-        isActive: Boolean(mapped.isActive)
-      });
-    }
+    if (!countdownData) return;
+    
+    const fetchAndFormat = async () => {
+      try {
+        // Get configured timezone from API
+        const settingsResponse = await fetch(`${import.meta.env.VITE_API_URL}/settings`);
+        const settings = await settingsResponse.json();
+        const timezone = settings?.data?.timezone || 'Europe/Berlin';
+        
+        const mapped = {
+          title: countdownData.title ?? 'Countdown zum SLAM25',
+          subtitle: countdownData.subtitle ?? `28. Oktober 2025 • 12:00 Uhr (${timezoneName})`,
+          target_date: countdownData.target_date,
+          button_text: countdownData.button_text || 'Zum Zeitplan',
+          button_emoji: countdownData.button_emoji || '📅',
+          button_link: countdownData.button_link || '/timetable',
+          is_active: countdownData.is_active ?? true
+        };
+        
+        const rawDate = mapped.target_date;
+        
+        if (rawDate) {
+          const utcDate = new Date(rawDate);
+          
+          // Format in configured timezone using formatToParts
+          const formatter = new Intl.DateTimeFormat('en-CA', {
+            timeZone: timezone,
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+          });
+          
+          const parts = formatter.formatToParts(utcDate);
+          const year = parts.find(p => p.type === 'year').value;
+          const month = parts.find(p => p.type === 'month').value;
+          const day = parts.find(p => p.type === 'day').value;
+          const hour = parts.find(p => p.type === 'hour').value;
+          const minute = parts.find(p => p.type === 'minute').value;
+          
+          const localDateTime = `${year}-${month}-${day}T${hour}:${minute}`;
+          
+          reset({
+            title: mapped.title,
+            subtitle: mapped.subtitle,
+            target_date: localDateTime,
+            button_text: mapped.button_text,
+            button_emoji: mapped.button_emoji,
+            button_link: mapped.button_link,
+            is_active: Boolean(mapped.is_active)
+          });
+        }
+      } catch (error) {
+        console.error('Error formatting countdown date:', error);
+      }
+    };
+    
+    fetchAndFormat();
   }, [countdownData, reset]);
 
   const onSubmit = async (data) => {
@@ -111,35 +139,63 @@ export default function AdminCountdown() {
     setSuccess(null);
 
     try {
-      // Convert the datetime-local input to UTC, treating the input as Berlin time
-      const localInput = new Date(data.targetDate);
+      // Get configured timezone from API
+      const settingsResponse = await fetch(`${import.meta.env.VITE_API_URL}/settings`);
+      const settings = await settingsResponse.json();
+      const timezone = settings?.data?.timezone || 'Europe/Berlin';
       
-      // Create a date that represents the same time in Berlin timezone
-      // We do this by creating a date in UTC that represents the Berlin time
-      const year = localInput.getFullYear();
-      const month = localInput.getMonth();
-      const day = localInput.getDate();
-      const hour = localInput.getHours();
-      const minute = localInput.getMinutes();
+      const dateTimeStr = data.target_date; // "2025-10-28T12:00"
       
-      // Create a date string in Berlin timezone format
-      const berlinDateString = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`;
+      // Parse the components
+      const [datePart, timePart] = dateTimeStr.split('T');
+      const [year, month, day] = datePart.split('-');
+      const [hour, minute] = timePart.split(':');
       
-      // Parse this as if it were in Berlin timezone and convert to UTC
-      const berlinDate = new Date(berlinDateString + '+01:00'); // Berlin is UTC+1 in October
-      const isoString = berlinDate.toISOString();
+      // Create a date string representing this time in the configured timezone
+      const localDateStr = `${year}-${month}-${day}T${hour}:${minute}:00`;
+      
+      // Strategy: Find what UTC time will display as this local time in the configured timezone
+      // Start with the date as if it were UTC
+      const asIfUTC = new Date(localDateStr + 'Z');
+      
+      // Format this UTC time in the configured timezone to see what it looks like there
+      const tzFormatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone: timezone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      });
+      
+      const parts = tzFormatter.formatToParts(asIfUTC);
+      const tzYear = parts.find(p => p.type === 'year').value;
+      const tzMonth = parts.find(p => p.type === 'month').value;
+      const tzDay = parts.find(p => p.type === 'day').value;
+      const tzHour = parts.find(p => p.type === 'hour').value;
+      const tzMinute = parts.find(p => p.type === 'minute').value;
+      const tzSecond = parts.find(p => p.type === 'second').value;
+      
+      const tzDateStr = `${tzYear}-${tzMonth}-${tzDay}T${tzHour}:${tzMinute}:${tzSecond}`;
+      
+      // Calculate the offset between what we want and what we got
+      const wantedTime = new Date(localDateStr).getTime();
+      const displayedTime = new Date(tzDateStr).getTime();
+      const offsetMs = wantedTime - displayedTime;
+      
+      // Apply the correction to get the correct UTC time
+      const correctUTC = new Date(asIfUTC.getTime() + offsetMs);
 
-      // Use TanStack Query mutation for consistent response handling
       await updateCountdown.mutateAsync({
         ...data,
-        targetDate: isoString
+        target_date: correctUTC.toISOString()
       });
 
       setSuccess('Countdown configuration saved successfully!');
       setTimeout(() => setSuccess(null), 3000);
-      // No manual refresh needed - TanStack Query handles this automatically
     } catch (error) {
-      console.error('Error saving countdown config:', error);
       setError('Failed to save countdown configuration');
     }
   };
@@ -148,18 +204,18 @@ export default function AdminCountdown() {
     reset({
       title: 'Countdown zum SLAM25',
       subtitle: `28. Oktober 2025 • 12:00 Uhr (${timezoneName})`,
-      targetDate: '2025-10-28T12:00',
-      buttonText: 'Zum Zeitplan',
-      buttonEmoji: '📅',
-      buttonLink: '/timetable',
-      isActive: true
+      target_date: '2025-10-28T12:00',
+      button_text: 'Zum Zeitplan',
+      button_emoji: '📅',
+      button_link: '/timetable',
+      is_active: true
     });
   };
 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#185757]"></div>
       </div>
     );
   }
@@ -250,7 +306,7 @@ export default function AdminCountdown() {
                 type="text"
                 id="title"
                 {...register('title')}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#A2D2B9] focus:border-[#185757] dark:bg-gray-700 dark:text-white"
                 placeholder="Countdown zum SLAM25"
               />
             </div>
@@ -263,20 +319,20 @@ export default function AdminCountdown() {
                 type="text"
                 id="subtitle"
                 {...register('subtitle')}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#A2D2B9] focus:border-[#185757] dark:bg-gray-700 dark:text-white"
                 placeholder="28. Oktober 2025 • 12:00 Uhr (Berlin Zeit)"
               />
             </div>
           </div>
 
           <div className="mt-6">
-            <label htmlFor="targetDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label htmlFor="target_date" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Target Date & Time
             </label>
             <input
               type="datetime-local"
-              id="targetDate"
-              {...register('targetDate')}
+              id="target_date"
+              {...register('target_date')}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
             />
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
@@ -291,40 +347,40 @@ export default function AdminCountdown() {
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
-              <label htmlFor="buttonText" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label htmlFor="button_text" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Button Text
               </label>
               <input
                 type="text"
-                id="buttonText"
-                {...register('buttonText')}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                id="button_text"
+                {...register('button_text')}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#A2D2B9] focus:border-[#185757] dark:bg-gray-700 dark:text-white"
                 placeholder="Zum Zeitplan"
               />
             </div>
 
             <div>
-              <label htmlFor="buttonEmoji" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label htmlFor="button_emoji" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Button Emoji
               </label>
               <input
                 type="text"
-                id="buttonEmoji"
-                {...register('buttonEmoji')}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                id="button_emoji"
+                {...register('button_emoji')}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#A2D2B9] focus:border-[#185757] dark:bg-gray-700 dark:text-white"
                 placeholder="📅"
               />
             </div>
 
             <div>
-              <label htmlFor="buttonLink" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label htmlFor="button_link" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Button Link
               </label>
               <input
                 type="text"
-                id="buttonLink"
-                {...register('buttonLink')}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                id="button_link"
+                {...register('button_link')}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#A2D2B9] focus:border-[#185757] dark:bg-gray-700 dark:text-white"
                 placeholder="/timetable"
               />
             </div>
@@ -337,7 +393,8 @@ export default function AdminCountdown() {
           
           <CheckboxInput
             label="Show countdown on landing page"
-            name="isActive"
+            name="is_active"
+            control={control}
             register={register}
             errors={errors}
           />
@@ -355,7 +412,7 @@ export default function AdminCountdown() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-6 py-2 bg-[#185757] text-white rounded-lg hover:bg-[#0f3a3b] focus:ring-2 focus:ring-[#A2D2B9] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {isSubmitting ? 'Saving...' : 'Save Configuration'}
           </button>

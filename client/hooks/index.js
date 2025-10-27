@@ -10,7 +10,7 @@ export * from './useInfoPages.js';
 export * from './useLinks.js';
 export * from './useSchnellzugriff.js';
 export * from './useCountdown.js';
-// WebSocket hooks removed - using simple polling instead
+export * from './useDashboardSettings.js';
 export * from './useEntityData.js';
 export * from './usePageTitle.js';
 

@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useNews, usePageTitle } from '../hooks/index.js';
-import pwaService from '../services/pwaService.js';
 import LoadingSpinner from './LoadingSpinner';
 import { ErrorMessage, SuccessMessage } from './StatusMessages.jsx';
 import { getAvailablePublishedFilterOptions, validateFilterValue } from '../utils/filterUtils.js';
 import { getNewsCategoryFilterOptions, getNewsCategoryLabel, getNewsCategoryIcon } from '../utils/newsCategories.js';
+import PDFDisplay from './shared/PDFDisplay.jsx';
 
 export default function News() {
   usePageTitle('Neuigkeiten');
@@ -126,7 +126,7 @@ export default function News() {
       )}
 
       {/* Header */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+      <div className="page-header-card">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Neuigkeiten & Updates</h1>
           <p className="text-gray-600 dark:text-gray-400">Aktuelle Informationen und Ankündigungen zum SLAM25 Event</p>
@@ -139,12 +139,12 @@ export default function News() {
             placeholder="News durchsuchen..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+            className="search-input"
           />
           <select
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
-            className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+            className="filter-select"
           >
             <option value="all">Alle Kategorien</option>
             {newsCategories.map(category => (
@@ -157,7 +157,7 @@ export default function News() {
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
-            className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+            className="filter-select"
           >
             <option value="date">Neueste zuerst</option>
             <option value="date-asc">Älteste zuerst</option>
@@ -173,17 +173,17 @@ export default function News() {
             <Link
               key={item.id}
               to={`/news/${item.slug}`}
-              className="bg-white dark:bg-gray-700 rounded-xl p-8 shadow-sm border border-gray-200 dark:border-gray-600 hover:shadow-lg transition-all duration-200 hover:-translate-y-1 block group"
+              className="content-card block group"
             >
               <div className="flex items-start space-x-5 mb-6">
                 <div className="flex-shrink-0">
-                  <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
-                    <span className="text-blue-600 dark:text-blue-400 text-xl">{getCategoryIconLocal(item.category)}</span>
+                  <div className="icon-container">
+                    <span className="text-[#185757] dark:text-[#A2D2B9] text-xl">{getCategoryIconLocal(item.category)}</span>
                   </div>
                 </div>
                 <div className="flex-1 min-w-0">
                   <h3 className="font-semibold text-gray-900 dark:text-white mb-3 line-clamp-2 leading-tight text-lg">{item.title}</h3>
-                  <span className="inline-block px-3 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-sm font-medium rounded-full">
+                  <span className="badge-category">
                     {getCategoryLabel(item.category)}
                   </span>
                 </div>
@@ -193,20 +193,11 @@ export default function News() {
               {item.featured_image_url && (
                 <div className="mb-4">
                   {item.featured_image_url.toLowerCase().includes('.pdf') ? (
-                    <div className="flex items-center space-x-3 p-4 bg-gray-50 dark:bg-gray-600 rounded-lg">
-                      <span className="text-3xl">📄</span>
-                      <div>
-                        <p className="text-sm font-medium text-gray-700 dark:text-gray-300">PDF-Dokument</p>
-                        <a 
-                          href={item.featured_image_url} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:text-blue-800 text-sm"
-                        >
-                          PDF anzeigen
-                        </a>
-                      </div>
-                    </div>
+                    <PDFDisplay 
+                      pdfUrl={item.featured_image_url}
+                      title="PDF-Dokument"
+                      variant="compact"
+                    />
                   ) : (
                     <img 
                       src={item.featured_image_url} 
@@ -230,7 +221,7 @@ export default function News() {
                     timeZone: 'Europe/Berlin'
                   })}</span>
                 </div>
-                <div className="flex items-center text-blue-600 dark:text-blue-400 text-sm font-medium group-hover:text-blue-800 dark:group-hover:text-blue-200 transition-colors">
+                <div className="flex items-center text-[#185757] dark:text-[#A2D2B9] text-sm font-medium group-hover:text-[#0f3a3b] dark:group-hover:text-[#8BC4A3] transition-colors">
                   <span>Weiterlesen</span>
                   <svg className="ml-1 w-4 h-4 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -245,10 +236,10 @@ export default function News() {
           <div className="text-center py-12">
             <div className="text-4xl mb-4">📰</div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-              Keine News gefunden
+              Nachrichten kommt bald :)
             </h3>
             <p className="text-gray-600 dark:text-gray-400">
-              Versuchen Sie andere Suchkriterien oder schauen Sie später wieder vorbei.
+              Bald gibt es hier spannende Neuigkeiten zum SLAM25!
             </p>
           </div>
         )}

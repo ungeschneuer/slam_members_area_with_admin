@@ -7,6 +7,8 @@ import { translateRoundStatus, getRoundStatusIcon, getRoundStatusColor } from '.
 import { hasCrewRole, getCrewRolesFromAssignment } from '../utils/crewRoleUtils.js';
 import { createParticipantLookupMap } from '../utils/participantLookupUtils.js';
 import { getAvailableContentFilterOptions, getAvailableComplexFilterOptions, validateFilterValue } from '../utils/filterUtils.js';
+import DayTabs from './shared/DayTabs.jsx';
+import FilterButtons from './shared/FilterButtons.jsx';
 
 export default function Rounds() {
   usePageTitle('Runden');
@@ -18,8 +20,62 @@ export default function Rounds() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [competitionTypeFilter, setCompetitionTypeFilter] = useState('all');
-  const [dateFilter, setDateFilter] = useState('all');
   const [success, setSuccess] = useState(null);
+
+  // Day tab logic
+  const uniqueDates = useMemo(() => 
+    [...new Set(rounds.map(r => r.date))].sort(),
+    [rounds]
+  );
+
+  const dayTabs = useMemo(() => 
+    uniqueDates.map((date, index) => ({
+      id: date,
+      label: `Tag ${index + 1}`,
+      subtitle: new Date(date).toLocaleDateString('de-DE', { 
+        weekday: 'short', 
+        day: 'numeric', 
+        month: 'short',
+        timeZone: 'Europe/Berlin'
+      })
+    })),
+    [uniqueDates]
+  );
+
+  // Smart default day selection based on current date
+  const [activeDay, setActiveDay] = useState(null);
+
+  // Set active day once data is loaded
+  useEffect(() => {
+    if (uniqueDates.length > 0 && !activeDay) {
+      const today = new Date();
+      const todayStr = today.toISOString().split('T')[0];
+      
+      // Check if today is within the event dates
+      const todayIndex = uniqueDates.findIndex(date => date === todayStr);
+      if (todayIndex !== -1) {
+        setActiveDay(uniqueDates[todayIndex]); // Current day
+        return;
+      }
+      
+      // Check if we're before the first day
+      const firstDate = new Date(uniqueDates[0]);
+      if (today < firstDate) {
+        setActiveDay(uniqueDates[0]); // First day
+        return;
+      }
+      
+      // Check if we're after the last day
+      const lastDate = new Date(uniqueDates[uniqueDates.length - 1]);
+      if (today > lastDate) {
+        setActiveDay(uniqueDates[uniqueDates.length - 1]); // Last day
+        return;
+      }
+      
+      // Fallback to first day
+      setActiveDay(uniqueDates[0]);
+    }
+  }, [uniqueDates, activeDay]);
 
   // Optimized lookup maps for O(1) participant access
   const participantLookup = useMemo(() => 
@@ -57,8 +113,8 @@ export default function Rounds() {
     return competitionTypeFilter === 'all' || round.competition_type === competitionTypeFilter;
   };
 
-  const matchesDateFilter = (round, dateFilter) => {
-    return dateFilter === 'all' || round.date === dateFilter;
+  const matchesDayFilter = (round, activeDay) => {
+    return activeDay && round.date === activeDay;
   };
 
   // Predefined filter options
@@ -76,52 +132,50 @@ export default function Rounds() {
     { id: 'U20-Wettbewerb', name: 'U20' }
   ];
 
+  // Day filtering first, then other filters
+  const dayFilteredRounds = useMemo(() => 
+    activeDay ? rounds.filter(r => r.date === activeDay) : [],
+    [rounds, activeDay]
+  );
+
   // Single-pass cascading filter options and results
-  const { statusOptions, competitionTypeOptions, dateOptions, filteredRounds } = useMemo(() => {
+  const { statusOptions, competitionTypeOptions, filteredRounds } = useMemo(() => {
     try {
       // Handle empty or invalid datasets
-      if (!Array.isArray(rounds) || rounds.length === 0) {
+      if (!Array.isArray(dayFilteredRounds) || dayFilteredRounds.length === 0) {
         return {
           statusOptions: predefinedStatusOptions,
           competitionTypeOptions: predefinedCompetitionTypeOptions,
-          dateOptions: [{ id: 'all', name: 'Alle Daten' }],
           filteredRounds: []
         };
       }
     
-    const afterSearch = rounds.filter(round => {
+    const afterSearch = dayFilteredRounds.filter(round => {
       if (!round || typeof round !== 'object') return false;
       return matchesSearchFilter(round, searchTerm, participantLookup);
     });
     
     const statuses = new Set();
     const competitionTypes = new Set();
-    const dates = new Set();
     const filtered = [];
     
     afterSearch.forEach(round => {
       const passesStatus = matchesStatusFilter(round, statusFilter);
       const passesCompType = matchesCompetitionTypeFilter(round, competitionTypeFilter);
-      const passesDate = matchesDateFilter(round, dateFilter);
       
       // Final filtered results
-      if (passesStatus && passesCompType && passesDate) {
+      if (passesStatus && passesCompType) {
         filtered.push(round);
       }
       
-      // For status options: match competition type + date (but NOT status filter)
-      if (passesCompType && passesDate) {
+      // For status options: match competition type (but NOT status filter)
+      if (passesCompType) {
         statuses.add(round.calculatedStatus || round.status);
       }
       
-      // For competition type options: match status + date (but NOT competition type filter)
-      if (passesStatus && passesDate && round.competition_type) {
+      // For competition type options: match status (but NOT competition type filter)
+      if (passesStatus && round.competition_type) {
         competitionTypes.add(round.competition_type);
-      }
-      
-      // For date options: match status + competition type (but NOT date filter)
-      if (passesStatus && passesCompType && round.date) {
-        dates.add(round.date);
       }
     });
     
@@ -140,23 +194,9 @@ export default function Rounds() {
       )
     ].filter(Boolean);
     
-    const dateOpts = [
-      { id: 'all', name: 'Alle Daten' },
-      ...Array.from(dates).sort((a, b) => new Date(a) - new Date(b)).map(date => ({
-        id: date,
-        name: new Date(date).toLocaleDateString('de-DE', { 
-          weekday: 'short', 
-          day: 'numeric', 
-          month: 'short',
-          timeZone: 'Europe/Berlin'
-        })
-      }))
-    ];
-    
       return {
         statusOptions: statusOpts,
         competitionTypeOptions: compTypeOpts,
-        dateOptions: dateOpts,
         filteredRounds: filtered
       };
     } catch (error) {
@@ -165,11 +205,10 @@ export default function Rounds() {
       return {
         statusOptions: predefinedStatusOptions,
         competitionTypeOptions: predefinedCompetitionTypeOptions,
-        dateOptions: [{ id: 'all', name: 'Alle Daten' }],
         filteredRounds: []
       };
     }
-  }, [rounds, searchTerm, participantLookup, statusFilter, competitionTypeFilter, dateFilter]);
+  }, [dayFilteredRounds, searchTerm, participantLookup, statusFilter, competitionTypeFilter]);
 
   // Auto-reset invalid filters (with loop prevention)
   const resetInProgress = useRef(false);
@@ -192,14 +231,6 @@ export default function Rounds() {
     }
   }, [competitionTypeOptions, competitionTypeFilter]);
 
-  useEffect(() => {
-    if (resetInProgress.current) return;
-    if (!dateOptions.some(opt => opt.id === dateFilter)) {
-      resetInProgress.current = true;
-      setDateFilter('all');
-      setTimeout(() => { resetInProgress.current = false; }, 0);
-    }
-  }, [dateOptions, dateFilter]);
 
   // Use centralized status functions
   const getStatusColor = (status) => getRoundStatusColor(status);
@@ -209,7 +240,7 @@ export default function Rounds() {
   const getCompetitionTypeColor = (type) => {
     switch (type) {
       case 'Einzelwettbewerb':
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
+        return 'bg-[#A2D2B9]/20 text-[#185757] dark:bg-[#185757]/30 dark:text-[#A2D2B9]';
       case 'Teamwettbewerb':
         return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
       case 'U20-Wettbewerb':
@@ -223,7 +254,7 @@ export default function Rounds() {
   const getCompetitionTypeIndicator = (type) => {
     switch (type) {
       case 'Einzelwettbewerb':
-        return 'bg-blue-500';
+        return 'bg-[#185757]';
       case 'Teamwettbewerb':
         return 'bg-green-500';
       case 'U20-Wettbewerb':
@@ -237,13 +268,13 @@ export default function Rounds() {
   const getCompetitionTypeBackground = (type) => {
     switch (type) {
       case 'Einzelwettbewerb':
-        return 'bg-blue-50/30 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800 hover:bg-blue-50/50 dark:hover:bg-blue-900/20';
+        return 'bg-[#A2D2B9]/40 dark:bg-[#185757]/50 border-[#185757]/40 dark:border-[#185757]/60 hover:bg-[#A2D2B9]/50 dark:hover:bg-[#185757]/60';
       case 'Teamwettbewerb':
-        return 'bg-green-50/30 dark:bg-green-900/10 border-green-200 dark:border-green-800 hover:bg-green-50/50 dark:hover:bg-green-900/20';
+        return 'bg-green-100/60 dark:bg-green-800/40 border-green-300 dark:border-green-600 hover:bg-green-100/70 dark:hover:bg-green-800/50';
       case 'U20-Wettbewerb':
-        return 'bg-purple-50/30 dark:bg-purple-900/10 border-purple-200 dark:border-purple-800 hover:bg-purple-50/50 dark:hover:bg-purple-900/20';
+        return 'bg-purple-100/60 dark:bg-purple-800/40 border-purple-300 dark:border-purple-600 hover:bg-purple-100/70 dark:hover:bg-purple-800/50';
       default:
-        return 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50';
+        return 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700/50';
     }
   };
 
@@ -324,90 +355,136 @@ export default function Rounds() {
       )}
 
       {/* Header */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+      <div className="page-header-card">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Runden</h1>
-          <p className="text-gray-600 dark:text-gray-400">Alle Poetry Slam Runden</p>
+          <p className="text-gray-600 dark:text-gray-300">Alle Poetry Slam Runden</p>
         </div>
 
         {/* Search and Filters */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <input
-                type="text"
-                placeholder="Runden oder Teilnehmer*innen suchen..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-          className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-          aria-label="Runden oder Teilnehmer suchen"
-              />
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-          aria-label="Status filtern"
-                >
-                  {statusOptions.map(option => (
-                    <option key={option.id} value={option.id}>
-                      {option.id === 'all' ? option.name : translateRoundStatus(option.id)}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  value={competitionTypeFilter}
-                  onChange={(e) => setCompetitionTypeFilter(e.target.value)}
-          className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-          aria-label="Wettbewerbstyp filtern"
-                >
-                  {competitionTypeOptions.map(option => (
-                    <option key={option.id} value={option.id}>
-                      {option.name}
-                    </option>
-                  ))}
-                </select>
-        <select
-          value={dateFilter}
-          onChange={(e) => setDateFilter(e.target.value)}
-          className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-          aria-label="Datum filtern"
-        >
-          {dateOptions.map(option => (
-            <option key={option.id} value={option.id}>
-              {option.name}
-            </option>
-          ))}
-        </select>
-        </div>
-      </div>
-            
-      {/* Timetable View */}
-      <div className="space-y-8">
-        {Object.entries(roundsByDate).map(([date, rounds]) => (
-          <div key={date} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-            {/* Date Header */}
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                {date === 'unknown' ? 'Datum unbekannt' : formatDateForDisplay(date)}
-              </h2>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                {rounds.length} Runde{rounds.length !== 1 ? 'n' : ''}
-              </p>
+        <div className="space-y-4">
+          <input
+            type="text"
+            placeholder="Runden oder Teilnehmer*innen suchen..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+            aria-label="Runden oder Teilnehmer suchen"
+          />
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
+                Status filtern
+              </label>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                aria-label="Status filtern"
+              >
+                {statusOptions.map(option => (
+                  <option key={option.id} value={option.id}>
+                    {option.id === 'all' ? option.name : translateRoundStatus(option.id)}
+                  </option>
+                ))}
+              </select>
             </div>
             
-            {/* Rounds List */}
-            <div className="divide-y divide-gray-200 dark:divide-gray-700">
-              {rounds.map((round) => (
+            <div>
+              <FilterButtons
+                options={competitionTypeOptions}
+                activeFilter={competitionTypeFilter}
+                onFilterChange={setCompetitionTypeFilter}
+                label="Wettbewerbstyp filtern"
+                ariaLabel="Wettbewerbstyp auswählen"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Day Tabs Section */}
+      {dayTabs.length > 0 && (
+        <div className="bg-gray-50 dark:bg-gray-900/50 rounded-xl p-4 mb-6">
+          <div className="flex justify-center">
+            <DayTabs 
+              days={dayTabs}
+              activeDay={activeDay}
+              onDayChange={setActiveDay}
+            />
+          </div>
+        </div>
+      )}
+            
+      {/* Rounds List */}
+      <div className="space-y-8">
+        {filteredRounds.length > 0 ? (
+          <div className="flex flex-col gap-5">
+              {filteredRounds.map((round) => (
                 <Link to={`/rounds/${round.slug}`} key={round.id}>
-                  <div className={`p-4 sm:p-6 transition-all duration-200 group rounded-xl shadow-sm hover:shadow-md border-l-4 ${getCompetitionTypeBackground(round.competition_type || 'Einzelwettbewerb')}`}>
-                    {/* Single Row Layout - Three Columns */}
-                    <div className="flex items-start gap-4">
+                  <div className={`p-4 sm:p-6 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 group border-l-4 ${getCompetitionTypeBackground(round.competition_type || 'Einzelwettbewerb')}`}>
+                    {/* Mobile Layout - Two Rows */}
+                    <div className="sm:hidden">
+                      {/* Row 1: Time, Title, Location */}
+                      <div className="flex items-start space-x-3 mb-3">
+                        <div className="text-center flex-shrink-0">
+                          <div className="text-lg font-bold text-gray-900 dark:text-white">
+                            {formatTime(round.start_time)} - {formatTime(round.end_time)}
+                          </div>
+                          <div className="text-xs text-gray-500 dark:text-gray-300 mt-1">
+                            {formatDateForDisplay(round.date)}
+                          </div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-lg font-bold text-gray-900 dark:text-white group-hover:text-[#185757] dark:group-hover:text-[#A2D2B9] transition-colors leading-tight mb-1">
+                            {round.title}
+                          </h3>
+                          <span className="text-sm text-gray-500 dark:text-gray-300 mb-2 block">
+                            {round.competition_type || 'Einzelwettbewerb'}
+                          </span>
+                          {round.location && (
+                            <div className="text-sm text-gray-600 dark:text-gray-300">
+                              {round.location}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-center text-[#185757] dark:text-[#A2D2B9] group-hover:text-[#0f3a3b] dark:group-hover:text-[#8BC4A3] transition-colors flex-shrink-0">
+                          <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </div>
+                      </div>
                       
+                      {/* Row 2: Participants - Full Width */}
+                      {round.assignments && round.assignments.filter(a => a.roles.includes('participant')).length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {round.assignments
+                            .filter(a => a.roles.includes('participant'))
+                            .map((assignment, index) => {
+                              const participantName = assignment.participant_name || assignment.team_name || `ID: ${assignment.participant_id || assignment.team_id}`;
+                              return (
+                                <span 
+                                  key={assignment.participant_id || assignment.team_id}
+                                  className="px-2 py-1 bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-md text-xs"
+                                >
+                                  {participantName}
+                                </span>
+                              );
+                            })}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Desktop Layout - Three Columns */}
+                    <div className="hidden sm:flex sm:items-start sm:gap-4">
                       {/* Column 1: Time */}
                       <div className="text-center flex-shrink-0">
                         <div className="text-lg font-bold text-gray-900 dark:text-white">
-                          {formatTime(round.start_time)}
+                          {formatTime(round.start_time)} - {formatTime(round.end_time)}
                         </div>
-                        <div className="text-sm text-gray-500 dark:text-gray-400">
-                          {formatTime(round.end_time)}
+                        <div className="text-xs text-gray-500 dark:text-gray-300 mt-1">
+                          {formatDateForDisplay(round.date)}
                         </div>
                       </div>
 
@@ -418,21 +495,21 @@ export default function Rounds() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between">
                           <div className="flex-1 min-w-0">
-                            <h3 className="text-lg font-bold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors leading-tight mb-1">
+                            <h3 className="text-lg font-bold text-gray-900 dark:text-white group-hover:text-[#185757] dark:group-hover:text-[#A2D2B9] transition-colors leading-tight mb-1">
                               {round.title}
                             </h3>
-                            <span className="text-sm text-gray-500 dark:text-gray-400 mb-2 block">
+                            <span className="text-sm text-gray-500 dark:text-gray-300 mb-2 block">
                               {round.competition_type || 'Einzelwettbewerb'}
                             </span>
                             
                             {/* Location */}
-                            <div className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+                            <div className="text-sm text-gray-600 dark:text-gray-300 mt-2">
                               <span className="truncate">{round.location || 'Unbekannter Ort'}</span>
                             </div>
                             
                             {/* Participants - Own Line */}
                             {round.assignments && round.assignments.filter(a => a.roles.includes('participant')).length > 0 && (
-                              <div className="flex items-center text-sm text-gray-600 dark:text-gray-400 mt-2">
+                              <div className="flex items-center text-sm text-gray-600 dark:text-gray-300 mt-2">
                                 <div className="flex flex-wrap gap-1">
                                   {round.assignments
                                     .filter(a => a.roles.includes('participant'))
@@ -442,7 +519,7 @@ export default function Rounds() {
                                       return (
                                         <span 
                                           key={assignment.participant_id || assignment.team_id}
-                                          className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md text-xs"
+                                          className="px-2 py-1 bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-md text-xs"
                                         >
                                           {participantName}
                                         </span>
@@ -454,7 +531,7 @@ export default function Rounds() {
                           </div>
                           
                           {/* Navigation Arrow */}
-                          <div className="flex items-center text-blue-600 dark:text-blue-400 group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors ml-2 flex-shrink-0">
+                          <div className="flex items-center text-[#185757] dark:text-[#A2D2B9] group-hover:text-[#0f3a3b] dark:group-hover:text-[#8BC4A3] transition-colors ml-2 flex-shrink-0">
                             <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                             </svg>
@@ -464,20 +541,28 @@ export default function Rounds() {
                     </div>
                   </div>
                 </Link>
-                                          ))}
-                                        </div>
-                                      </div>
-        ))}
-                            </div>
-
-      {/* Empty state */}
-      {Object.keys(roundsByDate).length === 0 && (
-        <div className="text-center py-12">
-                <div className="text-4xl mb-4">🎭</div>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Keine Runden gefunden</h3>
-          <p className="text-gray-600 dark:text-gray-400">Versuchen Sie andere Suchbegriffe oder Filter.</p>
-        </div>
-      )}
+              ))}
+            </div>
+        ) : (
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-12 shadow-sm border border-gray-200 dark:border-gray-700">
+            <div className="text-center">
+            <div className="text-4xl mb-4">🎭</div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+              {filteredRounds.length === 0 && dayFilteredRounds.length > 0 
+                ? 'Keine Runden gefunden' 
+                : 'Runden kommt bald :)'
+              }
+            </h3>
+            <p className="text-gray-600 dark:text-gray-300">
+              {filteredRounds.length === 0 && dayFilteredRounds.length > 0 
+                ? 'Versuche andere Filter oder suche nach anderen Begriffen.' 
+                : 'Bald werden hier alle Poetry Slam Runden zu sehen sein!'
+              }
+            </p>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -62,12 +62,16 @@ web_modules/
 # Yarn Integrity file
 .yarn-integrity
 
-# dotenv environment variable files
+# Environment files (ignore all except development and templates)
 .env
-.env.development.local
-.env.test.local
-.env.production.local
+.env.production
 .env.local
+.env.*.local
+
+# Allow development environment and templates
+!.env.development
+!.env.production.template
+!.env.simple
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache
@@ -196,14 +200,6 @@ typings/
 # Yarn Integrity file
 .yarn-integrity
 
-# dotenv environment variables file
-.env
-.env.test
-.env.production
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache
@@ -296,20 +292,6 @@ manifest.json.bak
 *.tmp
 *.temp
 
-# Environment files
-.env
-.env.development
-.env.production
-.env.local
-.env.development.local
-.env.production.local
-.env.test
-.env.test.local
-
-# Allow environment templates to be committed
-!.env.template
-!.env.development.template
-!.env.production.template
 
 # Logs
 *.log
@@ -364,3 +346,7 @@ public/uploads/**/*
 !public/uploads/news/
 !public/uploads/info-pages/
 !public/uploads/**/.gitkeep
+
+# Database migration backups (server-side backups)
+# These contain sensitive production data and should never be committed
+.backups/

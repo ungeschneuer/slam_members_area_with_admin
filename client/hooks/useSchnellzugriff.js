@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { API_URL } from '../config/api.js';
 import authService from '../services/authService.js';
 import { useEntityData } from './useEntityData.js';
+import { getQueryConfig } from '../config/polling.js';
 
 // Query keys for schnellzugriff
 export const schnellzugriffKeys = {
@@ -27,7 +28,8 @@ export function useSchnellzugriff(filters = {}, isAdmin = false) {
       const result = await response.json();
       return result?.data || result || [];
     },
-    enabled: true
+    enabled: true,
+    ...getQueryConfig('schnellzugriff', isAdmin),  // Add caching and polling config
   });
 }
 

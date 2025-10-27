@@ -19,7 +19,6 @@ const BreakingNews = () => {
           const formatted = await formatDateInTimezone(dateToFormat);
           setFormattedDate(formatted);
         } catch (error) {
-          console.error('Error formatting date:', error);
           setFormattedDate('');
         }
       };
@@ -29,8 +28,7 @@ const BreakingNews = () => {
     }
   }, [breakingNews]);
 
-  // Note: Real-time updates are now handled by useLiveData hook
-  // No need for direct WebSocket subscriptions or hard reloads
+  // Real-time updates handled by polling
 
   const formatDateInTimezone = async (dateString) => {
     try {
@@ -40,7 +38,6 @@ const BreakingNews = () => {
         day: 'numeric'
       });
     } catch (error) {
-      console.warn('Failed to format date in timezone, using fallback:', error);
       // Fallback to simple date formatting
       try {
         const date = new Date(dateString);
@@ -52,13 +49,13 @@ const BreakingNews = () => {
           });
         }
       } catch (fallbackError) {
-        console.warn('Fallback date formatting also failed:', fallbackError);
+        // Silent fallback
       }
       return '';
     }
   };
 
-  const getCategoryLabel = (category) => {
+  const getCategoryLabelLocal = (category) => {
     return getNewsCategoryLabel(category);
   };
 
@@ -72,7 +69,7 @@ const BreakingNews = () => {
   }
 
   return (
-    <div className="bg-gradient-to-r from-red-600 to-orange-600 text-white shadow-lg mb-8">
+    <div className="bg-[#185757] dark:bg-[#A2D2B9] text-white dark:text-gray-900 shadow-lg mb-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Mobile Layout */}
         <div className="block sm:hidden py-3">
@@ -88,7 +85,7 @@ const BreakingNews = () => {
                 {breakingNews.title}
               </div>
               {formattedDate && (
-                <div className="text-xs text-white/80 mt-1">
+                <div className="text-xs text-white/90 dark:text-gray-700 mt-1">
                   {formattedDate}
                 </div>
               )}
@@ -103,7 +100,7 @@ const BreakingNews = () => {
             </div>
             <Link
               to={`/news/${breakingNews.slug}`}
-              className="inline-flex items-center px-2 py-1 bg-white/20 hover:bg-white/30 rounded-full text-xs font-medium transition-colors duration-200 flex-shrink-0 whitespace-nowrap"
+              className="badge-primary flex-shrink-0 whitespace-nowrap"
             >
               Lesen →
             </Link>
@@ -124,7 +121,7 @@ const BreakingNews = () => {
           <div className="flex items-center space-x-4">
             <div className="text-sm">
               <span className="font-medium">{breakingNews.title}</span>
-              <span className="ml-2 text-white/80">
+              <span className="ml-2 text-white/90 dark:text-gray-700">
                 {formattedDate}
               </span>
               {breakingNews.breaking_news_until && (
@@ -136,7 +133,7 @@ const BreakingNews = () => {
             </div>
             <Link
               to={`/news/${breakingNews.slug}`}
-              className="inline-flex items-center px-2 py-1 bg-white/20 hover:bg-white/30 rounded-full text-xs font-medium transition-colors duration-200 whitespace-nowrap"
+              className="badge-primary whitespace-nowrap"
             >
               Lesen →
             </Link>

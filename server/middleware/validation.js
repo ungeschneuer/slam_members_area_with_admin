@@ -144,22 +144,12 @@ export const validateInfoPage = [
     .withMessage('Featured image URL must be a valid URL')
     .trim(),
   
-  body('meta_description')
-    .optional()
-    .isLength({ max: 160 })
-    .withMessage('Meta description must be less than 160 characters')
-    .trim()
-    .escape(),
   
   body('tags')
     .optional()
     .isArray()
     .withMessage('Tags must be an array'),
   
-  body('is_published')
-    .optional()
-    .isBoolean()
-    .withMessage('is_published must be a boolean'),
   
   body('published_at')
     .optional()
@@ -221,16 +211,18 @@ export const validateTimetableEntry = [
   body('type')
     .notEmpty()
     .withMessage('Type is required')
-    .isIn(['team-round', 'individual-round', 'workshop', 'fun', 'aftershow', 'general', 'technical', 'registration', 'party', 'celebration'])
-    .withMessage('Type must be one of: competition, break, announcement, workshop, social'),
+    .isIn(['team-round', 'individual-round', 'workshop', 'fun', 'aftershow', 'panel', 'networking', 'general', 'technical', 'registration', 'party', 'celebration'])
+    .withMessage('Type must be one of: team-round, individual-round, workshop, fun, aftershow, panel, networking, general, technical, registration, party, celebration'),
   
   body('status')
     .optional()
     .isIn(['confirmed', 'tentative', 'upcoming', 'active', 'completed', 'cancelled'])
-    .withMessage('Status must be one of: scheduled, in_progress, completed, cancelled'),
+    .withMessage('Status must be one of: confirmed, tentative, upcoming, active, completed, cancelled'),
   
   handleValidationErrors
 ];
+
+import { getCategoryValues } from '../../shared/constants/cityTipsCategories.js';
 
 // Enhanced validation for city tips
 export const validateCityTip = [
@@ -257,8 +249,8 @@ export const validateCityTip = [
   body('category')
     .notEmpty()
     .withMessage('Category is required')
-    .isIn(['culture', 'cafe', 'restaurant', 'bar', 'shopping', 'hotel', 'transport', 'entertainment'])
-    .withMessage('Category must be one of: culture, cafe, restaurant, bar, shopping, hotel, transport, entertainment'),
+    .isIn(getCategoryValues())
+    .withMessage(`Category must be one of: ${getCategoryValues().join(', ')}`),
   
   body('slug')
     .optional()

@@ -244,7 +244,7 @@ SELECT validate_coordinates(50.8278, 12.9244);
 
 ### Authentication
 
-- **Password hashing**: Using bcrypt with salt
+- **Password hashing**: Using bcryptjs with salt
 - **Session management**: Secure tokens with expiration
 - **Role-based access**: Granular permissions
 - **Audit logging**: Complete change tracking
@@ -364,7 +364,7 @@ BACKUP_RETENTION_DAYS=30
 
 # Security
 ENCRYPTION_KEY=slam25_encryption_key_2025_secure_random_string
-JWT_SECRET=slam25_jwt_secret_2025_secure_random_string
+JWT_SECRET=slam25_jwt_secret_2025_secure_random_string_minimum_64_characters_required_for_security
 ```
 
 ## Sample Data
@@ -394,11 +394,142 @@ The database schema is designed for easy API integration:
 Planned improvements:
 
 - **Full-text search**: Enhanced content searching
-- **Real-time notifications**: WebSocket integration
+- **Real-time notifications**: Simple polling (30s intervals)
 - **Advanced analytics**: User behavior tracking
 - **Multi-tenancy**: Support for multiple competitions
 - **API rate limiting**: Request throttling
 - **Data archiving**: Long-term storage strategies
+
+## Database Migrations
+
+The SLAM25 project uses a simple, automatic database migration system that runs during deployment.
+
+### How Migrations Work
+
+1. **Migration Files**: SQL files in `database/migrations/` directory
+2. **Tracking Table**: `schema_migrations` table tracks applied migrations
+3. **Automatic Execution**: Runs during deployment without manual intervention
+4. **Backup Safety**: Creates automatic backups before running migrations
+5. **Rollback Support**: Each migration has a corresponding rollback file
+
+### Naming Convention
+
+**New migrations**: Use timestamp prefix
+- Format: `YYYYMMDDHHMMSS_descriptive_name.sql`
+- Example: `20250126143000_add_user_preferences.sql`
+- Rollback: `20250126143000_add_user_preferences_rollback.sql`
+
+**Special files**:
+- `000_create_migrations_table.sql` - Infrastructure (always skipped by runner)
+- `*_rollback.sql` - Rollback files (always skipped by runner)
+
+**Ordering**: Alphabetical sort ensures chronological execution
+
+### Creating a New Migration
+
+1. **Create migration file**:
+   ```bash
+   touch database/migrations/$(date +"%Y%m%d%H%M%S")_descriptive_name.sql
+   ```
+
+2. **Write migration SQL**:
+   ```sql
+   -- Add user preferences table
+   CREATE TABLE IF NOT EXISTS user_preferences (
+       id SERIAL PRIMARY KEY,
+       user_id INTEGER NOT NULL,
+       preference_key VARCHAR(100) NOT NULL,
+       preference_value TEXT,
+       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+   );
+   
+   -- Add index for performance
+   CREATE INDEX IF NOT EXISTS idx_user_preferences_user_id 
+   ON user_preferences(user_id);
+   ```
+
+3. **Create rollback file**:
+   ```bash
+   touch database/migrations/$(date +"%Y%m%d%H%M%S")_descriptive_name_rollback.sql
+   ```
+
+4. **Write rollback SQL**:
+   ```sql
+   -- Rollback: Remove user preferences table
+   DROP TABLE IF EXISTS user_preferences;
+   ```
+
+### Running Migrations Locally
+
+```bash
+# Check migration status
+npm run migrate:status
+
+# Preview what migrations would run (dry-run)
+npm run migrate:dry-run
+
+# Run pending migrations
+npm run migrate
+
+# Rollback a specific migration
+npm run migrate:rollback 20250126143000_add_user_preferences.sql
+```
+
+### Migration Status
+
+The status command shows:
+- ✅ Applied migrations (green) with timestamps and execution times
+- ⏳ Pending migrations (yellow)
+- 📊 Total counts
+- 📁 Rollback file coverage
+
+### Backup Strategy
+
+**Location**: `.backups/` directory on server (git-ignored)
+
+**Structure**:
+```
+.backups/
+  pre-migration/          # Automatic backups before migrations
+    backup_20250126_143000.sql
+    backup_20250126_150000.sql
+  rollbacks/              # Backups before rollbacks
+    backup_20250126_153000.sql
+```
+
+**Retention**: Keep last 5 backups in each directory (auto-cleanup)
+
+**Security**: Directory is git-ignored to prevent committing sensitive data
+
+### Deployment Integration
+
+Migrations run automatically during deployment with three scenarios:
+
+1. **Database has data**: Run new migrations only
+2. **Database empty + backup exists**: Import backup, register migrations
+3. **Database empty + no backup**: Fail deployment (requires backup)
+
+### Troubleshooting Common Issues
+
+**Migration fails during deployment**:
+1. Check deployment logs for specific error
+2. Backup available in `.backups/pre-migration/`
+3. Manual recovery may be required
+
+**Rollback fails**:
+1. Check if rollback file exists
+2. Verify rollback SQL syntax
+3. Original backup remains intact
+
+**Missing rollback files**:
+1. Run `npm run migrate:status` to see coverage
+2. Create missing rollback files
+3. Test rollback before deployment
+
+**Migration out of order**:
+1. Check alphabetical ordering
+2. Use timestamp prefix for new migrations
+3. Existing migrations keep current names
 
 ## Support
 

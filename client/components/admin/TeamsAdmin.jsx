@@ -5,11 +5,13 @@ import LoadingSpinner from '../LoadingSpinner.jsx';
 import ErrorFallback from '../ErrorFallback.jsx';
 import { ErrorMessage, SuccessMessage } from '../StatusMessages.jsx';
 import { formatInstagramUrl, normalizeInstagramInput, extractInstagramUsername } from '../../utils/instagramUtils.js';
+import { handleLinkClick } from '../../utils/linkUtils.js';
 import ParticipantMultiSelect from './ParticipantMultiSelect.jsx';
 import { ADMIN_PARTICIPANTS_LIMIT } from '../../config/api.js';
+import ConsolidatedAdminTable from './ConsolidatedAdminTable.jsx';
 
 const TeamsAdmin = () => {
-  const { data: teams, isLoading: teamsLoading, error: teamsError } = useTeams();
+  const { data: teams, isLoading: teamsLoading, error: teamsError } = useTeams(true); // Pass isAdmin=true
   const { data: participants, isLoading: participantsLoading } = useParticipants({ limit: ADMIN_PARTICIPANTS_LIMIT }, true);
   const createTeamMutation = useCreateTeam();
   const updateTeamMutation = useUpdateTeam();
@@ -65,11 +67,11 @@ const TeamsAdmin = () => {
     }
   }, [editingTeam, resetEdit]);
 
-  // Filter teams based on search term
+  // Filter and sort teams based on search term
   const filteredTeams = useMemo(() => {
     if (!teams) return [];
 
-    return teams.filter(team => {
+    const filtered = teams.filter(team => {
       const matchesSearch = !searchTerm || 
         team.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         team.members?.some(member => 
@@ -77,6 +79,13 @@ const TeamsAdmin = () => {
         );
 
       return matchesSearch;
+    });
+
+    // Sort by first character of name alphabetically
+    return filtered.sort((a, b) => {
+      const nameA = (a.name || '').toLowerCase();
+      const nameB = (b.name || '').toLowerCase();
+      return nameA.localeCompare(nameB);
     });
   }, [teams, searchTerm]);
 
@@ -100,7 +109,7 @@ const TeamsAdmin = () => {
             const normalized = normalizeInstagramInput(teamData.instagram);
             return extractInstagramUsername(normalized) || teamData.instagram.replace(/^@/, '');
           } catch (error) {
-            console.warn('Instagram normalization failed:', error);
+            // Instagram normalization failed - using original value
             return teamData.instagram.replace(/^@/, '');
           }
         })() : ''
@@ -148,7 +157,7 @@ const TeamsAdmin = () => {
           const normalized = normalizeInstagramInput(teamData.instagram);
           return extractInstagramUsername(normalized) || teamData.instagram.replace(/^@/, '');
         } catch (error) {
-          console.warn('Instagram normalization failed:', error);
+          // Instagram normalization failed - using original value
           return teamData.instagram.replace(/^@/, '');
         }
       })() : ''
@@ -167,7 +176,7 @@ const TeamsAdmin = () => {
         setSuccess('Team erfolgreich gelöscht!');
         setTimeout(() => setSuccess(null), 3000);
       } catch (error) {
-        console.error('Failed to delete team:', error);
+        // Failed to delete team - handled by error state
         // Show detailed conflict info when available
         if (error?.status === 409 && error?.details?.activeRounds?.length) {
           const rounds = error.details.activeRounds
@@ -185,7 +194,7 @@ const TeamsAdmin = () => {
     try {
       await addTeamMemberMutation.mutateAsync({ teamId, participantId });
     } catch (error) {
-      console.error('Failed to add team member:', error);
+      // Failed to add team member - handled by error state
     }
   };
 
@@ -193,7 +202,7 @@ const TeamsAdmin = () => {
     try {
       await removeTeamMemberMutation.mutateAsync({ teamId, participantId });
     } catch (error) {
-      console.error('Failed to remove team member:', error);
+      // Failed to remove team member - handled by error state
       // Show user-friendly error message
       alert(`Failed to remove team member: ${error.message || 'Unknown error'}`);
     }
@@ -238,7 +247,7 @@ const TeamsAdmin = () => {
           <div className="flex flex-col sm:flex-row gap-3">
             <button
               onClick={() => setShowCreateForm(!showCreateForm)}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              className="w-full sm:w-auto min-h-[44px] px-4 py-2 bg-[#185757] dark:bg-[#A2D2B9] text-white dark:text-gray-900 rounded-lg hover:bg-[#0f3a3b] dark:hover:bg-[#8BC4A3] transition-colors focus:outline-none focus:ring-2 focus:ring-[#A2D2B9] dark:focus:ring-[#185757] focus:ring-offset-2 touch-manipulation active:scale-95"
             >
               {showCreateForm ? 'Abbrechen' : 'Team hinzufügen'}
             </button>
@@ -256,7 +265,7 @@ const TeamsAdmin = () => {
                 resetCreate();
                 setShowCreateForm(false);
               } catch (err) {
-                console.error('Create team failed:', err);
+                // Create team failed - handled by error state
                 setFormError(err?.message || 'Erstellen fehlgeschlagen');
               }
             })} className="space-y-4">
@@ -291,11 +300,11 @@ const TeamsAdmin = () => {
                 showRegion={true}
               />
               
-              <div className="flex space-x-3">
+              <div className="flex flex-col sm:flex-row gap-3">
                 <button
                   type="submit"
                   disabled={createTeamMutation.isPending}
-                  className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-70"
+                  className="w-full sm:w-auto min-h-[44px] px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-70 touch-manipulation active:scale-95"
                 >
                   {createTeamMutation.isPending ? 'Hinzufügen...' : 'Hinzufügen'}
                 </button>
@@ -307,7 +316,7 @@ const TeamsAdmin = () => {
                     setFormError('');
                     setSelectedMembers([]);
                   }}
-                  className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+                  className="w-full sm:w-auto min-h-[44px] px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 touch-manipulation active:scale-95"
                 >
                   Abbrechen
                 </button>
@@ -330,85 +339,90 @@ const TeamsAdmin = () => {
         </div>
 
         {/* Teams Table */}
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-            <thead className="bg-gray-50 dark:bg-gray-700">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Name</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Members</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Instagram</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Aktionen</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-              {filteredTeams.map((team) => (
-                <tr key={team.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900 dark:text-white">{team.name}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                    {team.members?.length || 0}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                    {team.instagram ? (
-                      <a
-                        href={formatInstagramUrl(team.instagram)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-pink-600 hover:text-pink-700 transition-colors"
-                      >
-                        Instagram
-                      </a>
-                    ) : '-'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => setEditingTeam(team)}
-                        className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
-                      >
-                        Bearbeiten
-                      </button>
-                      <button
-                        onClick={() => {
-                          setSelectedTeam(team);
-                          setShowMemberManagement(true);
-                        }}
-                        className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300 transition-colors"
-                      >
-                        Members
-                      </button>
-                      <button
-                        onClick={() => handleDeleteTeam(team.id)}
-                        className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 transition-colors"
-                      >
-                        Löschen
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {filteredTeams.length === 0 && (
-          <div className="text-center py-12">
-            <div className="text-4xl mb-4">👥</div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-              Keine Teams gefunden
-            </h3>
-            <p className="text-gray-600 dark:text-gray-400">
-              Versuchen Sie andere Suchkriterien oder fügen Sie ein neues Team hinzu.
-            </p>
-          </div>
-        )}
+        <ConsolidatedAdminTable
+          columns={[
+            {
+              key: 'name',
+              label: 'Name',
+              sortable: true,
+              render: (val) => (
+                <div className="text-sm font-medium text-gray-900 dark:text-white">{val}</div>
+              )
+            },
+            {
+              key: 'members',
+              label: 'Members',
+              sortable: true,
+              render: (val, team) => (
+                <span className="text-sm text-gray-900 dark:text-white">
+                  {team.members?.length || 0}
+                </span>
+              )
+            },
+            {
+              key: 'instagram',
+              label: 'Instagram',
+              render: (val) => (
+                val ? (
+                  <a
+                    href={formatInstagramUrl(val)}
+                    onClick={(e) => {
+                      const instagramLink = {
+                        url: formatInstagramUrl(val),
+                        title: `Instagram Profil von ${val}`,
+                        is_external: true
+                      };
+                      handleLinkClick(instagramLink, e);
+                    }}
+                    className="text-pink-600 hover:text-pink-700 transition-colors"
+                  >
+                    Instagram
+                  </a>
+                ) : (
+                  <span className="text-gray-500 dark:text-gray-400">-</span>
+                )
+              )
+            },
+            {
+              key: 'actions',
+              label: 'Aktionen',
+              render: (_, team) => (
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    onClick={() => setEditingTeam(team)}
+                    className="min-h-[44px] px-3 py-2 text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 transition-colors touch-manipulation active:scale-95 rounded"
+                  >
+                    Bearbeiten
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSelectedTeam(team);
+                      setShowMemberManagement(true);
+                    }}
+                    className="min-h-[44px] px-3 py-2 text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300 transition-colors touch-manipulation active:scale-95 rounded"
+                  >
+                    Members
+                  </button>
+                  <button
+                    onClick={() => handleDeleteTeam(team.id)}
+                    className="min-h-[44px] px-3 py-2 text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 transition-colors touch-manipulation active:scale-95 rounded"
+                  >
+                    Löschen
+                  </button>
+                </div>
+              )
+            }
+          ]}
+          data={filteredTeams}
+          loading={teamsLoading}
+          emptyMessage="Keine Teams gefunden. Versuchen Sie andere Suchkriterien oder fügen Sie ein neues Team hinzu."
+        />
       </div>
 
       {/* Edit Team Modal */}
       {editingTeam && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Team bearbeiten</h3>
             <form onSubmit={handleEditSubmit(async (data) => {
               try {
@@ -416,7 +430,7 @@ const TeamsAdmin = () => {
                 await handleUpdateTeam(editingTeam.id, data);
                 setEditingTeam(null);
               } catch (err) {
-                console.error('Update team failed:', err);
+                // Update team failed - handled by error state
                 setFormError(err?.message || 'Aktualisierung fehlgeschlagen');
               }
             })} className="space-y-4">
@@ -439,18 +453,18 @@ const TeamsAdmin = () => {
                   className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
                 />
               </div>
-              <div className="flex space-x-3">
+              <div className="flex flex-col sm:flex-row gap-3">
                 <button
                   type="submit"
                   disabled={updateTeamMutation.isPending}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-70"
+                  className="w-full sm:flex-1 min-h-[44px] px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-70 touch-manipulation active:scale-95"
                 >
                   {updateTeamMutation.isPending ? 'Speichern...' : 'Speichern'}
                 </button>
                 <button
                   type="button"
                   onClick={() => setEditingTeam(null)}
-                  className="flex-1 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+                  className="w-full sm:flex-1 min-h-[44px] px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 touch-manipulation active:scale-95"
                 >
                   Abbrechen
                 </button>
@@ -462,8 +476,8 @@ const TeamsAdmin = () => {
 
       {/* Member Management Modal */}
       {showMemberManagement && selectedTeam && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
               Manage Team Members: {selectedTeam.name}
             </h2>
@@ -482,7 +496,7 @@ const TeamsAdmin = () => {
                     </div>
                     <button
                       onClick={() => handleRemoveMember(selectedTeam.id, member.id)}
-                      className="px-3 py-1 text-sm bg-red-500 text-white rounded hover:bg-red-600"
+                      className="min-h-[44px] px-3 py-2 text-sm bg-red-500 text-white rounded hover:bg-red-600 touch-manipulation active:scale-95"
                     >
                       Remove
                     </button>
@@ -522,7 +536,7 @@ const TeamsAdmin = () => {
                     }
                   }}
                   disabled={addTeamMemberMutation.isPending}
-                  className="mt-3 w-full px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="mt-3 w-full min-h-[44px] px-4 py-2 bg-[#185757] dark:bg-[#A2D2B9] text-white dark:text-gray-900 rounded hover:bg-[#0f3a3b] dark:hover:bg-[#8BC4A3] disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation active:scale-95"
                 >
                   {addTeamMemberMutation.isPending 
                     ? 'Adding...' 
@@ -532,14 +546,14 @@ const TeamsAdmin = () => {
               )}
             </div>
 
-            <div className="flex justify-end space-x-3">
+            <div className="flex justify-end">
               <button
                 onClick={() => {
                   setShowMemberManagement(false);
                   setSelectedTeam(null);
                   setPendingMemberIds([]);
                 }}
-                className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+                className="w-full sm:w-auto min-h-[44px] px-4 py-2 bg-[#185757] dark:bg-[#A2D2B9] text-white dark:text-gray-900 rounded hover:bg-[#0f3a3b] dark:hover:bg-[#8BC4A3] touch-manipulation active:scale-95"
               >
                 Close
               </button>

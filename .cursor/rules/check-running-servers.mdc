@@ -1,0 +1,129 @@
+---
+alwaysApply: true
+description: Always check for running servers before starting development server
+---
+
+# Development Server Check - Always Verify Running Servers
+
+## Core Rule: Check Before Starting
+
+**ALWAYS check for running servers before starting the development server** to prevent port conflicts and ensure clean development environment.
+
+## Required Checks
+
+### 1. Check Server Port (3005)
+```bash
+# Check what's running on port 3005
+npm run check-port
+
+# Or manually check
+lsof -i :3005
+```
+
+### 2. Check Client Port (5173)
+```bash
+# Check what's running on port 5173
+lsof -i :5173
+```
+
+### 3. Stop Existing Servers
+```bash
+# Stop server on port 3005
+npm run stop
+
+# Or manually kill processes
+lsof -ti:3005 | xargs kill -9 2>/dev/null || echo 'No processes found on port 3005'
+lsof -ti:5173 | xargs kill -9 2>/dev/null || echo 'No processes found on port 5173'
+```
+
+## Development Workflow
+
+### ✅ Correct Development Start Sequence
+1. **Check for running servers** - `npm run check-port`
+2. **Stop any existing servers** - `npm run stop`
+3. **Start development server** - `npm run dev`
+
+### ❌ Don't Start Without Checking
+```bash
+# ❌ DON'T start without checking
+npm run dev  # May fail with port conflicts
+```
+
+## Port Configuration
+
+### Server Ports
+- **Backend**: 3005 (Express.js server)
+- **Frontend**: 5173 (Vite dev server)
+
+### Check Scripts Available
+- `npm run check-port` - Check port 3005
+- `npm run stop` - Stop server on port 3005
+- `npm run dev` - Start both client and server
+- `npm run dev:client` - Start only client (port 5173)
+- `npm run dev:server` - Start only server (port 3005)
+
+## Error Prevention
+
+### Port Conflict Errors
+```bash
+# Common error when port is in use
+Error: listen EADDRINUSE: address already in use :::3005
+Error: listen EADDRINUSE: address already in use :::5173
+```
+
+### Solution
+```bash
+# Always check and stop before starting
+npm run check-port
+npm run stop
+npm run dev
+```
+
+## Development Commands
+
+### Full Development Start
+```bash
+# Complete development setup
+npm run check-port && npm run stop && npm run dev
+```
+
+### Individual Component Start
+```bash
+# Start only server
+npm run check-port && npm run stop && npm run dev:server
+
+# Start only client
+npm run check-port && npm run stop && npm run dev:client
+```
+
+## Production Considerations
+
+### Production Start
+```bash
+# Production includes startup checks
+npm run start:production
+```
+
+### Restart Commands
+```bash
+# Restart server only
+npm run restart
+
+# Complete restart
+npm run restart:complete
+```
+
+## Benefits
+
+- **Prevents port conflicts** - No EADDRINUSE errors
+- **Clean development environment** - Fresh start every time
+- **Faster debugging** - No confusion about which server is running
+- **Consistent behavior** - Predictable development experience
+
+## Remember
+
+> "Always check before you start" - Development Best Practice
+
+**Check ports first.**
+**Stop existing servers.**
+**Then start development.**

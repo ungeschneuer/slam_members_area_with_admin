@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { useCityTips, useCreateCityTip, useUpdateCityTip, useDeleteCityTip } from '../../hooks/index.js';
+import { geocodingService } from '../../services/geocodingService.js';
 import LoadingSpinner from '../LoadingSpinner.jsx';
-import { getCategoryIcon } from '../../utils/categoryTranslations.js';
+import { getCategoryOptions } from '../../../shared/constants/cityTipsCategories.js';
+import { getCategoryIcon, getCategoryColor } from '../../utils/categoryUtils.js';
 import TextInput from '../forms/TextInput.jsx';
 import SelectInput from '../forms/SelectInput.jsx';
 import TextareaInput from '../forms/TextareaInput.jsx';
@@ -11,6 +12,8 @@ import { useFormManager } from '../../hooks/useFormManager.js';
 import { createValidationSchema, getDefaultValues } from '../../../shared/schemas/validationFactory.js';
 import { ErrorMessage, SuccessMessage } from '../shared/ErrorMessage.jsx';
 import { getAvailableContentFilterOptions, validateFilterValue } from '../../utils/filterUtils.js';
+import { useCityTips, useCreateCityTip, useUpdateCityTip, useDeleteCityTip } from '../../hooks/useCityTips.js';
+import { handleLinkClick } from '../../utils/linkUtils.js';
 
 // Use centralized validation schema
 const cityTipSchema = createValidationSchema('cityTip');
@@ -57,8 +60,7 @@ export default function AdminCityTips() {
         tips: editingTip.tips || '',
         // REMOVED: is_featured field - removed from form
         status: editingTip.status || 'ACTIVE',
-        opening_hours: typeof editingTip.opening_hours === 'string' ? editingTip.opening_hours : JSON.stringify(editingTip.opening_hours || {}, null, 2),
-        contact_info_email: editingTip.contact_info?.email || ''
+        opening_hours: editingTip.opening_hours || ''
       });
     }
   }, [editingTip, setFormValues]);
@@ -79,49 +81,37 @@ export default function AdminCityTips() {
     return () => subscription.unsubscribe();
   }, [form.watch, form.setValue, editingTip]);
 
-  const predefinedCategories = [
-    { value: 'culture', label: 'Kultur', icon: '🎭', color: 'bg-purple-500' },
-    { value: 'cafe', label: 'Café', icon: '☕', color: 'bg-yellow-500' },
-    { value: 'restaurant', label: 'Restaurant', icon: '🍽️', color: 'bg-red-500' },
-    { value: 'bar', label: 'Bar', icon: '🍺', color: 'bg-blue-500' },
-    { value: 'shopping', label: 'Shopping', icon: '🛍️', color: 'bg-green-500' },
-    { value: 'hotel', label: 'Hotel', icon: '🏨', color: 'bg-indigo-500' },
-    { value: 'transport', label: 'Transport', icon: '🚌', color: 'bg-gray-500' },
-    { value: 'entertainment', label: 'Unterhaltung', icon: '🎪', color: 'bg-pink-500' }
-  ];
+  const predefinedCategories = useMemo(() => {
+    return getCategoryOptions();
+  }, []);
 
   const predefinedPriceRanges = [
+    { value: 'Kostenlos', label: 'Kostenlos' },
     { value: '€', label: '€ (Günstig)' },
     { value: '€€', label: '€€ (Mittel)' },
     { value: '€€€', label: '€€€ (Teuer)' },
     { value: '€€€€', label: '€€€€ (Sehr teuer)' }
   ];
 
-  // Dynamic categories and price ranges based on existing content
+  // For admin interface, show all predefined categories (not filtered by existing content)
   const categories = useMemo(() => {
-    return getAvailableContentFilterOptions(cityTips, predefinedCategories, 'category');
-  }, [cityTips]);
+    return predefinedCategories;
+  }, []);
 
   const priceRanges = useMemo(() => {
-    return getAvailableContentFilterOptions(cityTips, predefinedPriceRanges, 'price_range');
-  }, [cityTips]);
+    return predefinedPriceRanges;
+  }, []);
 
   const handleAddTipSubmit = async (formData) => {
-    console.log('[AdminCityTips] handleAddTipSubmit called with data:', formData);
-    
     const tipData = {
       ...formData,
       // Let empty strings be undefined, not 0 - schema now handles coercion
       latitude: formData.latitude || undefined,
       longitude: formData.longitude || undefined,
-      opening_hours: formData.opening_hours ? JSON.parse(formData.opening_hours) : null,
-      contact_info: formData.contact_info_email ? { email: formData.contact_info_email } : null
+      opening_hours: formData.opening_hours || null
     };
     
-    console.log('[AdminCityTips] Processed tipData:', tipData);
-    
     const result = await createCityTip.mutateAsync(tipData);
-    console.log('[AdminCityTips] Create mutation result:', result);
     
     resetForm();
     setShowAddForm(false);
@@ -134,8 +124,7 @@ export default function AdminCityTips() {
       // Let empty strings be undefined, not 0 - schema now handles coercion
       latitude: formData.latitude || undefined,
       longitude: formData.longitude || undefined,
-      opening_hours: formData.opening_hours ? JSON.parse(formData.opening_hours) : null,
-      contact_info: formData.contact_info_email ? { email: formData.contact_info_email } : null
+      opening_hours: formData.opening_hours || null
     };
 
     await updateCityTip.mutateAsync({ id: editingTip.id, ...tipData });
@@ -170,40 +159,16 @@ export default function AdminCityTips() {
     }
 
     try {
-      // Use a free geocoding service (OpenStreetMap Nominatim)
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1&countrycodes=de`
-      );
+      const result = await geocodingService.geocodeAddress(address);
+      form.setValue('latitude', result.lat.toFixed(6));
+      form.setValue('longitude', result.lng.toFixed(6));
       
-      if (!response.ok) {
-        throw new Error('Geocoding service nicht verfügbar');
-      }
-      
-      const data = await response.json();
-      
-      if (data && data.length > 0) {
-        const result = data[0];
-        form.setValue('latitude', parseFloat(result.lat).toFixed(6));
-        form.setValue('longitude', parseFloat(result.lon).toFixed(6));
-        
-        // Show success message
-        setSuccessMessage(`Koordinaten erfolgreich ermittelt: ${result.display_name}`);
-      } else {
-        alert('Adresse nicht gefunden. Bitte überprüfen Sie die Eingabe oder geben Sie die Koordinaten manuell ein.');
-      }
+      // Show success message
+      setSuccessMessage(`Koordinaten erfolgreich ermittelt: ${result.displayName}`);
     } catch (error) {
-      console.error('Geocoding error:', error);
-      alert('Fehler beim Ermitteln der Koordinaten. Bitte geben Sie die Koordinaten manuell ein.');
+      const processedError = geocodingService.handleError(error);
+      alert(`Fehler beim Ermitteln der Koordinaten: ${processedError.message}`);
     }
-  };
-
-  const getCategoryIconLocal = (category) => {
-    return getCategoryIcon(category, 'cityTips');
-  };
-
-  const getCategoryColor = (category) => {
-    const categoryObj = categories.find(cat => cat.value === category);
-    return categoryObj?.color || 'bg-gray-500';
   };
 
   const filteredTips = cityTips.filter(tip =>
@@ -222,7 +187,7 @@ export default function AdminCityTips() {
         <ErrorMessage 
           error={componentError} 
           onDismiss={clearError}
-          showDetails={process.env.NODE_ENV === 'development'}
+          showDetails={import.meta.env.DEV}
         />
       )}
       
@@ -235,7 +200,7 @@ export default function AdminCityTips() {
       )}
 
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Stadt-Tipps verwalten</h1>
           <p className="text-gray-600 dark:text-gray-400">Chemnitz Empfehlungen und Locations verwalten</p>
@@ -245,7 +210,7 @@ export default function AdminCityTips() {
             setShowAddForm(!showAddForm);
             resetForm();
           }}
-          className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+          className="w-full sm:w-auto min-h-[44px] px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 touch-manipulation active:scale-95"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -264,11 +229,11 @@ export default function AdminCityTips() {
 
       {/* Add/Edit Form */}
       {(showAddForm || editingTip) && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div className="card-base overflow-hidden">
           {/* Form Header */}
           <div className="bg-gray-50 dark:bg-gray-700 px-6 py-4 border-b border-gray-200 dark:border-gray-600">
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+              <h2 className="heading-secondary">
                 {editingTip ? 'Stadt-Tipp bearbeiten' : 'Neuen Stadt-Tipp hinzufügen'}
               </h2>
               <button
@@ -293,7 +258,7 @@ export default function AdminCityTips() {
             {/* Basic Info Section */}
             <div className="space-y-4">
               <h4 className="text-lg font-semibold text-gray-900 dark:text-white">Grundinformationen</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <TextInput 
                   control={form.control}
                   name="name" 
@@ -343,7 +308,7 @@ export default function AdminCityTips() {
                   <button 
                     type="button"
                     onClick={handleGeocodeAddress}
-                    className="px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-1"
+                    className="min-h-[44px] px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-1 touch-manipulation active:scale-95"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
@@ -353,7 +318,7 @@ export default function AdminCityTips() {
                   </button>
                 </div>
                 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <TextInput 
                       control={form.control}
@@ -393,11 +358,11 @@ export default function AdminCityTips() {
 
             {/* Optional Details - Collapsible */}
             <details className="pt-6 border-t">
-              <summary className="text-lg font-semibold cursor-pointer hover:text-blue-600 mb-4">
+              <summary className="text-lg font-semibold cursor-pointer text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 mb-4">
                 Weitere Details (optional)
               </summary>
               <div className="space-y-4 mt-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <TextInput 
                     control={form.control}
                     name="website" 
@@ -406,7 +371,7 @@ export default function AdminCityTips() {
                     error={form.formState.errors.website?.message}
                   />
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <SelectInput 
                     control={form.control}
                     name="price_range" 
@@ -414,21 +379,16 @@ export default function AdminCityTips() {
                     options={priceRanges}
                     error={form.formState.errors.price_range?.message}
                   />
-                  <TextInput 
-                    control={form.control}
-                    name="contact_info_email" 
-                    label="E-Mail" 
-                      type="email"
-                    error={form.formState.errors.contact_info_email?.message}
-                  />
                 </div>
                 <TextareaInput 
                   control={form.control}
                   name="opening_hours" 
-                  label="Öffnungszeiten (JSON)"
+                  label="Öffnungszeiten"
                   error={form.formState.errors.opening_hours?.message}
                   rows={3}
-                  placeholder='{"monday": "09:00-18:00", "tuesday": "09:00-18:00"}'
+                  placeholder="Mo-Fr: 09:00-18:00
+Sa: 10:00-16:00
+So: Geschlossen"
                 />
                 <TextareaInput 
                   control={form.control}
@@ -441,18 +401,18 @@ export default function AdminCityTips() {
             </details>
 
             {/* Actions */}
-            <div className="flex gap-2 pt-6 border-t">
+            <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t">
                 <button
                   type="button"
                 onClick={() => { setShowAddForm(false); setEditingTip(null); resetForm(); }} 
-                className="px-4 py-2 border rounded-lg hover:bg-gray-50"
+                className="w-full sm:w-auto min-h-[44px] btn-secondary touch-manipulation active:scale-95"
                 >
                   Abbrechen
                 </button>
                   <button
                     type="submit"
                 disabled={form.formState.isSubmitting}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                className="w-full sm:w-auto min-h-[44px] btn-primary disabled:opacity-50 touch-manipulation active:scale-95"
                   >
                     {editingTip ? 'Änderungen speichern' : 'Stadt-Tipp hinzufügen'}
                   </button>
@@ -462,14 +422,14 @@ export default function AdminCityTips() {
       )}
 
       {/* City Tips Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredTips.map((tip) => (
-          <div key={tip.id} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow">
+          <div key={tip.id} className="card-elevated">
             <div className="p-6">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-start space-x-3">
                   <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white text-lg font-bold shadow-md ${getCategoryColor(tip.category)}`}>
-                    {getCategoryIconLocal(tip.category)}
+                    {getCategoryIcon(tip.category, 'cityTip')}
                   </div>
                   <div className="flex-1">
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">{tip.name}</h3>
@@ -485,10 +445,10 @@ export default function AdminCityTips() {
                     </div>
                   </div>
                 </div>
-                <div className="flex space-x-2">
+                <div className="flex flex-wrap gap-2">
                   <button
                     onClick={() => handleEditTip(tip)}
-                    className="p-2 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+                    className="min-h-[44px] min-w-[44px] p-2 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors touch-manipulation active:scale-95 rounded"
                     title="Bearbeiten"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -497,7 +457,7 @@ export default function AdminCityTips() {
                   </button>
                   <button
                     onClick={() => handleDeleteTip(tip.id)}
-                    className="p-2 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 transition-colors"
+                    className="min-h-[44px] min-w-[44px] p-2 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 transition-colors touch-manipulation active:scale-95 rounded"
                     title="Löschen"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -521,22 +481,25 @@ export default function AdminCityTips() {
               
               <div className="flex items-center justify-between text-sm">
                 <div className="flex items-center space-x-4">
-                {tip.phone && (
-                    <div className="flex items-center space-x-1 text-gray-500 dark:text-gray-400">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                      </svg>
-                      <span>{tip.phone}</span>
-                  </div>
-                )}
                 {tip.website && (
                     <div className="flex items-center space-x-1 text-blue-600 dark:text-blue-400">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                       </svg>
-                      <a href={tip.website} target="_blank" rel="noopener noreferrer" className="hover:underline">
-                      Website
-                    </a>
+                      <a 
+                        href={tip.website} 
+                        onClick={(e) => {
+                          const websiteLink = {
+                            url: tip.website,
+                            title: 'Website',
+                            is_external: true
+                          };
+                          handleLinkClick(websiteLink, e);
+                        }}
+                        className="hover:underline"
+                      >
+                        Website
+                      </a>
                   </div>
                 )}
                 </div>

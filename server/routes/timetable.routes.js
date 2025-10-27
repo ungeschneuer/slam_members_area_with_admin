@@ -19,6 +19,9 @@ import {
   validateTimetableEventId 
 } from '../middleware/validation.js';
 import { sanitizeEntity } from '../utils/sanitization.js';
+import { generateSlug, generateUniqueSlug, validateSlugInput } from '../utils/slugUtils.js';
+import { generateUniqueSlugInTransaction, generateRequestIdFromReq } from '../services/slugGenerationService.js';
+import { executeTransaction } from '../config/database.js';
 
 const router = express.Router();
 
@@ -146,70 +149,126 @@ router.get('/', async (req, res) => {
 });
 
 // Create timetable entry (admin endpoint)
-router.post('/', ...adminMiddleware(), ...validateTimetableEvent, async (req, res) => { // Idempotency removed
-  // Sanitize input data to prevent XSS
-  const sanitizedData = sanitizeEntity.timetable(req.body);
-  const { 
-    title, description, detailed_description, location, date, time, 
-    end_time, internal_link,
-    type, status, additional_links, slug 
-  } = sanitizedData;
-  
-  // Normalize data using schema
-  const normalizedData = normalizeData(sanitizedData, {
-    additionalLinks: { type: 'json', fallback: [] },
-    type: { type: 'string', fallback: 'general' },
-    status: { type: 'string', fallback: 'confirmed' }
-  });
-  
-  await executeCrudOperation(
-    'create',
-    `     INSERT INTO timetable_entries (title, description, detailed_description, location, 
-     date, time, end_time, type, status, internal_link, additional_links, slug)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
-    [title, description, detailed_description, location, date, time, 
-     end_time || null,
-     normalizedData.type, normalizedData.status, 
-     internal_link || null,
-     normalizedData.additional_links, slug],
-    'timetable',
-    'CREATE_TIMETABLE',
-    res
-  );
-  // Note: executeCrudOperation already sends the response
+router.post('/', ...adminMiddleware(), ...validateTimetableEvent, async (req, res) => {
+  try {
+    // Sanitize input data to prevent XSS
+    const sanitizedData = sanitizeEntity.timetable(req.body);
+    const normalizedData = normalizeData(sanitizedData, {
+      title: { type: 'string', fallback: '' },
+      description: { type: 'string', fallback: '' },
+      detailedDescription: { type: 'string', fallback: '' },
+      location: { type: 'string', fallback: '' },
+      date: { type: 'string', fallback: '' },
+      time: { type: 'string', fallback: '' },
+      end_time: { type: 'string', fallback: '' },
+      type: { type: 'string', fallback: 'general' },
+      status: { type: 'string', fallback: 'confirmed' },
+      additional_links: { type: 'json', fallback: [] },
+      participants: { type: 'json', fallback: [] },
+      slug: { type: 'string', fallback: '' }
+    });
+    
+    const startTime = startTiming();
+    
+        // Move slug generation inside transaction for atomicity
+        const entry = await executeTransaction(async (client) => {
+          // Generate unique slug using centralized service
+          const requestId = generateRequestIdFromReq(req);
+          const uniqueSlug = await generateUniqueSlugInTransaction(
+            client, 
+            normalizedData.title, 
+            'timetable_entries', 
+            requestId
+          );
+
+          // Create timetable entry with unique slug
+          return await simplifiedTimetableService.createTimetableWithAssignments(
+            {
+              title: normalizedData.title,
+              description: normalizedData.description,
+              detailed_description: normalizedData.detailedDescription,
+              location: normalizedData.location,
+              date: normalizedData.date,
+              time: normalizedData.time,
+              end_time: normalizedData.end_time,
+              type: normalizedData.type,
+              status: normalizedData.status,
+              additional_links: normalizedData.additional_links,
+              slug: uniqueSlug
+            },
+            normalizedData.participants,
+            client // Pass client for transaction
+          );
+        });
+    
+    const duration = endTiming(startTime);
+    
+    res.status(201).json({
+      success: true,
+      data: entry,
+      meta: { queryType: 'CREATE_TIMETABLE', duration }
+    });
+  } catch (error) {
+    sendErrorResponse(res, error, 'Failed to create timetable entry');
+  }
 });
 
 // Update timetable entry (admin endpoint)
-router.put('/:id', ...adminMiddleware(), ...validateTimetableEventId, ...validateTimetableEvent, async (req, res) => { // Optimistic locking removed
-  const { id } = req.params;
-  // Sanitize input data to prevent XSS
-  const sanitizedData = sanitizeEntity.timetable(req.body);
-  const { 
-    title, description, detailed_description, location, date, time, 
-    end_time, internal_link,
-    type, status, additional_links, slug 
-  } = sanitizedData;
-  
-  // Normalize data using schema
-  const normalizedData = normalizeData(sanitizedData, {
-    additionalLinks: { type: 'json', fallback: [] }
-  });
-  
-  await executeCrudOperation(
-    'update',
-    `     UPDATE timetable_entries SET title = $1, description = $2, detailed_description = $3, 
-     location = $4, date = $5, time = $6, end_time = $7, type = $8, status = $9, 
-     internal_link = $10, additional_links = $11, slug = $12, updated_at = NOW() 
-     WHERE id = $13 RETURNING *`,
-    [title, description, detailed_description, location, date, time, 
-     end_time || null,
-     type, status, 
-     internal_link || null,
-     normalizedData.additionalLinks, slug, parseInt(id)],
-    'timetable',
-    'UPDATE_TIMETABLE',
-    res
-  );
+router.put('/:id', ...adminMiddleware(), ...validateTimetableEventId, ...validateTimetableEvent, async (req, res) => {
+  try {
+    const entryId = parseInt(req.params.id);
+    if (isNaN(entryId)) {
+      return sendErrorResponse(res, new Error('Invalid entry ID'), 'Invalid entry ID', 400);
+    }
+    
+    // Sanitize input data to prevent XSS
+    const sanitizedData = sanitizeEntity.timetable(req.body);
+    const normalizedData = normalizeData(sanitizedData, {
+      title: { type: 'string', fallback: '' },
+      description: { type: 'string', fallback: '' },
+      detailedDescription: { type: 'string', fallback: '' },
+      location: { type: 'string', fallback: '' },
+      date: { type: 'string', fallback: '' },
+      time: { type: 'string', fallback: '' },
+      end_time: { type: 'string', fallback: '' },
+      type: { type: 'string', fallback: 'general' },
+      status: { type: 'string', fallback: 'confirmed' },
+      additional_links: { type: 'json', fallback: [] },
+      participants: { type: 'json', fallback: [] },
+      slug: { type: 'string', fallback: '' }
+    });
+    
+    const startTime = startTiming();
+    
+    // Use service to update entry with participants in a transaction
+    const entry = await simplifiedTimetableService.updateTimetableWithAssignments(
+      entryId,
+      {
+        title: normalizedData.title,
+        description: normalizedData.description,
+        detailed_description: normalizedData.detailedDescription,
+        location: normalizedData.location,
+        date: normalizedData.date,
+        time: normalizedData.time,
+        end_time: normalizedData.end_time,
+        type: normalizedData.type,
+        status: normalizedData.status,
+        additional_links: normalizedData.additional_links,
+        slug: normalizedData.slug
+      },
+      normalizedData.participants
+    );
+    
+    const duration = endTiming(startTime);
+    
+    res.json({
+      success: true,
+      data: entry,
+      meta: { queryType: 'UPDATE_TIMETABLE', duration }
+    });
+  } catch (error) {
+    sendErrorResponse(res, error, 'Failed to update timetable entry');
+  }
 });
 
 // Delete timetable entry (admin endpoint)
@@ -230,7 +289,7 @@ router.delete('/:id', ...adminMiddleware(), ...validateTimetableEventId, async (
 // Add participant to timetable entry
 router.post('/:entryId/participants', ...adminMiddleware(), async (req, res) => {
   const { entryId } = req.params;
-  const { participantId, role = 'Teilnehmer' } = req.body;
+  const { participantId, role = 'Teilnehmer*in' } = req.body;
   
   try {
     const startTime = startTiming();

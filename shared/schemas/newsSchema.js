@@ -6,7 +6,9 @@ export const newsSchema = z.object({
   content: z.string().min(1, 'Inhalt ist erforderlich'),
   excerpt: z.string().max(500, 'Auszug zu lang').optional(),
   category: z.string().min(1, 'Kategorie ist erforderlich').max(100, 'Kategorie zu lang'),
-  priority: z.number().int().min(1, 'Priorität muss mindestens 1 sein').max(5, 'Priorität darf nicht über 5 liegen').optional(),
+  priority: z.enum(['NORMAL', 'HIGH', 'URGENT'], {
+    errorMap: () => ({ message: 'Priorität muss einer von sein: NORMAL, HIGH, URGENT' })
+  }).optional().default('NORMAL'),
   featured_image_url: z.string().url('Ungültige Bild-URL').optional(),
   tags: z.array(z.string().min(1, 'Tag darf nicht leer sein')).optional().default([]),
   status: z.enum(['DRAFT', 'PUBLISHED', 'ARCHIVED'], {
@@ -46,7 +48,7 @@ export const newsFieldSchemas = {
   content: z.string().min(1),
   excerpt: z.string().max(500).optional(),
   category: z.string().min(1).max(100),
-  priority: z.number().int().min(1).max(5).optional(),
+  priority: z.enum(['NORMAL', 'HIGH', 'URGENT']).optional(),
   featured_image_url: z.string().url().optional(),
   tags: z.array(z.string().min(1)).optional(),
   status: z.enum(['DRAFT', 'PUBLISHED', 'ARCHIVED']),

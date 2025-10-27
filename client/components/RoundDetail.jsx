@@ -13,6 +13,7 @@ import {
   getParticipantFallbackName 
 } from '../utils/participantLookupUtils.js';
 import { getRegionFlag, getContentTypeIcon, getContentTypeGradient } from '../utils/detailViewUtils.js';
+import { handleLinkClick } from '../utils/linkUtils.js';
 import BackButton from './shared/BackButton.jsx';
 
 const RoundDetail = () => {
@@ -111,7 +112,7 @@ const RoundDetail = () => {
           <ErrorMessage message={error} />
           <Link 
             to="/rounds" 
-            className="mt-4 inline-block bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+            className="mt-4 inline-block bg-[#185757] dark:bg-[#A2D2B9] text-white dark:text-gray-900 px-4 py-2 rounded-lg hover:bg-[#0f3a3b] dark:hover:bg-[#8BC4A3] transition-colors"
           >
             Zurück zu den Runden
           </Link>
@@ -127,7 +128,7 @@ const RoundDetail = () => {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Runde nicht gefunden</h1>
           <Link 
             to="/rounds" 
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+            className="bg-[#185757] dark:bg-[#A2D2B9] text-white dark:text-gray-900 px-4 py-2 rounded-lg hover:bg-[#0f3a3b] dark:hover:bg-[#8BC4A3] transition-colors"
           >
             Zurück zu den Runden
           </Link>
@@ -147,7 +148,7 @@ const RoundDetail = () => {
           
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-8">
             <div className="flex items-start space-x-4">
-              <div className={`w-16 h-16 bg-gradient-to-br ${getContentTypeGradient('round')} rounded-full flex items-center justify-center text-white text-2xl font-bold`}>
+              <div className={`w-16 h-16 bg-${getContentTypeGradient('round')} rounded-full flex items-center justify-center text-white text-2xl font-bold`}>
                 {getContentTypeIcon('round')}
               </div>
               <div className="flex-1">
@@ -158,7 +159,7 @@ const RoundDetail = () => {
                   <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(round.calculatedStatus || round.status)}`}>
                     {getRoundStatusIcon(round.calculatedStatus || round.status)} {getStatusLabel(round.calculatedStatus || round.status)}
                   </span>
-                  <span className="text-gray-600 dark:text-gray-400">
+                  <span className="text-gray-600 dark:text-gray-300">
                     {getCompetitionTypeLabel(round.competition_type)}
                   </span>
                 </div>
@@ -219,15 +220,21 @@ const RoundDetail = () => {
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Fotos</h2>
               <a
                 href={round.photos_cloud_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Zur Foto-Galerie öffnen (öffnet in neuem Tab)"
-                className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 font-medium"
+                onClick={(e) => {
+                  const photosLink = {
+                    url: round.photos_cloud_url,
+                    title: 'Zu den Fotos öffnen',
+                    is_external: true
+                  };
+                  handleLinkClick(photosLink, e);
+                }}
+                aria-label="Zu den Fotos öffnen (öffnet in neuem Tab)"
+                className="inline-flex items-center px-6 py-3 bg-[#185757] dark:bg-[#A2D2B9] text-white dark:text-gray-900 rounded-lg hover:bg-[#0f3a3b] dark:hover:bg-[#8BC4A3] transition-colors duration-200 font-medium"
               >
                 <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
-                Zur Foto-Galerie
+                Zu den Fotos
                 <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                 </svg>
@@ -240,16 +247,16 @@ const RoundDetail = () => {
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Wettbewerbsdetails</h2>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Typ</div>
+                <div className="text-sm font-medium text-gray-500 dark:text-gray-300">Typ</div>
                 <div className="text-gray-900 dark:text-white">{getCompetitionTypeLabel(round.competition_type)}</div>
               </div>
               <div>
-                <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Jury-Mitglieder</div>
+                <div className="text-sm font-medium text-gray-500 dark:text-gray-300">Jury-Mitglieder</div>
                 <div className="text-gray-900 dark:text-white">{round.total_jury_members}</div>
               </div>
               {round.assignments && round.assignments.filter(a => a.roles.includes('participant')).length > 0 && (
                 <div>
-                  <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Teilnehmer*innen</div>
+                  <div className="text-sm font-medium text-gray-500 dark:text-gray-300">Teilnehmer*innen</div>
                   <div className="text-gray-900 dark:text-white">{round.assignments.filter(a => a.roles.includes('participant')).length}</div>
                 </div>
               )}
@@ -269,7 +276,7 @@ const RoundDetail = () => {
           {/* Crew */}
           {round.assignments && round.assignments.filter(hasCrewRole).length > 0 && (
             <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Crew</h2>
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">SLAM25-Team</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4">
                 {round.assignments
                   .filter(hasCrewRole)
@@ -410,7 +417,7 @@ const RoundDetail = () => {
                         <div key={`feature-team-${assignment.team_id}-${index}`}>
                           <Link
                             to={`/teams/${assignment.team_slug || 'unknown'}`}
-                            className="block p-4 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-lg hover:from-purple-100 to-pink-100 dark:hover:from-purple-900/30 dark:hover:to-pink-900/30 transition-colors duration-200 group border border-purple-200 dark:border-purple-800"
+                            className="block p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors duration-200 group border border-purple-200 dark:border-purple-800"
                           >
                             <div className="flex items-center space-x-3">
                               <div className="flex-1 min-w-0">
@@ -459,7 +466,7 @@ const RoundDetail = () => {
                           {participant ? (
                             <Link
                               to={`/participants/${participant.slug}`}
-                              className="block p-4 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-lg hover:from-purple-100 to-pink-100 dark:hover:from-purple-900/30 dark:hover:to-pink-900/30 transition-colors duration-200 group"
+                              className="block p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors duration-200 group"
                             >
                               <div className="flex items-center space-x-3">
                                 <div className="flex-1 min-w-0">
@@ -488,7 +495,7 @@ const RoundDetail = () => {
                               </div>
                             </Link>
                           ) : (
-                            <div className="p-4 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-lg">
+                            <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
                               <div className="flex items-center space-x-3">
                                 <div className="flex-1 min-w-0">
                                   <p className="font-medium text-gray-900 dark:text-white break-words leading-tight">
@@ -546,14 +553,14 @@ const RoundDetail = () => {
                         return (
                           <div key={participantIndex} className={`p-4 rounded-lg border ${
                             isWinner 
-                              ? 'bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 border-yellow-200 dark:border-yellow-800' 
+                              ? 'bg-yellow-50 orange-50 dark:from-yellow-900/20 dark:orange-900/20 border-yellow-200 dark:border-yellow-800' 
                               : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600'
                           }`}>
                             <div className="flex items-center space-x-3 min-w-0 flex-1">
                               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 ${
                                 isWinner 
-                                  ? 'bg-gradient-to-br from-yellow-500 to-orange-600 text-white' 
-                                  : 'bg-gradient-to-br from-blue-500 to-purple-600 text-white'
+                                  ? 'bg-yellow-500 text-white' 
+                                  : 'bg-[#185757] text-white'
                               }`}>
                                 {participant.order || participantIndex + 1}
                               </div>
@@ -764,14 +771,14 @@ const RoundDetail = () => {
                               </div>
                             </Link>
                           ) : (
-                            <div className="h-full p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                            <div className="h-full p-4 bg-gray-50 dark:bg-gray-600 rounded-lg">
                               <div className="flex items-center space-x-3 h-full">
                                 <div className="flex-1 min-w-0">
                                   <p className="font-medium text-gray-900 dark:text-white break-words leading-tight">
                                     {name}
                                   </p>
                                   {assignment.participant_region && (
-                                    <p className="text-xs text-gray-400 dark:text-gray-500 break-words mt-1">
+                                    <p className="text-xs text-gray-400 dark:text-gray-400 break-words mt-1">
                                       {getRegionFlag(assignment.participant_region)} {assignment.participant_region}
                                     </p>
                                   )}

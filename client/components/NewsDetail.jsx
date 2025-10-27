@@ -4,8 +4,10 @@ import { useNewsItem, usePageTitle } from '../hooks/index.js';
 import LoadingSpinner from './LoadingSpinner.jsx';
 import { getNewsCategoryLabel, getNewsCategoryIcon } from '../utils/newsCategories.js';
 import { getContentTypeIcon, getContentTypeGradient } from '../utils/detailViewUtils.js';
+import { getCategoryByValue } from '../../shared/constants/cityTipsCategories.js';
 import BackButton from './shared/BackButton.jsx';
 import MarkdownRenderer from './shared/MarkdownRenderer.jsx';
+import PDFDisplay from './shared/PDFDisplay.jsx';
 
 const NewsDetail = () => {
   const { slug } = useParams();
@@ -94,7 +96,7 @@ const NewsDetail = () => {
         {/* Article Header */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-8 mb-8">
           <div className="flex items-start space-x-4">
-            <div className={`w-16 h-16 bg-gradient-to-br ${getContentTypeGradient('news')} rounded-full flex items-center justify-center text-white text-2xl font-bold`}>
+            <div className={`w-16 h-16 bg-${getContentTypeGradient('news')} rounded-full flex items-center justify-center text-white text-2xl font-bold`}>
               {getContentTypeIcon('news')}
             </div>
             <div className="flex-1">
@@ -125,22 +127,12 @@ const NewsDetail = () => {
         {article.featured_image_url && (
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-8 mb-6">
             {article.featured_image_url.toLowerCase().includes('.pdf') ? (
-              <div className="flex items-center space-x-4 p-6 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                <span className="text-4xl">📄</span>
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">PDF-Dokument</h3>
-                  <p className="text-gray-600 dark:text-gray-400 mb-4">Zugehöriges PDF-Dokument zu diesem Artikel</p>
-                  <a 
-                    href={article.featured_image_url} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    <span className="mr-2">📄</span>
-                    PDF öffnen
-                  </a>
-                </div>
-              </div>
+              <PDFDisplay 
+                pdfUrl={article.featured_image_url}
+                title="PDF-Dokument"
+                description="Zugehöriges PDF-Dokument zu diesem Artikel"
+                variant="default"
+              />
             ) : (
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Bild</h3>

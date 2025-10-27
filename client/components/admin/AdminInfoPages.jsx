@@ -1,471 +1,478 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { useInfoPages, useCreateInfoPage, useUpdateInfoPage, useDeleteInfoPage } from '../../hooks/index.js';
-import LoadingSpinner from '../LoadingSpinner.jsx';
-import { useFormManager } from '../../hooks/useFormManager.js';
-import { createValidationSchema, getDefaultValues } from '../../../shared/schemas/validationFactory.js';
-import { mapInfoPageFormToAPI } from '../../utils/formMappers.js';
-import TextInput from '../forms/TextInput.jsx';
-import SelectInput from '../forms/SelectInput.jsx';
-import TextareaInput from '../forms/TextareaInput.jsx';
-import MarkdownTextarea from '../forms/MarkdownTextarea.jsx';
-import CheckboxInput from '../forms/CheckboxInput.jsx';
-import { getAvailableContentFilterOptions, validateFilterValue } from '../../utils/filterUtils.js';
+import React, { useState } from 'react';
+import { useForm, useFieldArray } from 'react-hook-form';
+import { z } from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useError } from '../../hooks/useError.js';
+import { useInfoPages, useCreateInfoPage, useUpdateInfoPage, useDeleteInfoPage } from '../../hooks/useInfoPages.js';
+import FileUploadSection from './FileUploadSection.jsx';
+import ConsolidatedAdminTable from './ConsolidatedAdminTable.jsx';
 
-// Use centralized validation schema
-const infoPageSchema = createValidationSchema('infoPage');
+// Simple inline schema - no complex abstractions
+const infoPageSchema = z.object({
+  title: z.string().min(1, 'Titel ist erforderlich'),
+  slug: z.string().min(1, 'Slug ist erforderlich'),
+  content: z.string().min(1, 'Inhalt ist erforderlich'),
+  excerpt: z.string().optional(),
+  category: z.enum(['general', 'rules', 'chemnitz', 'weiteres']),
+  display_order: z.number().min(0),
+  status: z.enum(['DRAFT', 'PUBLISHED', 'ARCHIVED'])
+  // NO file fields, NO tags - handled separately
+});
 
-const AdminInfoPages = () => {
-  const { data: pagesData, isLoading: loading, error } = useInfoPages({}, true); // isAdmin = true
-  const createInfoPage = useCreateInfoPage();
-  const updateInfoPage = useUpdateInfoPage();
-  const deleteInfoPage = useDeleteInfoPage();
-  
-  const pages = useMemo(() => Array.isArray(pagesData) ? pagesData : [], [pagesData]);
-  const [editingPage, setEditingPage] = useState(null);
+function AdminInfoPages() {
   const [showForm, setShowForm] = useState(false);
-  const [uploading, setUploading] = useState(false);
+  const [editingPage, setEditingPage] = useState(null);
+  const { handleError } = useError();
 
-  // Form management with centralized error handling
-  const { 
-    form, 
-    error: componentError, 
-    isSubmitting, 
-    submitForm, 
-    resetForm, 
-    setFormValues,
-    clearError 
-  } = useFormManager(infoPageSchema, { 
-    defaultValues: getDefaultValues('infoPage') 
-  });
-  
-  // Auto-generate slug from title
-  useEffect(() => {
-    const subscription = form.watch((value, { name }) => {
-      if (name === 'title' && value?.title && !editingPage) {
-        const slug = value.title
-          .toLowerCase()
-          .replace(/[äöü]/g, char => ({ ä: 'ae', ö: 'oe', ü: 'ue' }[char]))
-          .replace(/[^\w\s-]/g, '')
-          .replace(/\s+/g, '-')
-          .substring(0, 200);
-        form.setValue('slug', slug);
-      }
-    });
-    return () => subscription.unsubscribe();
-  }, [form.watch, form.setValue, editingPage]);
-
-  const onSubmit = async (data) => {
-    const apiData = mapInfoPageFormToAPI(data);
-    if (editingPage) {
-      await updateInfoPage.mutateAsync({ id: editingPage.id, ...apiData });
-    } else {
-      await createInfoPage.mutateAsync(apiData);
+  // Direct useForm - no abstractions
+  const form = useForm({
+    resolver: zodResolver(infoPageSchema),
+    defaultValues: {
+      title: '',
+      slug: '',
+      content: '',
+      excerpt: '',
+      category: 'general',
+      display_order: 0,
+      status: 'DRAFT'
     }
-    
-    // Proper cleanup
-    setShowForm(false);
-    setEditingPage(null);
-    resetForm(); // Reset to defaults
+  });
+
+  const { register, handleSubmit, reset, setValue, watch, formState: { errors, isSubmitting } } = form;
+
+  // Additional links management
+  const { fields: linkFields, append: appendLink, remove: removeLink } = useFieldArray({
+    control: form.control,
+    name: 'additionalLinks'
+  });
+
+  // Queries and mutations using hooks
+  const { data: infoPages = [], isLoading } = useInfoPages({}, true);
+  const createInfoPageMutation = useCreateInfoPage();
+  const updateInfoPageMutation = useUpdateInfoPage();
+  const deleteInfoPageMutation = useDeleteInfoPage();
+
+  // Clean form submit handler
+  const onSubmit = async (data) => {
+    try {
+      const payload = {
+        title: data.title,
+        slug: data.slug,
+        content: data.content,
+        excerpt: data.excerpt || '',
+        category: data.category,
+        display_order: data.display_order,
+        status: data.status,
+        // Backend expects snake_case
+        file_url: editingPage?.file_url || null,
+        file_type: editingPage?.file_type || null,
+        file_description: editingPage?.file_description || '',
+        additional_links: data.additionalLinks || [],
+        tags: editingPage?.tags || [],
+        published_at: editingPage?.published_at || null
+      };
+
+      if (editingPage) {
+        await updateInfoPageMutation.mutateAsync({ id: editingPage.id, ...payload });
+        setShowForm(false);
+        setEditingPage(null);
+        reset();
+      } else {
+        await createInfoPageMutation.mutateAsync(payload);
+        setShowForm(false);
+        setEditingPage(null);
+        reset();
+      }
+    } catch (error) {
+      console.error('Form submission error:', error);
+      handleError(error, { context: 'form_submission' });
+    }
   };
 
+  // Edit handler
   const handleEdit = (page) => {
     setEditingPage(page);
-    setFormValues({
+    setShowForm(true);
+    
+    // ✅ Use reset() to set all form values at once
+    reset({
       title: page.title,
       slug: page.slug,
       content: page.content,
       excerpt: page.excerpt || '',
       category: page.category,
-      order: page.order || 0,
+      display_order: page.display_order,
       status: page.status,
-      featuredImageUrl: page.featured_image_url || '',
-      metaDescription: page.meta_description || '',
-      tags: page.tags || [],
-      isPublished: page.is_published
+      additionalLinks: page.additional_links || []
     });
-    setShowForm(true);
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('Möchtest du diese Seite wirklich löschen?')) {
-      return;
-    }
+  // File upload handlers
+  const handleFileUpload = (filePath, fileType) => {
+    // Update form state as primary source of truth
+    setValue('file_url', filePath);
+    setValue('file_type', fileType);
     
-    try {
-      await deleteInfoPage.mutateAsync(id);
-    } catch (err) {
-      console.error('Error deleting page:', err);
-      setError('root', { type: 'server', message: 'Fehler beim Löschen der Seite' });
+    // Update editingPage only for immediate display
+    if (editingPage) {
+      setEditingPage(prev => ({
+        ...prev,
+        file_url: filePath,
+        file_type: fileType
+      }));
     }
   };
 
-  const handleImageUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    try {
-      setUploading(true);
-      const formData = new FormData();
-      formData.append('image', file);
-
-      const response = await fetch(`/api/info-pages/${editingPage.id}/upload-image`, {
-        method: 'POST',
-        body: formData,
-        credentials: 'include' // Important for sending cookies
-      });
-
-      if (!response.ok) {
-        throw new Error('Upload failed');
-      }
-
-      const result = await response.json();
-      form.setValue('featuredImageUrl', result.image.filePath, { shouldDirty: true });
-    } catch (err) {
-      console.error('Error uploading image:', err);
-      // Error handling is now managed by useFormManager
-      console.error('Error uploading image:', err);
-    } finally {
-      setUploading(false);
+  const handleFileRemove = () => {
+    // Update form state as primary source of truth
+    setValue('file_url', null);
+    setValue('file_type', null);
+    setValue('file_description', '');
+    
+    // Update editingPage only for immediate display
+    if (editingPage) {
+      setEditingPage(prev => ({
+        ...prev,
+        file_url: null,
+        file_type: null,
+        file_description: ''
+      }));
     }
   };
 
-  const handleResetForm = () => {
-    resetForm();
+  const handleDescriptionChange = (description) => {
+    // Update form state as primary source of truth
+    setValue('file_description', description);
+    
+    // Update editingPage only for immediate display
+    if (editingPage) {
+      setEditingPage(prev => ({
+        ...prev,
+        file_description: description
+      }));
+    }
   };
 
-  const predefinedCategories = [
+  // Category options
+  const categories = [
     { value: 'general', label: 'Allgemein' },
     { value: 'rules', label: 'Regeln' },
-    { value: 'legal', label: 'Rechtliches' },
-    { value: 'help', label: 'Hilfe' }
+    { value: 'chemnitz', label: 'Chemnitz' },
+    { value: 'weiteres', label: 'Weiteres' }
   ];
 
-  // Dynamic categories based on existing content (only published items)
-  const categories = useMemo(() => {
-    // Get categories that have at least one published item
-    const categoriesInUse = new Set(
-      pages
-        .filter(page => page.status === 'PUBLISHED' || page.is_published)
-        .map(page => page.category)
-        .filter(Boolean)
-    );
-    
-    // Return predefined options that have published content or are the "all" option
-    return predefinedCategories.filter(option => 
-      option.value === 'all' || categoriesInUse.has(option.value)
-    );
-  }, [pages]);
-
+  // Status options
   const statusOptions = [
     { value: 'DRAFT', label: 'Entwurf' },
     { value: 'PUBLISHED', label: 'Veröffentlicht' },
     { value: 'ARCHIVED', label: 'Archiviert' }
   ];
 
-  if (loading) {
-    return <LoadingSpinner />;
+  if (isLoading) {
+    return <div className="flex justify-center items-center h-64">Lade...</div>;
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-900">Info-Seiten verwalten</h2>
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Info-Seiten</h2>
         <button
           onClick={() => {
-            setShowForm(true);
             setEditingPage(null);
-            resetForm();
+            setShowForm(true);
+            reset();
           }}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+          className="w-full sm:w-auto min-h-[44px] px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors touch-manipulation active:scale-95"
         >
           Neue Seite erstellen
         </button>
       </div>
 
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <p className="text-red-800">{error?.message || error}</p>
-        </div>
+      {/* Table */}
+      {!showForm && (
+        <ConsolidatedAdminTable
+          columns={[
+            {
+              key: 'title',
+              label: 'Titel',
+              sortable: true,
+              render: (val, page) => (
+                <div>
+                  <div className="text-sm font-medium text-gray-900 dark:text-white">
+                    {page.title}
+                  </div>
+                  <div className="text-sm text-gray-500 dark:text-gray-400">
+                    /{page.slug}
+                  </div>
+                </div>
+              )
+            },
+            {
+              key: 'category',
+              label: 'Kategorie',
+              sortable: true,
+              render: (val) => (
+                <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                  {categories.find(c => c.value === val)?.label || val}
+                </span>
+              )
+            },
+            {
+              key: 'status',
+              label: 'Status',
+              sortable: true,
+              render: (val) => (
+                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                  val === 'PUBLISHED' 
+                    ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                    : val === 'DRAFT'
+                    ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                    : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+                }`}>
+                  {statusOptions.find(s => s.value === val)?.label || val}
+                </span>
+              )
+            },
+            {
+              key: 'display_order',
+              label: 'Reihenfolge',
+              sortable: true
+            },
+            {
+              key: 'actions',
+              label: 'Aktionen',
+              render: (_, page) => (
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    onClick={() => handleEdit(page)}
+                    className="min-h-[44px] px-3 py-2 text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-200 touch-manipulation active:scale-95 rounded"
+                  >
+                    Bearbeiten
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (window.confirm('Sind Sie sicher, dass Sie diese Seite löschen möchten?')) {
+                        deleteInfoPageMutation.mutate(page.id);
+                      }
+                    }}
+                    className="min-h-[44px] px-3 py-2 text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-200 touch-manipulation active:scale-95 rounded"
+                  >
+                    Löschen
+                  </button>
+                </div>
+              )
+            }
+          ]}
+          data={infoPages}
+          loading={isLoading}
+          emptyMessage="Keine Info-Seiten vorhanden"
+        />
       )}
 
       {/* Form */}
       {showForm && (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold mb-4">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
             {editingPage ? 'Seite bearbeiten' : 'Neue Seite erstellen'}
           </h3>
           
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            {form.formState.errors.root && (
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            {errors.root && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                <p className="text-red-800 text-sm">{form.formState.errors.root.message}</p>
+                <p className="text-red-800 text-sm">{errors.root.message}</p>
               </div>
             )}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <TextInput label="Titel *" name="title" control={form.control} error={form.formState.errors.title?.message} />
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Titel *
+                </label>
+                <input
+                  {...register('title')}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                />
+                {errors.title && <span className="text-red-600 text-sm">{errors.title.message}</span>}
+              </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Slug *
                 </label>
                 <input
-                  type="text"
-                  aria-invalid={form.formState.errors.slug ? 'true' : 'false'}
-                  {...form.register('slug', { required: 'Slug ist erforderlich' })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  {...register('slug')}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
                 />
-                {form.formState.errors.slug && (
-                  <p className="mt-1 text-sm text-red-600" role="alert">{form.formState.errors.slug.message}</p>
-                )}
+                {errors.slug && <span className="text-red-600 text-sm">{errors.slug.message}</span>}
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <SelectInput label="Kategorie" name="category" control={form.control} options={categories.map(c => ({ value: c.value, label: c.label }))} error={form.formState.errors.category?.message} />
-              
-              <SelectInput label="Status" name="status" control={form.control} options={statusOptions.map(s => ({ value: s.value, label: s.label }))} error={form.formState.errors.status?.message} />
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Kategorie
+                </label>
+                <select
+                  {...register('category')}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                >
+                  {categories.map(cat => (
+                    <option key={cat.value} value={cat.value}>{cat.label}</option>
+                  ))}
+                </select>
+                {errors.category && <span className="text-red-600 text-sm">{errors.category.message}</span>}
+              </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Status
+                </label>
+                <select
+                  {...register('status')}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                >
+                  {statusOptions.map(status => (
+                    <option key={status.value} value={status.value}>{status.label}</option>
+                  ))}
+                </select>
+                {errors.status && <span className="text-red-600 text-sm">{errors.status.message}</span>}
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Reihenfolge
                 </label>
                 <input
                   type="number"
-                  aria-invalid={form.formState.errors.order ? 'true' : 'false'}
-                  {...form.register('order', { valueAsNumber: true })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  {...register('display_order', { valueAsNumber: true })}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
                 />
+                {errors.display_order && <span className="text-red-600 text-sm">{errors.display_order.message}</span>}
               </div>
             </div>
 
             <div>
-              <TextareaInput
-                label="Kurzbeschreibung"
-                name="excerpt"
-                control={form.control}
-                error={form.formState.errors}
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Kurzbeschreibung
+              </label>
+              <textarea
+                {...register('excerpt')}
+                rows={2}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
                 placeholder="Kurze Beschreibung der Seite..."
-                rows={2}
               />
+              {errors.excerpt && <span className="text-red-600 text-sm">{errors.excerpt.message}</span>}
             </div>
 
             <div>
-              <MarkdownTextarea
-                label="Inhalt (Markdown) *"
-                name="content"
-                control={form.control}
-                errors={form.formState.errors}
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Inhalt (Markdown) *
+              </label>
+              <textarea
+                {...register('content')}
+                rows={15}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white font-mono"
                 placeholder="# Überschrift&#10;&#10;Hier kommt der Inhalt in Markdown-Format..."
-                rows={12}
-                rules={{ required: 'Inhalt ist erforderlich' }}
-                helpText="Verwende Markdown-Syntax für Formatierung. URLs werden automatisch verlinkt."
+              />
+              {errors.content && <span className="text-red-600 text-sm">{errors.content.message}</span>}
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                Verwende Markdown-Syntax für Formatierung.
+              </p>
+            </div>
+
+            {/* File Upload Section */}
+            <div className="space-y-6">
+              {!editingPage && (
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  💡 Speichere die Seite zuerst, um Dateien hochzuladen
+                </p>
+              )}
+              
+              <FileUploadSection
+                type="universal"
+                currentUrl={editingPage?.file_url}
+                currentType={editingPage?.file_type}
+                description={editingPage?.file_description}
+                onUpload={handleFileUpload}
+                onRemove={handleFileRemove}
+                onDescriptionChange={handleDescriptionChange}
+                editingPageId={editingPage?.id}
+                disabled={!editingPage}
               />
             </div>
 
-            <div>
-              <TextareaInput
-                label="Meta-Beschreibung"
-                name="meta_description"
-                control={form.control}
-                error={form.formState.errors}
-                placeholder="SEO Meta-Beschreibung..."
-                rows={2}
-              />
-            </div>
-
-            {editingPage && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Bild hochladen
-                </label>
-                <input
-                  type="file"
-                  accept="image/*,.pdf"
-                  onChange={handleImageUpload}
-                  disabled={uploading}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                {uploading && <p className="text-sm text-gray-500 mt-1">Wird hochgeladen...</p>}
-                
-                {/* Current file preview */}
-                {editingPage?.featured_image_url && (
-                  <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-                    <p className="text-sm font-medium text-gray-700 mb-2">Aktuelle Datei:</p>
-                    {editingPage.featured_image_url.toLowerCase().includes('.pdf') ? (
-                      <div className="flex items-center space-x-2">
-                        <span className="text-2xl">📄</span>
-                        <span className="text-sm text-gray-600">PDF-Datei</span>
-                        <a 
-                          href={editingPage.featured_image_url} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:text-blue-800 text-sm"
-                        >
-                          Anzeigen
-                        </a>
-                      </div>
-                    ) : (
-                      <div className="flex items-center space-x-3">
-                        <img 
-                          src={editingPage.featured_image_url} 
-                          alt="Featured image" 
-                          className="w-16 h-16 object-cover rounded"
-                        />
-                        <div>
-                          <p className="text-sm text-gray-600">Bild</p>
-                          <a 
-                            href={editingPage.featured_image_url} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="text-blue-600 hover:text-blue-800 text-sm"
-                          >
-                            Anzeigen
-                          </a>
-                        </div>
-                      </div>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        form.setValue('featuredImageUrl', '');
-                        setEditingPage({...editingPage, featured_image_url: null});
-                      }}
-                      className="mt-2 text-sm text-red-600 hover:text-red-800"
-                    >
-                      Datei entfernen
-                    </button>
-                  </div>
-                )}
+            {/* Additional Links Section */}
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Zusätzliche Links</h3>
+                <button
+                  type="button"
+                  onClick={() => appendLink({ title: '', url: '' })}
+                  className="min-h-[44px] px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm touch-manipulation active:scale-95"
+                >
+                  Link hinzufügen
+                </button>
               </div>
-            )}
 
-            <CheckboxInput
-              label="Sofort veröffentlichen"
-              name="is_published"
-              control={form.control}
-              error={form.formState.errors.is_published?.message}
-            />
+              {linkFields.map((link, index) => (
+                <div key={link.id} className="flex items-center space-x-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <input
+                    type="text"
+                    placeholder="Titel"
+                    {...register(`additionalLinks.${index}.title`)}
+                    className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                  />
+                  <input
+                    type="url"
+                    placeholder="URL"
+                    {...register(`additionalLinks.${index}.url`)}
+                    className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeLink(index)}
+                    className="min-h-[44px] min-w-[44px] px-3 py-2 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 focus:outline-none rounded flex items-center justify-center touch-manipulation active:scale-95"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
 
-            <div className="flex justify-end space-x-3">
+              {linkFields.length === 0 && (
+                <div className="text-center py-4 text-gray-500 dark:text-gray-400">
+                  <p>Noch keine Links hinzugefügt</p>
+                  <p className="text-sm">Klicken Sie auf "Link hinzufügen" um einen Link hinzuzufügen</p>
+                </div>
+              )}
+            </div>
+
+            {/* Form Actions */}
+            <div className="flex flex-col sm:flex-row gap-3 pt-4">
               <button
                 type="button"
                 onClick={() => {
                   setShowForm(false);
                   setEditingPage(null);
-                  resetForm();
+                  reset();
                 }}
-                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
+                className="w-full sm:w-auto min-h-[44px] px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-600 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors touch-manipulation active:scale-95"
               >
                 Abbrechen
               </button>
               <button
                 type="submit"
-                disabled={isSubmitting || createInfoPage.isPending || updateInfoPage.isPending}
-                className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors disabled:opacity-70"
+                disabled={isSubmitting}
+                className="w-full sm:w-auto min-h-[44px] px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation active:scale-95"
               >
-                {isSubmitting || createInfoPage.isPending || updateInfoPage.isPending ? 'Speichern...' : (editingPage ? 'Aktualisieren' : 'Erstellen')}
+                {isSubmitting ? 'Speichere...' : (editingPage ? 'Aktualisieren' : 'Erstellen')}
               </button>
             </div>
           </form>
         </div>
       )}
-
-      {/* Pages List */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900">
-            Alle Seiten ({pages.length})
-          </h3>
-        </div>
-        
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Titel
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Kategorie
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Erstellt
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Aktionen
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {pages.map(page => (
-                <tr key={page.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">
-                        {page.title}
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        /{page.slug}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
-                      {page.category}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      page.is_published 
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-yellow-100 text-yellow-800'
-                    }`}>
-                      {page.is_published ? 'Veröffentlicht' : 'Entwurf'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(page.created_at).toLocaleDateString('de-DE')}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div className="flex justify-end space-x-2">
-                      <button
-                        onClick={() => handleEdit(page)}
-                        className="text-blue-600 hover:text-blue-900"
-                      >
-                        Bearbeiten
-                      </button>
-                      <button
-                        onClick={() => handleDelete(page.id)}
-                        className="text-red-600 hover:text-red-900"
-                      >
-                        Löschen
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
     </div>
   );
-};
+}
 
 export default AdminInfoPages;
-
-
-
-
-
-
-
-
-
-
-
-
-

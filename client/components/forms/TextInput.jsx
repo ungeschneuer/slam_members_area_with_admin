@@ -23,7 +23,7 @@ export default function TextInput({
     return (
       <div>
         {label && (
-          <label htmlFor={name} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          <label htmlFor={name} className="label-base">
             {label}
             {required && <span className="text-red-500 ml-1">*</span>}
           </label>
@@ -42,7 +42,7 @@ export default function TextInput({
               autoComplete={autoComplete}
               disabled={disabled}
               aria-invalid={hasError ? 'true' : 'false'}
-              className={`w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white ${hasError ? 'border-red-500 focus:ring-red-500' : ''} ${className}`}
+              className={`input-base ${hasError ? 'border-red-500 focus:ring-red-500' : 'focus:ring-[#A2D2B9] focus:border-[#185757]'} ${className}`}
             />
           )}
         />
@@ -57,7 +57,7 @@ export default function TextInput({
   return (
     <div>
       {label && (
-        <label htmlFor={name} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+        <label htmlFor={name} className="label-base">
           {label}
           {required && <span className="text-red-500 ml-1">*</span>}
         </label>
@@ -71,7 +71,7 @@ export default function TextInput({
         aria-invalid={hasError ? 'true' : 'false'}
         {...(register ? register(name, rules) : {})}
         disabled={disabled}
-        className={`w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white ${hasError ? 'border-red-500 focus:ring-red-500' : ''} ${className}`}
+        className={`input-base ${hasError ? 'border-red-500 focus:ring-red-500' : 'focus:ring-[#A2D2B9] focus:border-[#185757]'} ${className}`}
       />
       {hasError && (
         <p className="mt-1 text-sm text-red-600 dark:text-red-400" role="alert">{errors[name].message}</p>

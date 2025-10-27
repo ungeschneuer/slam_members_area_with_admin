@@ -4,8 +4,10 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useCityTipBySlug, usePageTitle } from '../hooks/index.js';
 import LoadingSpinner from './LoadingSpinner.jsx';
 import { createMap, destroyMap, createDefaultIcon, createMarkerWithPopup, isValidCoordinates } from '../utils/leafletUtils.js';
-import { translateCategory, getCategoryIcon, getCategoryColor } from '../utils/categoryTranslations.js';
+import { geocodingService } from '../services/geocodingService.js';
 import { getContentTypeGradient } from '../utils/detailViewUtils.js';
+import { handleLinkClick } from '../utils/linkUtils.js';
+import { getCategoryIcon, getCategoryLabel } from '../utils/categoryUtils.js';
 import BackButton from './shared/BackButton.jsx';
 
 const CityTipDetail = () => {
@@ -73,34 +75,15 @@ const CityTipDetail = () => {
 
     const address = cityTip?.address;
     if (address) {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
-      
-      fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`, {
-        headers: { 'Accept': 'application/json' },
-        signal: controller.signal
-      })
-        .then(res => res.json())
-        .then(results => {
-          if (Array.isArray(results) && results.length > 0) {
-            const { lat, lon } = results[0];
-            initMap(parseFloat(lat), parseFloat(lon));
-          }
+      geocodingService.geocodeAddress(address)
+        .then(result => {
+          initMap(result.lat, result.lng);
         })
-        .catch((error) => {
-          if (error.name === 'AbortError') {
-            console.warn('Geocoding request timed out after 5 seconds');
-          } else {
-            console.warn('Failed to geocode address:', error);
-          }
-        })
-        .finally(() => {
-          clearTimeout(timeoutId);
+        .catch(error => {
+          const processedError = geocodingService.handleError(error);
+          console.warn('Geocoding failed:', processedError.message);
+          // Could show user notification here if needed
         });
-      return () => {
-        controller.abort();
-        clearTimeout(timeoutId);
-      };
     }
   }, [cityTip]);
 
@@ -120,14 +103,6 @@ const CityTipDetail = () => {
 
   
 
-  const getCategoryIconLocal = (category) => {
-    return getCategoryIcon(category, 'cityTips');
-  };
-
-  const getCategoryLabelLocal = (category) => {
-    return translateCategory(category, 'cityTips');
-  };
-
   const getPriceRangeLabel = (priceRange) => {
     const labels = {
       'Free': 'Kostenlos',
@@ -141,28 +116,6 @@ const CityTipDetail = () => {
 
   
 
-  const getOpeningHoursStatus = (openingHours) => {
-    if (!openingHours) return null;
-    
-    const now = new Date();
-    const currentDay = now.toLocaleDateString('de-DE', { weekday: 'long' });
-    const currentTime = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-    
-    if (typeof openingHours === 'object' && openingHours[currentDay]) {
-      const hours = openingHours[currentDay];
-      if (hours === 'Geschlossen') return { status: 'closed', text: 'Geschlossen' };
-      if (hours.includes('-')) {
-        const [open, close] = hours.split('-').map(h => h.trim());
-        if (currentTime >= open && currentTime <= close) {
-          return { status: 'open', text: `Geöffnet bis ${close}` };
-        } else {
-          return { status: 'closed', text: `Öffnet um ${open}` };
-        }
-      }
-    }
-    
-    return null;
-  };
 
   if (loading) return <LoadingSpinner />;
 
@@ -216,7 +169,6 @@ const CityTipDetail = () => {
     );
   }
 
-  const openingStatus = getOpeningHoursStatus(cityTip.opening_hours);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
@@ -246,21 +198,10 @@ const CityTipDetail = () => {
           {/* Header with actions */}
           <div className="p-8 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-start space-x-4">
-              <div className={`w-16 h-16 bg-gradient-to-br ${getContentTypeGradient('cityTip')} rounded-full flex items-center justify-center text-white text-2xl font-bold shadow-lg`}>
-                {getCategoryIconLocal(cityTip.category)}
+              <div className={`w-16 h-16 bg-${getContentTypeGradient('cityTip')} rounded-full flex items-center justify-center text-white text-2xl font-bold shadow-lg`}>
+                {getCategoryIcon(cityTip.category, 'cityTip')}
               </div>
               <div className="flex-1">
-                {openingStatus && (
-                  <div className="flex items-center space-x-3 mb-2">
-                    <span className={`inline-block px-3 py-1 text-sm font-medium rounded-full ${
-                      openingStatus.status === 'open' 
-                        ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200'
-                        : 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200'
-                    }`}>
-                      {openingStatus.text}
-                    </span>
-                  </div>
-                )}
                 <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
                   {cityTip.name}
                 </h1>
@@ -284,20 +225,6 @@ const CityTipDetail = () => {
                 </div>
               </div>
               
-              {cityTip.contact_info?.phone && (
-                <div className="flex items-start space-x-3">
-                  <span className="text-gray-500 dark:text-gray-400 mt-1 text-xl">📞</span>
-                  <div>
-                    <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Telefon</h3>
-                    <a 
-                      href={`tel:${cityTip.contact_info.phone}`}
-                      className="text-blue-600 dark:text-blue-400 hover:underline"
-                    >
-                      {cityTip.contact_info.phone}
-                    </a>
-                  </div>
-                </div>
-              )}
               
               {cityTip.website && (
                 <div className="flex items-start space-x-3">
@@ -306,8 +233,14 @@ const CityTipDetail = () => {
                     <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Website</h3>
                     <a 
                       href={cityTip.website}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                      onClick={(e) => {
+                        const websiteLink = {
+                          url: cityTip.website,
+                          title: 'Website besuchen',
+                          is_external: true
+                        };
+                        handleLinkClick(websiteLink, e);
+                      }}
                       className="text-blue-600 dark:text-blue-400 hover:underline"
                     >
                       Website besuchen
@@ -402,62 +335,18 @@ const CityTipDetail = () => {
           {/* Sidebar */}
           <div className="space-y-6">
             {/* Opening Hours */}
-            {cityTip.opening_hours && (
+            {cityTip.opening_hours && cityTip.opening_hours !== '{}' && cityTip.opening_hours.trim() !== '' && (
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                 <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
                   <span className="mr-2">🕒</span>
                   Öffnungszeiten
                 </h2>
-                <div className="text-gray-700 dark:text-gray-300">
-                  {typeof cityTip.opening_hours === 'string' ? (
-                    <p>{cityTip.opening_hours}</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {Object.entries(cityTip.opening_hours).map(([day, hours]) => (
-                        <div key={day} className="flex justify-between">
-                          <span className="font-medium">{day}:</span>
-                          <span>{hours}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                <div className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                  {cityTip.opening_hours}
                 </div>
               </div>
             )}
 
-            {/* Contact Information */}
-            {cityTip.contact_info && (
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
-                  <span className="mr-2">📞</span>
-                  Kontakt
-                </h2>
-                <div className="space-y-3">
-                  {cityTip.contact_info.phone && (
-                    <div className="flex items-center">
-                      <span className="mr-3 text-xl">📞</span>
-                      <a 
-                        href={`tel:${cityTip.contact_info.phone}`}
-                        className="text-blue-600 dark:text-blue-400 hover:underline"
-                      >
-                        {cityTip.contact_info.phone}
-                      </a>
-                    </div>
-                  )}
-                  {cityTip.contact_info.email && (
-                    <div className="flex items-center">
-                      <span className="mr-3 text-xl">✉️</span>
-                      <a 
-                        href={`mailto:${cityTip.contact_info.email}`}
-                        className="text-blue-600 dark:text-blue-400 hover:underline"
-                      >
-                        {cityTip.contact_info.email}
-                      </a>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
 
             {/* Additional Information */}
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
@@ -465,7 +354,7 @@ const CityTipDetail = () => {
               <div className="space-y-3">
                 <div>
                   <h3 className="font-medium text-gray-900 dark:text-white mb-1">Kategorie</h3>
-                  <p className="text-gray-600 dark:text-gray-400">{getCategoryLabelLocal(cityTip.category)}</p>
+                  <p className="text-gray-600 dark:text-gray-400">{getCategoryLabel(cityTip.category, 'cityTip')}</p>
                 </div>
                 {cityTip.price_range && (
                   <div>
@@ -492,8 +381,14 @@ const CityTipDetail = () => {
                   {/* Google Maps Button */}
                   <a
                     href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(cityTip.address)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    onClick={(e) => {
+                      const googleMapsLink = {
+                        url: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(cityTip.address)}`,
+                        title: 'In Google Maps öffnen',
+                        is_external: true
+                      };
+                      handleLinkClick(googleMapsLink, e);
+                    }}
                     className="flex items-center justify-center w-full px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors font-medium"
                   >
                     <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24" fill="currentColor">
@@ -505,8 +400,14 @@ const CityTipDetail = () => {
                   {/* Apple Maps Button */}
                   <a
                     href={`https://maps.apple.com/?q=${encodeURIComponent(cityTip.address)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    onClick={(e) => {
+                      const appleMapsLink = {
+                        url: `https://maps.apple.com/?q=${encodeURIComponent(cityTip.address)}`,
+                        title: 'In Apple Maps öffnen',
+                        is_external: true
+                      };
+                      handleLinkClick(appleMapsLink, e);
+                    }}
                     className="flex items-center justify-center w-full px-4 py-3 bg-gray-800 hover:bg-gray-900 text-white rounded-lg transition-colors font-medium"
                   >
                     <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24" fill="currentColor">

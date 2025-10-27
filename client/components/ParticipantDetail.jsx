@@ -12,6 +12,7 @@ import {
   getContentTypeIcon,
   getContentTypeGradient
 } from '../utils/detailViewUtils.js';
+import { handleLinkClick } from '../utils/linkUtils.js';
 import BackButton from './shared/BackButton.jsx';
 
 export default function ParticipantDetail() {
@@ -77,7 +78,7 @@ export default function ParticipantDetail() {
         assignment.roles.forEach(role => {
           switch (role) {
             case 'participant':
-              roles.push('Turnier-Teilnehmer*in');
+              roles.push('Wettbewerb-Teilnehmer*in');
               break;
             case 'feature_artist':
               const order = assignment.metadata?.display_order || 0;
@@ -96,7 +97,7 @@ export default function ParticipantDetail() {
                 const crewLabel = role === 'crew' && assignment.metadata?.role 
                   ? assignment.metadata.role 
                   : getCrewRoleLabel(role);
-                roles.push(`Crew: ${crewLabel}`);
+                roles.push(`SLAM25-Team: ${crewLabel}`);
               } else {
                 roles.push(role);
               }
@@ -152,12 +153,12 @@ export default function ParticipantDetail() {
       });
       
       // Handle roles array (consistent with rounds) - use first role as primary
-      const roles = participantInEvent?.roles || ['Teilnehmer*in'];
-      const primaryRole = Array.isArray(roles) ? roles[0] : roles;
+      const role = participantInEvent?.role || 'Teilnehmer*in';
+      const roles = [role]; // Convert to array for consistent handling
       
       return {
         ...event,
-        role: primaryRole,
+        role: role,
         roles: roles,
         metadata: participantInEvent?.metadata || {},
         type: 'event'
@@ -238,19 +239,19 @@ export default function ParticipantDetail() {
                     return roles.map((role, index) => (
                       <span 
                         key={`role-${role}-${index}`}
-                        className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getRoleColor(role)}`}
+                        className="badge-role"
                       >
                         {role}
                       </span>
                     ));
                   })()}
                   {participant.region && (
-                    <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
+                    <span className="badge-region">
                       {getRegionFlag(participant.region)} {participant.region}
                     </span>
                   )}
                   {participant.pronouns && (
-                    <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-300">
+                    <span className="badge-pronouns">
                       {participant.pronouns}
                     </span>
                   )}
@@ -258,8 +259,14 @@ export default function ParticipantDetail() {
                 {participant.instagram && (
                   <a
                     href={`https://instagram.com/${participant.instagram}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    onClick={(e) => {
+                      const instagramLink = {
+                        url: `https://instagram.com/${participant.instagram}`,
+                        title: `Instagram Profil von ${participant.name}`,
+                        is_external: true
+                      };
+                      handleLinkClick(instagramLink, e);
+                    }}
                     className="inline-flex items-center text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors duration-200"
                   >
                     <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 24 24">
@@ -276,12 +283,12 @@ export default function ParticipantDetail() {
 
         {/* Rounds Section */}
         {enhancedParticipantRounds.length > 0 && (
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
-            <div className="px-8 py-6 border-b border-gray-200 dark:border-gray-700">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+          <div className="detail-section mb-6">
+            <div className="detail-section-header">
+              <h2 className="detail-section-title">
                 🏆 Turnier-Runden
               </h2>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              <p className="detail-section-subtitle">
                 Runden, an denen {participant.name} teilnimmt
               </p>
             </div>
@@ -293,7 +300,7 @@ export default function ParticipantDetail() {
                     <div className="flex-1">
                       <div className="flex items-center space-x-3 mb-3">
                         <div className="flex items-center space-x-2">
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300">
+                          <span className="badge-primary">
                             🏆 Runde
                           </span>
                           
@@ -450,22 +457,22 @@ export default function ParticipantDetail() {
                         </div>
                       </div>
 
-                      {/* Role Information */}
-                      <div className="flex flex-wrap gap-2 mb-3">
-                        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">
-                          {event.role}
-                        </span>
-                      </div>
                     </div>
                     
                     {/* Link to Details */}
                     <div className="ml-4">
-                      <Link
-                        to={`/timetable/event/${event.id}`}
-                        className="inline-flex items-center px-3 py-1 text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
-                      >
-                        Details →
-                      </Link>
+                      {event.slug ? (
+                        <Link
+                          to={`/timetable/event/${event.slug}`}
+                          className="inline-flex items-center px-3 py-1 text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+                        >
+                          Details →
+                        </Link>
+                      ) : (
+                        <span className="inline-flex items-center px-3 py-1 text-sm text-gray-400 cursor-not-allowed">
+                          No Details Available
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -537,8 +544,14 @@ export default function ParticipantDetail() {
                           {team.instagram && (
                             <a
                               href={`https://instagram.com/${team.instagram}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                              onClick={(e) => {
+                                const teamInstagramLink = {
+                                  url: `https://instagram.com/${team.instagram}`,
+                                  title: `Instagram Profil von ${team.name}`,
+                                  is_external: true
+                                };
+                                handleLinkClick(teamInstagramLink, e);
+                              }}
                               className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
                             >
                               📷 @{team.instagram}

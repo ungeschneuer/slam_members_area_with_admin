@@ -200,7 +200,7 @@ BACKUP_RETENTION_DAYS=30
 
 # Security
 ENCRYPTION_KEY=slam25_encryption_key_2025_secure_random_string
-JWT_SECRET=slam25_jwt_secret_2025_secure_random_string
+JWT_SECRET=slam25_jwt_secret_2025_secure_random_string_minimum_64_characters_required_for_security
 
 # Application Settings
 NODE_ENV=production

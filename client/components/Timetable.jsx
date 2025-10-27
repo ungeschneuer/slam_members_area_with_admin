@@ -272,6 +272,23 @@ export default function Timetable() {
     return timeString;
   };
 
+  // Helper function to format date for display
+  const formatDateForDisplay = (date) => {
+    if (!date) return 'Datum unbekannt';
+    try {
+      const dateObj = new Date(date);
+      if (isNaN(dateObj.getTime())) return 'Ungültiges Datum';
+      return dateObj.toLocaleDateString('de-DE', { 
+        weekday: 'short',
+        day: '2-digit', 
+        month: '2-digit',
+        timeZone: 'Europe/Berlin'
+      });
+    } catch (error) {
+      return 'Ungültiges Datum';
+    }
+  };
+
   // Helper function to get link icon
   const getLinkIcon = (type) => {
     if (!type || typeof type !== 'string') return '🔗';
@@ -295,49 +312,42 @@ export default function Timetable() {
         return {
           cardBg: 'bg-red-100 dark:bg-red-900/40',
           cardBorder: 'border-red-300 dark:border-red-700',
-          timeCircle: 'bg-gradient-to-br from-red-500 to-red-600',
           accent: 'text-red-800 dark:text-red-200'
         };
       case 'individual-round':
         return {
           cardBg: 'bg-blue-100 dark:bg-blue-900/40',
           cardBorder: 'border-blue-300 dark:border-blue-700',
-          timeCircle: 'bg-gradient-to-br from-blue-500 to-blue-600',
           accent: 'text-blue-800 dark:text-blue-200'
         };
       case 'workshop':
         return {
           cardBg: 'bg-green-100 dark:bg-green-900/40',
           cardBorder: 'border-green-300 dark:border-green-700',
-          timeCircle: 'bg-gradient-to-br from-green-500 to-green-600',
           accent: 'text-green-800 dark:text-green-200'
         };
       case 'fun':
         return {
           cardBg: 'bg-yellow-100 dark:bg-yellow-900/40',
           cardBorder: 'border-yellow-300 dark:border-yellow-700',
-          timeCircle: 'bg-gradient-to-br from-yellow-500 to-yellow-600',
           accent: 'text-yellow-800 dark:text-yellow-200'
         };
       case 'aftershow':
         return {
           cardBg: 'bg-purple-100 dark:bg-purple-900/40',
           cardBorder: 'border-purple-300 dark:border-purple-700',
-          timeCircle: 'bg-gradient-to-br from-purple-500 to-purple-600',
           accent: 'text-purple-800 dark:text-purple-200'
         };
       case 'panel':
         return {
           cardBg: 'bg-orange-100 dark:bg-orange-900/40',
           cardBorder: 'border-orange-300 dark:border-orange-700',
-          timeCircle: 'bg-gradient-to-br from-orange-500 to-orange-600',
           accent: 'text-orange-800 dark:text-orange-200'
         };
       default:
         return {
           cardBg: 'bg-gray-100 dark:bg-gray-800',
           cardBorder: 'border-gray-300 dark:border-gray-600',
-          timeCircle: 'bg-gradient-to-br from-gray-500 to-gray-600',
           accent: 'text-gray-800 dark:text-gray-200'
         };
     }
@@ -353,6 +363,28 @@ export default function Timetable() {
       case 'aftershow': return 'border-l-purple-500';
       case 'panel': return 'border-l-orange-500';
       default: return 'border-l-gray-500';
+    }
+  };
+
+  // Helper function to get competition type indicator color
+  const getCompetitionTypeIndicator = (eventType) => {
+    switch (eventType) {
+      case 'team-round':
+        return 'bg-red-500';
+      case 'individual-round':
+        return 'bg-[#185757]';
+      case 'workshop':
+        return 'bg-green-500';
+      case 'fun':
+        return 'bg-yellow-500';
+      case 'aftershow':
+        return 'bg-purple-500';
+      case 'panel':
+        return 'bg-orange-500';
+      case 'networking':
+        return 'bg-teal-500';
+      default:
+        return 'bg-gray-500';
     }
   };
 
@@ -468,11 +500,17 @@ export default function Timetable() {
                       className={`${colors.cardBg} ${getBorderColorClass(event.type)} border-l-4 rounded-lg p-3 sm:p-6 shadow-sm border ${colors.cardBorder} hover:shadow-md transition-all duration-200 block group`}
                     >
                       <div className="flex items-start space-x-3 sm:space-x-4">
-                        <div className="flex-shrink-0">
-                          <div className={`w-8 h-8 sm:w-12 sm:h-12 ${colors.timeCircle} rounded-full flex items-center justify-center text-white font-bold text-sm sm:text-base`}>
-                            {event.time && typeof event.time === 'string' ? event.time.split(':')[0] : '?'}
+                        <div className="text-center flex-shrink-0">
+                          <div className="text-lg font-bold text-gray-900 dark:text-white">
+                            {formatTime(event.time)} - {formatTime(event.end_time)}
+                          </div>
+                          <div className="text-xs text-gray-500 dark:text-gray-300 mt-1">
+                            {formatDateForDisplay(event.date)}
                           </div>
                         </div>
+
+                        {/* Colored Indicator Line - Desktop only */}
+                        <div className={`hidden sm:block w-1 h-12 rounded-full ${getCompetitionTypeIndicator(event.type)}`}></div>
                         
                         <div className="flex-1 min-w-0">
                           {/* Title Row with Navigation Arrow */}

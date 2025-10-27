@@ -16,7 +16,8 @@ const endpoints = [
   '/city-tips',
   '/info-pages',
   '/links',
-  '/schnellzugriff'
+  '/schnellzugriff',
+  '/countdown-config'
 ];
 
 const issues = [];
@@ -75,8 +76,8 @@ async function validateEndpoint(endpoint) {
       }
       
       if (endpoint === '/city-tips' && sample.opening_hours) {
-        if (typeof sample.opening_hours === 'string') {
-          result.issues.push('opening_hours field is string instead of parsed JSONB');
+        if (typeof sample.opening_hours !== 'string') {
+          result.issues.push('opening_hours field should be string (converted from JSONB)');
         }
       }
       
@@ -128,12 +129,53 @@ async function validateEndpoint(endpoint) {
   console.log(''); // Empty line for readability
 }
 
+async function testDetailEndpoints() {
+  console.log('\n🔗 Testing detail endpoints with real slugs...\n');
+  
+  try {
+    // Load check results to get available slugs
+    const fs = await import('fs');
+    const checkData = fs.readFileSync('check-results.json', 'utf8');
+    const checkResults = JSON.parse(checkData);
+    const slugs = checkResults.slugs;
+    
+    const detailEndpoints = [
+      { base: '/participants', slugs: slugs.participants?.slice(0, 3) || [] },
+      { base: '/teams', slugs: slugs.teams?.slice(0, 2) || [] },
+      { base: '/rounds', slugs: slugs.rounds?.slice(0, 3) || [] },
+      { base: '/news', slugs: slugs.news?.slice(0, 3) || [] },
+      { base: '/timetable', slugs: slugs.timetable_entries?.slice(0, 3) || [] },
+      { base: '/city-tips', slugs: slugs.city_tips?.slice(0, 3) || [] },
+      { base: '/info-pages', slugs: slugs.info_pages?.slice(0, 3) || [] }
+    ];
+    
+    for (const { base, slugs: endpointSlugs } of detailEndpoints) {
+      if (endpointSlugs.length === 0) {
+        console.log(`⚠️  ${base}: No slugs available for testing`);
+        continue;
+      }
+      
+      for (const slug of endpointSlugs) {
+        const endpoint = `${base}/${slug}`;
+        await validateEndpoint(endpoint);
+      }
+    }
+    
+  } catch (error) {
+    console.log('⚠️  Could not load check results for detail endpoint testing');
+    console.log('   Run check-test-data.js first to get available slugs');
+  }
+}
+
 async function main() {
   console.log('Testing all API endpoints...\n');
   
   for (const endpoint of endpoints) {
     await validateEndpoint(endpoint);
   }
+  
+  // Test detail endpoints
+  await testDetailEndpoints();
   
   // Summary
   console.log('📊 VALIDATION SUMMARY');

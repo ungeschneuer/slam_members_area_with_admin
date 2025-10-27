@@ -24,30 +24,22 @@ export function useCountdown() {
       const raw = result?.data || result || null;
       if (!raw) return null;
 
-      // Normalize to camelCase while keeping snake_case aliases for existing consumers
-      const mapped = {
+      // Return snake_case properties directly
+      return {
         title: raw.title ?? 'Countdown zum SLAM25',
         subtitle: raw.subtitle ?? '28. Oktober 2025 • 12:00 Uhr (Berlin Zeit)',
-        targetDate: raw.targetDate || raw.target_date || null,
-        buttonText: raw.buttonText || raw.button_text || 'Zum Zeitplan',
-        buttonEmoji: raw.buttonEmoji || raw.button_emoji || '📅',
-        buttonLink: raw.buttonLink || raw.button_link || '/timetable',
-        isActive: typeof raw.isActive === 'boolean' ? raw.isActive : (raw.is_active ?? false),
-      };
-
-      // Also expose snake_case for legacy reads (e.g., MemberDashboard uses target_date)
-      return {
-        ...mapped,
-        target_date: mapped.targetDate,
-        button_text: mapped.buttonText,
-        button_emoji: mapped.buttonEmoji,
-        button_link: mapped.buttonLink,
-        is_active: mapped.isActive,
+        target_date: raw.target_date || null,
+        button_text: raw.button_text || 'Zum Zeitplan',
+        button_emoji: raw.button_emoji || '📅',
+        button_link: raw.button_link || '/timetable',
+        is_active: raw.is_active ?? false,
       };
     },
-    staleTime: 1 * 60 * 1000, // 1 minute (countdown updates frequently)
-    gcTime: 5 * 60 * 1000, // 5 minutes
+    // Use getQueryConfig FIRST, then override specific values
     ...getQueryConfig('countdown', false),
+    staleTime: 10 * 60 * 1000,  // 10 minutes (override for consistent caching)
+    gcTime: 20 * 60 * 1000,     // 20 minutes
+    // refetchInterval from getQueryConfig will be 1 minute (CRITICAL)
   });
 }
 

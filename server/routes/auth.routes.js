@@ -4,21 +4,27 @@
  */
 
 import express from 'express';
-import bcrypt from 'bcrypt';
+import bcryptjs from 'bcryptjs';
 import { body, validationResult } from 'express-validator';
 import { executeQuery } from '../config/database.js';
-import { generateToken, setAuthCookie, clearAuthCookie, authenticate, adminMiddleware } from '../middleware/simpleAuth.js';
+import { generateToken, generateRefreshToken, verifyRefreshToken, revokeRefreshToken, setAuthCookie, clearAuthCookie, authenticate, adminMiddleware } from '../middleware/simpleAuth.js';
+import { rateLimitConfig } from '../config/security.js';
+import logger from '../config/logger.js';
 
 const router = express.Router();
 
 // Validation middleware
 const validateLogin = [
-  body('email').isEmail().normalizeEmail(),
+  body('identifier')
+    .trim()
+    .notEmpty().withMessage('Username or email is required')
+    .isLength({ min: 1, max: 255 }).withMessage('Invalid username or email length')
+    .escape(), // Sanitize input
   body('password').isLength({ min: 6 })
 ];
 
 // Login endpoint with cookie authentication
-router.post('/login', validateLogin, async (req, res) => {
+router.post('/login', rateLimitConfig.login, validateLogin, async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -28,12 +34,12 @@ router.post('/login', validateLogin, async (req, res) => {
       });
     }
 
-    const { email, password, rememberMe = false } = req.body;
+    const { identifier, password, rememberMe = false } = req.body;
 
-    // Find user by email (case-insensitive)
+    // Find user by username or email (case-insensitive)
     const userResult = await executeQuery(
-      'SELECT id, username, email, password_hash, role, is_active FROM users WHERE LOWER(email) = LOWER($1)',
-      [email]
+      'SELECT id, username, email, password_hash, role, is_active, first_name, last_name FROM users WHERE LOWER(email) = LOWER($1) OR LOWER(username) = LOWER($1)',
+      [identifier]
     );
 
     if (userResult.rows.length === 0) {
@@ -53,7 +59,7 @@ router.post('/login', validateLogin, async (req, res) => {
     }
 
     // Verify password
-    const isValidPassword = await bcrypt.compare(password, user.password_hash);
+    const isValidPassword = await bcryptjs.compare(password, user.password_hash);
     if (!isValidPassword) {
       return res.status(401).json({ 
         error: 'Invalid credentials',
@@ -69,10 +75,20 @@ router.post('/login', validateLogin, async (req, res) => {
       role: user.role
     };
 
-    const accessToken = generateToken(tokenPayload);
+    const accessToken = generateToken(tokenPayload, rememberMe);
+    const refreshToken = generateRefreshToken(user.id);
 
-    // Set secure HTTP-only cookie
-    setAuthCookie(res, accessToken);
+    // Set secure HTTP-only cookies
+    setAuthCookie(res, accessToken, rememberMe);
+    
+    // Set refresh token cookie (longer expiration)
+    res.cookie('refreshToken', refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      path: '/'
+    });
 
     res.json({
       success: true,
@@ -89,9 +105,82 @@ router.post('/login', validateLogin, async (req, res) => {
 
   } catch (error) {
     logger.error('Login error:', error);
+    logger.error('Login error details:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
     res.status(500).json({ 
       error: 'Internal server error',
-      code: 'LOGIN_ERROR' 
+      code: 'LOGIN_ERROR',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Token refresh endpoint
+router.post('/refresh', async (req, res) => {
+  try {
+    const refreshToken = req.cookies?.refreshToken;
+    
+    if (!refreshToken) {
+      return res.status(401).json({
+        success: false,
+        error: 'Refresh token required',
+        code: 'REFRESH_TOKEN_REQUIRED'
+      });
+    }
+    
+    const refreshResult = verifyRefreshToken(refreshToken);
+    
+    if (!refreshResult.valid) {
+      return res.status(401).json({
+        success: false,
+        error: refreshResult.error,
+        code: 'INVALID_REFRESH_TOKEN'
+      });
+    }
+    
+    // Get user data
+    const userResult = await executeQuery(
+      'SELECT id, username, email, role, is_active FROM users WHERE id = $1',
+      [refreshResult.userId]
+    );
+    
+    if (userResult.rows.length === 0 || !userResult.rows[0].is_active) {
+      return res.status(401).json({
+        success: false,
+        error: 'User not found or inactive',
+        code: 'USER_INACTIVE'
+      });
+    }
+    
+    const user = userResult.rows[0];
+    
+    // Generate new access token
+    const tokenPayload = {
+      userId: user.id,
+      username: user.username,
+      email: user.email,
+      role: user.role
+    };
+    
+    const newAccessToken = generateToken(tokenPayload, false); // Default expiration
+    
+    // Set new access token cookie
+    setAuthCookie(res, newAccessToken, false);
+    
+    res.json({
+      success: true,
+      message: 'Token refreshed successfully'
+    });
+    
+  } catch (error) {
+    logger.error('Token refresh error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      code: 'REFRESH_ERROR'
     });
   }
 });
@@ -99,8 +188,22 @@ router.post('/login', validateLogin, async (req, res) => {
 // Logout endpoint
 router.post('/logout', authenticate, async (req, res) => {
   try {
-    // Clear authentication cookie
-    clearAuthCookie(res);
+    const token = req.cookies?.authToken;
+    const refreshToken = req.cookies?.refreshToken;
+    
+    // Clear authentication cookies and blacklist tokens
+    clearAuthCookie(res, token);
+    
+    // Revoke refresh token
+    if (refreshToken) {
+      revokeRefreshToken(refreshToken);
+      res.clearCookie('refreshToken', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        path: '/'
+      });
+    }
 
     res.json({
       success: true,

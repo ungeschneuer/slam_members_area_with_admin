@@ -12,7 +12,8 @@ export const CREW_ROLES = {
   crew_wettbewerbsleitung: 'Wettbewerbsleitung',
   crew_buechertisch: 'Büchertisch',
   crew_social_media: 'Social Media',
-  crew_fotos: 'Fotos'
+  crew_fotos: 'Fotos',
+  crew_dj: 'DJ'
 };
 
 // Check if a role is a crew role (new format OR old format)
@@ -24,7 +25,7 @@ export const isCrewRole = (role) => {
 // Get label for any crew role
 export const getCrewRoleLabel = (role) => {
   if (!role || typeof role !== 'string') return 'Unknown Role';
-  if (role === 'crew') return 'Crew-Mitglied'; // Backward compatibility
+  if (role === 'crew') return 'SLAM25-Team-Mitglied'; // Backward compatibility
   return CREW_ROLES[role] || role.replace('crew_', '').replace(/_/g, ' ');
 };
 
@@ -49,7 +50,7 @@ export const getCrewRolesFromAssignment = (assignment) => {
   
   // Fallback for old crew without metadata
   if (assignment.roles.includes('crew')) {
-    return ['Crew-Mitglied'];
+    return ['SLAM25-Team-Mitglied'];
   }
   
   return [];
@@ -65,7 +66,7 @@ export const hasCrewRole = (assignment) => {
 
 // Role options for admin UI (memoized for performance)
 const ROLE_OPTIONS = [
-  { value: 'participant', label: 'Teilnehmer*in' },
+  { value: 'participant', label: 'Wettbewerb-Teilnehmer*in' },
   { value: 'jury', label: 'Jury' },
   { value: 'moderator', label: 'Moderator*in' },
   { value: 'feature_artist', label: 'Feature-Künstler*in' },

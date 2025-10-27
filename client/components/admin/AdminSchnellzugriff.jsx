@@ -20,7 +20,7 @@ const AdminSchnellzugriff = () => {
 
   const schema = z.object({
     title: z.string().min(1, 'Titel ist erforderlich'),
-    description: z.string().optional(),
+    description: z.string().max(26, 'Beschreibung darf maximal 26 Zeichen lang sein').optional(),
     url: z.string().url('Gültige URL ist erforderlich'),
     icon: z.string()
       .min(1, 'Icon ist erforderlich')
@@ -28,12 +28,12 @@ const AdminSchnellzugriff = () => {
       .regex(/^[\p{Emoji}\u200d\ufe0f]+$/u, 'Bitte gib ein gültiges Emoji ein')
       .optional(),
     color: z.string().optional(),
-    sortOrder: z.number().optional(),
-    isActive: z.boolean().optional(),
-    isExternal: z.boolean().optional()
+    sort_order: z.number().optional(),
+    is_active: z.boolean().optional(),
+    is_external: z.boolean().optional()
   });
 
-  const { register, handleSubmit, reset, watch, formState: { errors, isSubmitting } } = useForm({
+  const { register, handleSubmit, reset, watch, control, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(schema),
     defaultValues: {
       title: '',
@@ -41,9 +41,9 @@ const AdminSchnellzugriff = () => {
       url: '',
       icon: '🔗',
       color: 'blue',
-      sortOrder: 0,
-      isActive: true,
-      isExternal: true
+      sort_order: 0,
+      is_active: true,
+      is_external: true
     }
   });
 
@@ -84,9 +84,9 @@ const AdminSchnellzugriff = () => {
       url: link.url,
       icon: link.icon,
       color: link.color,
-      sortOrder: link.sort_order || 0,
-      isActive: link.is_active,
-      isExternal: link.is_external
+      sort_order: link.sort_order || 0,
+      is_active: link.is_active,
+      is_external: link.is_external
     });
     setShowForm(true);
   };
@@ -112,7 +112,7 @@ const AdminSchnellzugriff = () => {
       await updateSchnellzugriff.mutateAsync({
         id: link.id,
         ...link,
-        isActive: !link.is_active
+        is_active: !link.is_active
       });
       // No manual refresh needed - TanStack Query handles this automatically
     } catch (err) {
@@ -155,7 +155,11 @@ const AdminSchnellzugriff = () => {
 
         <div className="mb-6">
           <button
-            onClick={() => setShowForm(true)}
+            onClick={() => {
+              setEditingLink(null);
+              reset();
+              setShowForm(true);
+            }}
             className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
             <span className="mr-2">➕</span>
@@ -192,6 +196,7 @@ const AdminSchnellzugriff = () => {
                     register={register}
                     errors={errors}
                     rows={2}
+                    maxLength={26}
                   />
                 </div>
 
@@ -253,7 +258,7 @@ const AdminSchnellzugriff = () => {
                   </label>
                   <input
                     type="number"
-                    {...register('sortOrder', { valueAsNumber: true })}
+                    {...register('sort_order', { valueAsNumber: true })}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
                   />
                 </div>
@@ -261,14 +266,16 @@ const AdminSchnellzugriff = () => {
                 <div className="flex space-x-4">
                   <CheckboxInput
                     label="Aktiv"
-                    name="isActive"
+                    name="is_active"
+                    control={control}
                     register={register}
                     errors={errors}
                   />
 
                   <CheckboxInput
                     label="Externer Link"
-                    name="isExternal"
+                    name="is_external"
+                    control={control}
                     register={register}
                     errors={errors}
                   />

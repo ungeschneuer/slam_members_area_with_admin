@@ -1,4 +1,5 @@
 import React from 'react';
+import { useLocation } from 'react-router-dom';
 
 // Main page transition wrapper - React 19 compatible
 export default function PageTransition({ children, className = '' }) {
@@ -142,10 +143,13 @@ export function AnimateOnScroll({ children, threshold = 0.1, className = '' }) {
 // Route Transition Component for React Router - React 19 compatible
 export function RouteTransition({ children }) {
   const [isVisible, setIsVisible] = React.useState(false);
+  const location = useLocation();
 
   React.useEffect(() => {
     setIsVisible(true);
-  }, []);
+    // Scroll to top when route changes
+    window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+  }, [location.pathname, location.search, location.hash]);
 
   return (
     <div 

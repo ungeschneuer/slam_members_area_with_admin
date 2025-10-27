@@ -91,8 +91,8 @@ export function useParticipant(id) {
       return result?.data || result || null;
     },
     enabled: !!id,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
+    staleTime: 10 * 60 * 1000,  // 10 minutes (was 5)
+    gcTime: 20 * 60 * 1000,     // 20 minutes (was 10)
   });
 }
 

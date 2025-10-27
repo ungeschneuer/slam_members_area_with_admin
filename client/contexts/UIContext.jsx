@@ -7,7 +7,7 @@ export function UIProvider({ children }) {
   const [configLoaded, setConfigLoaded] = useState(false);
   
   // Static areas configuration
-  const areas = ['Teilnehmer*innen', 'Runden', 'Zeitplan', 'Neuigkeiten', 'Stadt-Tipps', 'Links', 'Info'];
+  const areas = ['Teilnehmer*innen', 'Runden', 'Zeitplan', 'Neuigkeiten', 'Stadt-Tipps', 'Info', 'Fun'];
 
   // Auto-set config as loaded after component mounts
   useEffect(() => {

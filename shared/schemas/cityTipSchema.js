@@ -9,8 +9,7 @@ export const cityTipSchema = z.object({
   latitude: z.coerce.number().min(-90, 'Ungültige Breitengrad').max(90, 'Ungültige Breitengrad').optional().nullable(),
   longitude: z.coerce.number().min(-180, 'Ungültige Längengrad').max(180, 'Ungültige Längengrad').optional().nullable(),
   price_range: z.string().max(50, 'Preisbereich zu lang').optional(),
-  opening_hours: z.record(z.any()).optional().default({}),
-  contact_info: z.record(z.any()).optional().default({}),
+  opening_hours: z.string().max(1000, 'Öffnungszeiten zu lang').optional(),
   website: z.string().url('Ungültige Website-URL').optional(),
   images: z.array(z.object({
     url: z.string().url('Ungültige Bild-URL'),
@@ -18,7 +17,6 @@ export const cityTipSchema = z.object({
   })).optional().default([]),
   slug: z.string().min(3, 'Slug zu kurz').max(255, 'Slug zu lang').regex(/^[a-z0-9-]+$/, 'Slug darf nur Kleinbuchstaben, Zahlen und Bindestriche enthalten'),
   tips: z.string().max(2000, 'Tipps zu lang').optional(),
-  is_featured: z.boolean().optional().default(false),
   status: z.enum(['ACTIVE', 'INACTIVE', 'ARCHIVED'], {
     errorMap: () => ({ message: 'Status muss einer von sein: AKTIV, INAKTIV, ARCHIVIERT' })
   }).optional().default('ACTIVE')
@@ -50,8 +48,7 @@ export const cityTipFieldSchemas = {
   latitude: z.coerce.number().min(-90).max(90).optional().nullable(),
   longitude: z.coerce.number().min(-180).max(180).optional().nullable(),
   price_range: z.string().max(50).optional(),
-  opening_hours: z.record(z.any()).optional(),
-  contact_info: z.record(z.any()).optional(),
+  opening_hours: z.string().max(1000).optional(),
   website: z.string().url().optional(),
   images: z.array(z.object({
     url: z.string().url(),
@@ -59,6 +56,5 @@ export const cityTipFieldSchemas = {
   })).optional(),
   slug: z.string().min(3).max(255).regex(/^[a-z0-9-]+$/),
   tips: z.string().max(2000).optional(),
-  is_featured: z.boolean().optional(),
   status: z.enum(['ACTIVE', 'INACTIVE', 'ARCHIVED'])
 };

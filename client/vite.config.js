@@ -20,7 +20,7 @@ export default defineConfig({
     middlewareMode: false,
     hmr: {
       overlay: false, // Disable error overlay for source map issues
-      port: 5173, // Align HMR WebSocket with dev server port
+      port: 5173, // Development server port
       host: 'localhost'
     },
     // Proxy API requests to backend server
@@ -38,29 +38,32 @@ export default defineConfig({
   },
   build: {
     target: 'esnext',
-    // Enable sourcemaps for development, disable for production
-    sourcemap: process.env.NODE_ENV === 'development',
-    outDir: '../dist',
+    // Disabled for security and performance
+    sourcemap: false,
+    outDir: 'dist',
     rollupOptions: {
       output: {
+        // Enable cache busting with hashed filenames
+        entryFileNames: 'assets/[name]-[hash].js',
+        chunkFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash].[ext]',
         manualChunks: {
           vendor: ['react', 'react-dom'],
           router: ['react-router-dom'],
           query: ['@tanstack/react-query'],
-          // Socket.io removed - using simple polling instead
           leaflet: ['leaflet']
         }
       }
     },
     // Production optimizations
     minify: process.env.NODE_ENV === 'production' ? 'terser' : false,
-    cssCodeSplit: true,
+    cssCodeSplit: false, // Keep single CSS file for simpler cache busting
     assetsInlineLimit: 4096,
     chunkSizeWarningLimit: 1500
   },
   css: {
-    // Enable sourcemaps for development
-    devSourcemap: process.env.NODE_ENV === 'development'
+    // Disabled for security and performance
+    devSourcemap: false
   },
   // Optimize dependencies to prevent source map issues
   optimizeDeps: {
@@ -68,7 +71,7 @@ export default defineConfig({
   },
   // Handle source map errors gracefully
   esbuild: {
-    sourcemap: process.env.NODE_ENV === 'development'
+    sourcemap: false
   }
 })
 

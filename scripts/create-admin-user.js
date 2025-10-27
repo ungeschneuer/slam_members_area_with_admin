@@ -5,16 +5,16 @@
  * Creates a default admin user for development and testing
  */
 
-import bcrypt from 'bcrypt';
+import bcryptjs from 'bcryptjs';
 import { executeQuery } from '../server/config/database.js';
 import logger from '../server/config/logger.js';
 
 const DEFAULT_ADMIN = {
-  username: 'admin',
-  email: 'admin@slam25.de',
-  password: 'admin123',
-  firstName: 'Admin',
-  lastName: 'User',
+  username: 'marcel',
+  email: 'marcel@spektakel-kollektiv.de',
+  password: 'slam25admin2024',
+  firstName: 'Marcel',
+  lastName: 'Admin',
   role: 'admin'
 };
 
@@ -35,7 +35,7 @@ async function createAdminUser() {
     
     // Hash password
     const saltRounds = 10;
-    const passwordHash = await bcrypt.hash(DEFAULT_ADMIN.password, saltRounds);
+    const passwordHash = await bcryptjs.hash(DEFAULT_ADMIN.password, saltRounds);
     
     // Create admin user
     const result = await executeQuery(`

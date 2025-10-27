@@ -161,7 +161,7 @@ export class ErrorService {
    * @param {Object} context - Additional context
    */
   static logError(error, context = {}) {
-    if (process.env.NODE_ENV === 'development') {
+    if (import.meta.env.DEV) {
       console.group('🚨 ErrorService Log');
       console.error('Error:', error);
       console.log('Context:', context);

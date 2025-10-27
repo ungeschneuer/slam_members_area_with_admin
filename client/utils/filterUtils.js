@@ -16,7 +16,8 @@ export function getAvailableFilterOptions(data, predefinedOptions, field) {
   }
 
   if (data.length === 0) {
-    return predefinedOptions.filter(option => option.id === 'all' || option.value === 'all');
+    // Return all predefined options if no data exists
+    return predefinedOptions;
   }
 
   // Get unique values from data
@@ -48,7 +49,8 @@ export function getAvailablePublishedFilterOptions(data, predefinedOptions, fiel
   }
 
   if (data.length === 0) {
-    return predefinedOptions.filter(option => option.id === 'all' || option.value === 'all');
+    // Return all predefined options if no data exists
+    return predefinedOptions;
   }
 
   // Get unique values from published data only
@@ -92,7 +94,8 @@ export function getAvailableComplexFilterOptions(data, predefinedOptions, extrac
   }
 
   if (data.length === 0) {
-    return predefinedOptions.filter(option => option.id === 'all' || option.value === 'all');
+    // Return all predefined options if no data exists
+    return predefinedOptions;
   }
 
   // Get unique values using custom extraction function
@@ -226,22 +229,14 @@ export function extractParticipantRoles(participant) {
  * @returns {string} German translation of the role
  */
 export function translateRole(role) {
+  // Simple role translation - database is migrated to use consistent role names
   const roleTranslations = {
-    'participant': 'Teilnehmer*in',
-    'Participant': 'Teilnehmer*in',
+    'participant': 'Wettbewerb-Teilnehmer*in',
     'supporter': 'Supporter*in',
-    'Supporter': 'Supporter*in',
-    'Supporter*in': 'Supporter*in',
     'jury': 'Jury',
-    'Jury': 'Jury',
     'moderator': 'Moderator*in',
-    'Moderator': 'Moderator*in',
-    'crew': 'Crew',
-    'Crew': 'Crew',
     'feature_artist': 'Feature Artist',
-    'Feature Artist': 'Feature Artist',
-    'team': 'Team',
-    'Team': 'Team'
+    'team': 'Team'
   };
   
   return roleTranslations[role] || role;
@@ -275,7 +270,7 @@ export function getRoleBasedColors(item) {
   if (item.type === 'team') {
     return {
       bg: 'bg-blue-50 dark:bg-blue-900/20',
-      border: 'border-blue-200 dark:border-blue-800',
+      border: 'border-[#185757]/30 dark:border-[#185757]/50',
       text: 'text-blue-900 dark:text-blue-100'
     };
   }
@@ -296,20 +291,24 @@ export function getRoleBasedColors(item) {
 
   // Define color schemes for different roles
   const roleColors = {
-    'Teilnehmer*in': {
+    'Wettbewerb-Teilnehmer*in': {
       bg: 'bg-green-50 dark:bg-green-900/20',
       border: 'border-green-200 dark:border-green-800',
       text: 'text-green-900 dark:text-green-100'
     },
     'Supporter*in': {
-      bg: 'bg-purple-50 dark:bg-purple-900/20',
-      border: 'border-purple-200 dark:border-purple-800',
-      text: 'text-purple-900 dark:text-purple-100'
-    },
-    'Crew': {
       bg: 'bg-orange-50 dark:bg-orange-900/20',
       border: 'border-orange-200 dark:border-orange-800',
       text: 'text-orange-900 dark:text-orange-100'
+    },
+    'SLAM25-Team': {
+      bg: 'bg-amber-50 dark:bg-amber-900/30',
+      border: 'border-amber-400/60 dark:border-amber-500/60',
+      text: 'text-amber-900 dark:text-amber-100',
+      shadow: 'shadow-xl shadow-amber-300/40 dark:shadow-amber-800/30',
+      glow: 'ring-2 ring-amber-400/60 dark:ring-amber-500/60',
+      animation: 'animate-pulse-slow',
+      premium: 'slam25-team-premium-bg'
     },
     'SLAM-MC': {
       bg: 'bg-red-50 dark:bg-red-900/20',
@@ -318,12 +317,12 @@ export function getRoleBasedColors(item) {
     },
     'Organisator*in': {
       bg: 'bg-indigo-50 dark:bg-indigo-900/20',
-      border: 'border-indigo-200 dark:border-indigo-800',
+      border: 'border-[#185757]/30 dark:border-[#185757]/50',
       text: 'text-indigo-900 dark:text-indigo-100'
     },
     'Moderator*in': {
       bg: 'bg-pink-50 dark:bg-pink-900/20',
-      border: 'border-pink-200 dark:border-pink-800',
+      border: 'border-[#185757]/30 dark:border-[#185757]/50',
       text: 'text-pink-900 dark:text-pink-100'
     },
     'Techniker*in': {
@@ -338,7 +337,7 @@ export function getRoleBasedColors(item) {
     },
     'Videograf*in': {
       bg: 'bg-cyan-50 dark:bg-cyan-900/20',
-      border: 'border-cyan-200 dark:border-cyan-800',
+      border: 'border-[#185757]/30 dark:border-[#185757]/50',
       text: 'text-cyan-900 dark:text-cyan-100'
     },
     'Feature Artist': {

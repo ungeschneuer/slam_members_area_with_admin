@@ -11,7 +11,7 @@ export default function LoadingSpinner({ size = "md", text = "Lädt..." }) {
   return (
     <div className="flex flex-col items-center justify-center py-12" role="status" aria-label="Loading">
       <svg 
-        className={`animate-spin ${sizeClasses[size]} text-blue-600 dark:text-blue-400 mb-4`} 
+        className={`animate-spin ${sizeClasses[size]} text-[#185757] dark:text-[#A2D2B9] mb-4`} 
         xmlns="http://www.w3.org/2000/svg" 
         fill="none" 
         viewBox="0 0 24 24"

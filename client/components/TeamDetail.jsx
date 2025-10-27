@@ -20,6 +20,7 @@ import {
   getContentTypeGradient
 } from '../utils/detailViewUtils.js';
 import { isCrewRole, getCrewRoleLabel } from '../utils/crewRoleUtils.js';
+import { handleLinkClick } from '../utils/linkUtils.js';
 import LoadingSpinner from './LoadingSpinner.jsx';
 import ErrorFallback from './ErrorFallback.jsx';
 
@@ -58,7 +59,7 @@ const TeamDetail = () => {
         teamAssignment.roles.forEach(role => {
           switch (role) {
             case 'participant':
-              translatedRoles.push('Turnier-Teilnehmer*in');
+              translatedRoles.push('Wettbewerb-Teilnehmer*in');
               break;
             case 'feature_artist':
               const order = teamAssignment.metadata?.display_order || 0;
@@ -77,7 +78,7 @@ const TeamDetail = () => {
                 const crewLabel = role === 'crew' && teamAssignment.metadata?.role 
                   ? teamAssignment.metadata.role 
                   : getCrewRoleLabel(role);
-                translatedRoles.push(`Crew: ${crewLabel}`);
+                translatedRoles.push(`SLAM25-Team: ${crewLabel}`);
               } else {
                 translatedRoles.push(role);
               }
@@ -110,23 +111,23 @@ const TeamDetail = () => {
             Zurück zu Teilnehmer*innen
           </BackButton>
           
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-8">
+          <div className="detail-section p-8">
             <div className="flex items-start">
               <div className="flex-1">
               <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
                 {team.name}
               </h1>
               <div className="flex flex-wrap items-center gap-2 mb-3">
-                <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
+                <span className="badge-primary">
                   👥 Team
                 </span>
                 {team.region && (
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
+                  <span className="badge-region">
                     {getRegionFlag(team.region)} {team.region}
                   </span>
                 )}
                 {team.members && (
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
+                  <span className="badge-region">
                     {team.members.length} Mitglieder
                   </span>
                 )}
@@ -134,8 +135,14 @@ const TeamDetail = () => {
               {team.instagram && (
                 <a
                   href={`https://instagram.com/${team.instagram}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  onClick={(e) => {
+                    const instagramLink = {
+                      url: `https://instagram.com/${team.instagram}`,
+                      title: `Instagram Profil von ${team.name}`,
+                      is_external: true
+                    };
+                    handleLinkClick(instagramLink, e);
+                  }}
                   className="inline-flex items-center text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors duration-200"
                 >
                   <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 24 24">
@@ -156,12 +163,12 @@ const TeamDetail = () => {
 
         {/* Team Members */}
         {team.members && team.members.length > 0 && (
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
-            <div className="px-8 py-6 border-b border-gray-200 dark:border-gray-700">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+          <div className="detail-section mb-6">
+            <div className="detail-section-header">
+              <h2 className="detail-section-title">
                 👥 Team-Mitglieder
               </h2>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              <p className="detail-section-subtitle">
                 Mitglieder von {team.name}
               </p>
             </div>
@@ -225,7 +232,7 @@ const TeamDetail = () => {
                   teamAssignment.roles.forEach(role => {
                     switch (role) {
                       case 'participant':
-                        translatedRoles.push('Turnier-Teilnehmer*in');
+                        translatedRoles.push('Wettbewerb-Teilnehmer*in');
                         break;
                       case 'feature_artist':
                         const order = teamAssignment.metadata?.display_order || 0;
@@ -244,7 +251,7 @@ const TeamDetail = () => {
                           const crewLabel = role === 'crew' && teamAssignment.metadata?.role 
                             ? teamAssignment.metadata.role 
                             : getCrewRoleLabel(role);
-                          translatedRoles.push(`Crew: ${crewLabel}`);
+                          translatedRoles.push(`SLAM25-Team: ${crewLabel}`);
                         } else {
                           translatedRoles.push(role);
                         }
@@ -439,12 +446,18 @@ const TeamDetail = () => {
                     </div>
                     
                     <div className="ml-4">
-                      <Link
-                        to={`/timetable/event/${event.id}`}
-                        className="inline-flex items-center px-3 py-1 text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
-                      >
-                        Details →
-                      </Link>
+                      {event.slug ? (
+                        <Link
+                          to={`/timetable/event/${event.slug}`}
+                          className="inline-flex items-center px-3 py-1 text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+                        >
+                          Details →
+                        </Link>
+                      ) : (
+                        <span className="inline-flex items-center px-3 py-1 text-sm text-gray-400 cursor-not-allowed">
+                          No Details Available
+                        </span>
+                      )}
                     </div>
                   </div>
 

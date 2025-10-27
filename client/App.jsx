@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
+import tokenRefreshService from './services/tokenRefreshService.js';
 import Admin from './Admin';
 import Themes from './components/Themes';
 import MemberDashboard from './components/MemberDashboard';
@@ -18,9 +19,11 @@ import EventDetail from './components/EventDetail';
 import CityTips from './components/CityTips';
 import CityTipDetail from './components/CityTipDetail';
 import Info from './components/Info';
-import Links from './components/Links';
-import PWAInstallPrompt from './components/PWAInstallPrompt.jsx';
+import Fun from './components/Fun';
+import MeetSomeoneNew from './components/MeetSomeoneNew';
 import ErrorBoundary, { withErrorBoundary } from './components/ErrorBoundary.jsx';
+import UserPasswordGate from './components/UserPasswordGate.jsx';
+import Footer from './components/Footer.jsx';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext.jsx';
 import { AuthProvider, useAuth } from './contexts/AuthContext.jsx';
 import { UIProvider, useUI } from './contexts/UIContext.jsx';
@@ -29,7 +32,7 @@ import authService from './services/authService.js';
 
 const Navigation = React.memo(function Navigation() {
   const location = useLocation();
-  const isTestEnv = typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'test';
+  const isTestEnv = import.meta.env.MODE === 'test';
   const { theme, toggleTheme } = useTheme();
   const { areas, mobileMenuOpen, setMobileMenuOpen, configLoaded, setConfigLoaded } = useUI();
   const { isAdmin, setIsAdmin } = useAuth();
@@ -85,9 +88,9 @@ const Navigation = React.memo(function Navigation() {
 
   if (!configLoaded) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+      <div className="min-h-screen bg-[#E7EFE4] dark:bg-gray-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#185757] mx-auto mb-4"></div>
           <p className="text-gray-600 dark:text-gray-400">Lade Konfiguration...</p>
         </div>
       </div>
@@ -103,7 +106,8 @@ const Navigation = React.memo(function Navigation() {
     'Zeitplan': '/timetable',
     'Stadt-Tipps': '/city-tips',
     'Links': '/links',
-    'Info': '/info'
+    'Info': '/info',
+    'Fun': '/fun'
   };
 
   // Handle keyboard navigation
@@ -125,7 +129,7 @@ const Navigation = React.memo(function Navigation() {
           <div className="flex items-center">
             <Link 
               to="/" 
-              className="flex items-center space-x-3 hover:opacity-80 transition-opacity focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded-lg"
+              className="flex items-center space-x-3 hover:opacity-80 transition-opacity focus:outline-none focus:ring-2 focus:ring-[#A2D2B9] focus:ring-offset-2 rounded-lg"
               aria-label="SLAM25 - Zur Startseite"
             >
               <div className="w-10 h-10 flex items-center justify-center" aria-hidden="true">
@@ -151,9 +155,9 @@ const Navigation = React.memo(function Navigation() {
               <Link
                 key={area}
                 to={areaPaths[area]}
-                className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#A2D2B9] focus:ring-offset-2 ${
                   isActive(areaPaths[area])
-                    ? 'bg-blue-600 text-white shadow-md'
+                    ? 'bg-[#185757] text-white shadow-md'
                     : 'text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'
                 }`}
                 role="menuitem"
@@ -163,13 +167,13 @@ const Navigation = React.memo(function Navigation() {
               </Link>
             ))}
             {isAdmin && (
-              <Link to="/admin" aria-label="Admin angemeldet - zum Admin-Dashboard wechseln" data-testid="admin-indicator" className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2">
+              <Link to="/admin" aria-label="Admin angemeldet - zum Admin-Dashboard wechseln" data-testid="admin-indicator" className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-[#185757] text-white dark:bg-[#A2D2B9] dark:text-gray-900 hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[#A2D2B9] focus:ring-offset-2">
                 Admin
               </Link>
             )}
             <button
               onClick={toggleTheme}
-              className="p-2 rounded-lg text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              className="p-2 rounded-lg text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#A2D2B9] focus:ring-offset-2"
               title={`Wechsel zu ${theme === 'light' ? 'dunklem' : 'hellem'} Modus`}
               aria-label={`Wechsel zu ${theme === 'light' ? 'dunklem' : 'hellem'} Modus`}
             >
@@ -180,13 +184,13 @@ const Navigation = React.memo(function Navigation() {
           {/* Right side actions (mobile and tablet) */}
           <div className="lg:hidden flex items-center space-x-2">
             {isAdmin && (
-              <Link to="/admin" aria-label="Admin angemeldet - zum Admin-Dashboard wechseln" data-testid="admin-indicator" className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2">
+              <Link to="/admin" aria-label="Admin angemeldet - zum Admin-Dashboard wechseln" data-testid="admin-indicator" className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-[#185757] text-white dark:bg-[#A2D2B9] dark:text-gray-900 hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[#A2D2B9] focus:ring-offset-2">
                 Admin
               </Link>
             )}
             <button
               onClick={toggleTheme}
-              className="p-2 rounded-lg text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              className="p-2 rounded-lg text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#A2D2B9] focus:ring-offset-2"
               title={`Wechsel zu ${theme === 'light' ? 'dunklem' : 'hellem'} Modus`}
               aria-label={`Wechsel zu ${theme === 'light' ? 'dunklem' : 'hellem'} Modus`}
             >
@@ -195,7 +199,7 @@ const Navigation = React.memo(function Navigation() {
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               onKeyDown={handleKeyDown}
-              className="p-2 rounded-lg text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200 touch-target touch-feedback focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              className="p-2 rounded-lg text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200 touch-target touch-feedback focus:outline-none focus:ring-2 focus:ring-[#A2D2B9] focus:ring-offset-2"
               aria-label="Menü öffnen"
               aria-expanded={mobileMenuOpen}
               aria-controls="mobile-menu"
@@ -227,7 +231,7 @@ const Navigation = React.memo(function Navigation() {
                   onClick={() => setMobileMenuOpen(false)}
                   className={`mobile-nav-item ${
                     isActive(areaPaths[area])
-                      ? 'bg-blue-600 text-white shadow-md'
+                      ? 'bg-[#185757] text-white shadow-md'
                       : 'text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'
                   }`}
                   role="menuitem"
@@ -236,7 +240,7 @@ const Navigation = React.memo(function Navigation() {
                   <div className="flex items-center justify-between">
                     <span className="mobile-text-base">{area}</span>
                     {isActive(areaPaths[area]) && (
-                      <span className="text-blue-200" aria-hidden="true">✓</span>
+                      <span className="text-[#A2D2B9]" aria-hidden="true">✓</span>
                     )}
                   </div>
                 </Link>
@@ -250,17 +254,24 @@ const Navigation = React.memo(function Navigation() {
 });
 
 function App() {
+  // Initialize token refresh service
+  useEffect(() => {
+    // Token refresh service is automatically initialized when imported
+    console.log('Token refresh service initialized');
+  }, []);
+
   return (
     <ThemeProvider>
       <AuthProvider>
         <UIProvider>
           <Router>
-            <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-              <Navigation />
-              <BreakingNews />
-              <main id="main-content" role="main" tabIndex="-1">
-                <ErrorBoundary name="MainRoutes" showDetails>
-                <Routes>
+            <div className="min-h-screen bg-[#E7EFE4] dark:bg-gray-900">
+              <UserPasswordGate>
+                <Navigation />
+                <BreakingNews />
+                <main id="main-content" role="main" tabIndex="-1">
+                  <ErrorBoundary name="MainRoutes" showDetails>
+                  <Routes>
             <Route path="/" element={
               <ErrorBoundary name="MemberDashboard">
                 <RouteTransition>
@@ -351,13 +362,6 @@ function App() {
                 </FadeIn>
               </RouteTransition>
             } />
-            <Route path="/links" element={
-              <RouteTransition>
-                <FadeIn>
-                  <Links />
-                </FadeIn>
-              </RouteTransition>
-            } />
             <Route path="/info" element={
               <RouteTransition>
                 <FadeIn>
@@ -372,6 +376,24 @@ function App() {
                 </FadeIn>
               </RouteTransition>
             } />
+        <Route path="/fun" element={
+          <ErrorBoundary name="Fun">
+            <RouteTransition>
+              <FadeIn>
+                <Fun />
+              </FadeIn>
+            </RouteTransition>
+          </ErrorBoundary>
+        } />
+        {/* <Route path="/fun/meet" element={
+          <ErrorBoundary name="MeetSomeoneNew">
+            <RouteTransition>
+              <FadeIn>
+                <MeetSomeoneNew />
+              </FadeIn>
+            </RouteTransition>
+          </ErrorBoundary>
+        } /> */}
             <Route path="/admin/*" element={
               <RouteTransition>
                 <FadeIn>
@@ -380,9 +402,10 @@ function App() {
               </RouteTransition>
             } />
           </Routes>
-                </ErrorBoundary>
-              </main>
-              <PWAInstallPrompt />
+                  </ErrorBoundary>
+                </main>
+              </UserPasswordGate>
+              <Footer />
             </div>
           </Router>
         </UIProvider>

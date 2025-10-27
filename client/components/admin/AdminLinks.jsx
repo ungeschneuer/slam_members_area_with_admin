@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { FadeIn } from '../Transitions.jsx';
 import { useLinks, useCreateLink, useUpdateLink, useDeleteLink } from '../../hooks/index.js';
 import { useForm } from 'react-hook-form';
@@ -17,8 +17,13 @@ const AdminLinks = () => {
   const [localError, setLocalError] = useState('');
   
   const links = useMemo(() => Array.isArray(linksData) ? linksData : [], [linksData]);
+  const sortedLinks = useMemo(() => {
+    return [...links].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+  }, [links]);
+
   const [editingLink, setEditingLink] = useState(null);
   const [showForm, setShowForm] = useState(false);
+  const [isReordering, setIsReordering] = useState(false);
   const linkSchema = z.object({
     title: z.string().min(1, 'Titel ist erforderlich'),
     url: z.string().url('Gültige URL ist erforderlich'),
@@ -30,12 +35,12 @@ const AdminLinks = () => {
       .regex(/^[\p{Emoji}\u200d\ufe0f]+$/u, 'Bitte gib ein gültiges Emoji ein')
       .optional(),
     color: z.string().optional(),
-    sortOrder: z.number().optional(),
-    isExternal: z.boolean().optional(),
-    isActive: z.boolean().optional()
+    sort_order: z.number().optional(),
+    is_external: z.boolean().optional(),
+    is_active: z.boolean().optional()
   });
 
-  const { register, handleSubmit, reset, setValue, watch, formState: { errors, isSubmitting } } = useForm({
+  const { register, handleSubmit, reset, setValue, watch, control, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(linkSchema),
     defaultValues: {
       title: '',
@@ -43,13 +48,14 @@ const AdminLinks = () => {
       url: '',
       icon: '🔗',
       category: 'Sonstiges',
-      isExternal: true,
+      is_external: true,
       color: 'blue',
-      sortOrder: 0,
-      isActive: true
+      sort_order: 0,
+      is_active: true
     }
   });
   const currentColor = watch('color');
+
 
   const colorOptions = [
     { value: 'blue', label: 'Blau', class: 'bg-blue-100 text-blue-800' },
@@ -88,10 +94,10 @@ const AdminLinks = () => {
       url: link.url,
       icon: link.icon,
       category: link.category,
-      isExternal: link.isExternal,
+      is_external: link.is_external,
       color: link.color,
-      sortOrder: link.sortOrder || 0,
-      isActive: link.isActive
+      sort_order: link.sort_order || 0,
+      is_active: link.is_active
     });
     setShowForm(true);
   };
@@ -113,13 +119,109 @@ const AdminLinks = () => {
       url: '',
       icon: '🔗',
       category: 'Sonstiges',
-      isExternal: true,
+      is_external: true,
       color: 'blue',
-      sortOrder: 0,
-      isActive: true
+      sort_order: 0,
+      is_active: true
     });
     setEditingLink(null);
     setShowForm(false);
+  };
+
+  const handleMoveUp = async (link, currentIndex) => {
+    if (currentIndex === 0 || isReordering) return;
+    
+    const prevLink = sortedLinks[currentIndex - 1];
+    
+    try {
+      setIsReordering(true);
+      setLocalError('');
+      
+      // Get current sort orders
+      const currentSortOrder = link.sort_order || 0;
+      const prevSortOrder = prevLink.sort_order || 0;
+      
+      // Swap sort orders
+      await Promise.all([
+        updateLink.mutateAsync({ 
+          id: link.id,
+          title: link.title,
+          description: link.description,
+          url: link.url,
+          icon: link.icon,
+          category: link.category,
+          is_external: link.is_external,
+          color: link.color,
+          sort_order: prevSortOrder,
+          is_active: link.is_active
+        }),
+        updateLink.mutateAsync({ 
+          id: prevLink.id,
+          title: prevLink.title,
+          description: prevLink.description,
+          url: prevLink.url,
+          icon: prevLink.icon,
+          category: prevLink.category,
+          is_external: prevLink.is_external,
+          color: prevLink.color,
+          sort_order: currentSortOrder,
+          is_active: prevLink.is_active
+        })
+      ]);
+    } catch (err) {
+      console.error('Reorder error:', err);
+      setLocalError(err.message || 'Fehler beim Verschieben.');
+    } finally {
+      setIsReordering(false);
+    }
+  };
+
+  const handleMoveDown = async (link, currentIndex) => {
+    if (currentIndex === sortedLinks.length - 1 || isReordering) return;
+    
+    const nextLink = sortedLinks[currentIndex + 1];
+    
+    try {
+      setIsReordering(true);
+      setLocalError('');
+      
+      // Get current sort orders
+      const currentSortOrder = link.sort_order || 0;
+      const nextSortOrder = nextLink.sort_order || 0;
+      
+      // Swap sort orders
+      await Promise.all([
+        updateLink.mutateAsync({ 
+          id: link.id,
+          title: link.title,
+          description: link.description,
+          url: link.url,
+          icon: link.icon,
+          category: link.category,
+          is_external: link.is_external,
+          color: link.color,
+          sort_order: nextSortOrder,
+          is_active: link.is_active
+        }),
+        updateLink.mutateAsync({ 
+          id: nextLink.id,
+          title: nextLink.title,
+          description: nextLink.description,
+          url: nextLink.url,
+          icon: nextLink.icon,
+          category: nextLink.category,
+          is_external: nextLink.is_external,
+          color: nextLink.color,
+          sort_order: currentSortOrder,
+          is_active: nextLink.is_active
+        })
+      ]);
+    } catch (err) {
+      console.error('Reorder error:', err);
+      setLocalError(err.message || 'Fehler beim Verschieben.');
+    } finally {
+      setIsReordering(false);
+    }
   };
 
   if (loading) {
@@ -157,8 +259,12 @@ const AdminLinks = () => {
 
         <div className="mb-6">
           <button
-            onClick={() => setShowForm(true)}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+            onClick={() => {
+              setEditingLink(null);
+              reset();
+              setShowForm(true);
+            }}
+            className="min-h-[44px] bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors touch-manipulation active:scale-95"
           >
             + Neuer Link
           </button>
@@ -171,7 +277,7 @@ const AdminLinks = () => {
             </h3>
             
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <TextInput label="Titel *" name="title" register={register} rules={{ required: 'Titel ist erforderlich' }} errors={errors} />
 
                 <TextInput label="URL *" name="url" type="url" register={register} rules={{ required: 'URL ist erforderlich' }} errors={errors} />
@@ -221,7 +327,7 @@ const AdminLinks = () => {
                         key={color.value}
                         type="button"
                         onClick={() => setValue('color', color.value)}
-                        className={`px-3 py-1 rounded-lg text-sm border-2 ${
+                        className={`min-h-[44px] px-3 py-2 rounded-lg text-sm border-2 touch-manipulation active:scale-95 ${
                           currentColor === color.value 
                             ? 'border-blue-500' 
                             : 'border-gray-300 dark:border-gray-600 hover:border-gray-400'
@@ -239,44 +345,46 @@ const AdminLinks = () => {
                   </label>
                   <input
                     type="number"
-                    {...register('sortOrder', { valueAsNumber: true })}
+                    {...register('sort_order', { valueAsNumber: true })}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
                     placeholder="0"
                   />
                   <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    Niedrigere Zahlen erscheinen zuerst. Links werden nach Kategorie, dann nach Sortierung, dann nach Titel sortiert.
+                    Niedrigere Zahlen erscheinen zuerst. Tipp: Nutze die Pfeile in der Liste für einfaches Umordnen.
                   </p>
                 </div>
 
                 <div className="flex items-center space-x-4">
                   <CheckboxInput
                     label="Externer Link"
-                    name="isExternal"
+                    name="is_external"
+                    control={control}
                     register={register}
                     errors={errors}
                   />
 
                   <CheckboxInput
                     label="Aktiv"
-                    name="isActive"
+                    name="is_active"
+                    control={control}
                     register={register}
                     errors={errors}
                   />
                 </div>
               </div>
 
-              <div className="flex justify-end space-x-3">
+              <div className="flex flex-col sm:flex-row gap-3">
                 <button
                   type="button"
                   onClick={resetForm}
-                  className="px-4 py-2 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
+                  className="w-full sm:w-auto min-h-[44px] px-4 py-2 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 touch-manipulation active:scale-95"
                 >
                   Abbrechen
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting || createLink.isPending || updateLink.isPending}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-70"
+                  className="w-full sm:w-auto min-h-[44px] px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-70 touch-manipulation active:scale-95"
                 >
                   {isSubmitting || createLink.isPending || updateLink.isPending ? 'Speichern...' : (editingLink ? 'Aktualisieren' : 'Erstellen')}
                 </button>
@@ -285,54 +393,71 @@ const AdminLinks = () => {
           </div>
         )}
 
-        <div className="space-y-4">
-          {links.map(link => (
-            <div key={link.id} className="p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+        <div className="space-y-3">
+          {sortedLinks.map((link, index) => (
+            <div key={link.id} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
               <div className="flex items-start justify-between">
-                <div className="flex items-start space-x-3">
-                  <div className="text-2xl">{link.icon}</div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                <div className="flex items-start space-x-3 flex-1">
+                  <span className="text-3xl">{link.icon}</span>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-gray-900 dark:text-white text-lg">
                       {link.title}
                     </h3>
-                    <p className="text-gray-600 dark:text-gray-400 text-sm">
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                       {link.description}
                     </p>
-                    <div className="flex items-center space-x-2 mt-2">
-                      <span className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-2 py-1 rounded">
+                    <div className="flex flex-wrap gap-2 mt-2 text-xs">
+                      <span className={`px-2 py-1 rounded ${
+                        link.color === 'blue' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300' :
+                        link.color === 'purple' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-300' :
+                        link.color === 'green' ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300' :
+                        link.color === 'red' ? 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300' :
+                        link.color === 'yellow' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300' :
+                        link.color === 'indigo' ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/20 dark:text-indigo-300' :
+                        'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+                      }`}>
                         {link.category}
                       </span>
-                      <span className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-2 py-1 rounded">
-                        {link.color}
+                      <span className="text-gray-500 dark:text-gray-400">
+                        Sortierung: {link.sort_order || 0}
                       </span>
-                      <span className="text-xs bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 px-2 py-1 rounded">
-                        Sortierung: {link.sortOrder || 0}
+                      <span className={link.is_active ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
+                        {link.is_active ? 'Aktiv' : 'Inaktiv'}
                       </span>
-                      {link.isExternal && (
-                        <span className="text-xs bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 px-2 py-1 rounded">
-                          Extern
-                        </span>
-                      )}
-                      {!link.isActive && (
-                        <span className="text-xs bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300 px-2 py-1 rounded">
-                          Inaktiv
-                        </span>
-                      )}
                     </div>
                   </div>
                 </div>
-                
-                <div className="flex space-x-2">
+                <div className="flex items-center space-x-2 ml-4">
+                  {/* Reorder buttons */}
+                  <div className="flex flex-col space-y-1">
+                    <button
+                      onClick={() => handleMoveUp(link, index)}
+                      disabled={index === 0 || isReordering}
+                      className="min-h-[44px] min-w-[44px] p-2 text-lg text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 disabled:opacity-30 disabled:cursor-not-allowed transition-colors touch-manipulation active:scale-95"
+                      title="Nach oben"
+                    >
+                      {isReordering ? '⏳' : '↑'}
+                    </button>
+                    <button
+                      onClick={() => handleMoveDown(link, index)}
+                      disabled={index === sortedLinks.length - 1 || isReordering}
+                      className="min-h-[44px] min-w-[44px] p-2 text-lg text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 disabled:opacity-30 disabled:cursor-not-allowed transition-colors touch-manipulation active:scale-95"
+                      title="Nach unten"
+                    >
+                      {isReordering ? '⏳' : '↓'}
+                    </button>
+                  </div>
+                  {/* Edit/Delete buttons */}
                   <button
                     onClick={() => handleEdit(link)}
-                    className="p-2 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
+                    className="min-h-[44px] min-w-[44px] p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors touch-manipulation active:scale-95"
                     title="Bearbeiten"
                   >
                     ✏️
                   </button>
                   <button
                     onClick={() => handleDelete(link.id)}
-                    className="p-2 text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400"
+                    className="min-h-[44px] min-w-[44px] p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors touch-manipulation active:scale-95"
                     title="Löschen"
                   >
                     🗑️

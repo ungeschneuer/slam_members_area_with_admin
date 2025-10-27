@@ -1,20 +1,20 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { useParticipants, useParticipantsSearch, useTeams, usePageTitle } from '../hooks/index.js';
-import pwaService from '../services/pwaService.js';
+import { useParticipants, useTeams, usePageTitle } from '../hooks/index.js';
 import LoadingSpinner from './LoadingSpinner';
 import { ErrorMessage, SuccessMessage } from './StatusMessages.jsx';
 import PaginationControls from './PaginationControls.jsx';
 import { formatInstagramUrl } from '../utils/instagramUtils.js';
 import { getRegionFlag } from '../utils/detailViewUtils.js';
 import { extractParticipantRoles, matchesParticipantRole, translateRole, getRoleBasedColors } from '../utils/filterUtils.js';
+import { isCrewRole, getCrewRoleLabel } from '../utils/crewRoleUtils.js';
 
 export default function Participants() {
-  usePageTitle('Teilnehmer*innen');
+  usePageTitle('Wettbewerb-Teilnehmer*innen');
   
   // State declarations
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortBy, setSortBy] = useState('name');
+  const [sortBy, setSortBy] = useState('random');
   const [filterBundesland, setFilterBundesland] = useState('all');
   const [filterRole, setFilterRole] = useState('all');
   
@@ -22,22 +22,14 @@ export default function Participants() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(24);
   
-  // Use server-side search when there's a search term, otherwise load all participants
-  const hasSearchTerm = searchTerm.trim().length >= 2;
+  // Session-stable random seed for consistent randomization
+  const [randomSeed] = useState(() => Math.random());
   
-  // Server-side search
-  const { 
-    data: searchResponse, 
-    isLoading: searchLoading, 
-    error: searchError 
-  } = useParticipantsSearch(searchTerm, { role: filterRole, region: filterBundesland }, {
-    page: currentPage,
-    limit: pageSize,
-    enabled: hasSearchTerm
-  });
-  
-  // Fallback: Load all participants when no search term
-  const { data: allParticipantsResponse, isLoading: participantsLoading, error: participantsError } = useParticipants({ limit: 10000, offset: 0 }, false, { enabled: !hasSearchTerm });
+  // Always load all participants for client-side filtering
+  // Note: Client-side filtering is optimal for current scale (243 participants)
+  // If participant count grows significantly (1000+), consider server-side search
+  // Search algorithm is optimized with early returns and memoized lowercase conversion
+  const { data: allParticipantsResponse, isLoading: participantsLoading, error: participantsError } = useParticipants({ limit: 10000, offset: 0 }, false);
   const { data: teams = [], isLoading: teamsLoading, error: teamsError } = useTeams();
   const [success, setSuccess] = useState(null);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -55,17 +47,20 @@ export default function Participants() {
     };
   }, []);
 
-  // Extract participants data based on search mode
+  // Extract participants data (always from same source)
+  // This ensures stable data source and prevents focus loss during search
   const allParticipants = useMemo(() => {
-    if (hasSearchTerm && searchResponse?.data) {
-      // Use search results
-      return Array.isArray(searchResponse.data) ? searchResponse.data : [];
-    } else if (allParticipantsResponse?.data) {
-      // Use fallback data
+    if (allParticipantsResponse?.data) {
       return Array.isArray(allParticipantsResponse.data) ? allParticipantsResponse.data : [];
     }
     return Array.isArray(allParticipantsResponse) ? allParticipantsResponse : [];
-  }, [hasSearchTerm, searchResponse, allParticipantsResponse]);
+  }, [allParticipantsResponse]);
+
+  // Seeded random number generator for stable randomization
+  const seededRandom = useCallback((seed, index) => {
+    const x = Math.sin(seed + index) * 10000;
+    return x - Math.floor(x);
+  }, []);
 
   // Combine participants and teams for unified view
   const allItems = [
@@ -74,18 +69,29 @@ export default function Participants() {
   ];
 
   // Extract matching logic to reusable functions
+  // Optimized for performance with larger datasets
   const matchesSearchFilter = (item, search) => {
     if (!search) return true;
     if (!item || typeof item !== 'object') return false;
     
+    // Memoize lowercase search term to avoid repeated calls
+    const searchLower = search.toLowerCase();
+    
+    // Check most common fields first (name is most likely to match)
     const fullName = item.name || '';
-    return fullName.toLowerCase().includes(search.toLowerCase()) ||
-           item.region?.toLowerCase().includes(search.toLowerCase()) ||
-           item.role?.toLowerCase().includes(search.toLowerCase()) ||
-           item.pronouns?.toLowerCase().includes(search.toLowerCase()) ||
-           (item.members && item.members.some(member => 
-             member.name.toLowerCase().includes(search.toLowerCase())
-           ));
+    if (fullName.toLowerCase().includes(searchLower)) return true;
+    
+    // Check other fields in order of likelihood
+    if (item.region?.toLowerCase().includes(searchLower)) return true;
+    if (item.role?.toLowerCase().includes(searchLower)) return true;
+    if (item.pronouns?.toLowerCase().includes(searchLower)) return true;
+    
+    // Only search team members if other fields don't match (most expensive operation)
+    if (item.members && item.members.some(member => 
+      member.name.toLowerCase().includes(searchLower)
+    )) return true;
+    
+    return false;
   };
 
 
@@ -139,18 +145,36 @@ export default function Participants() {
         }
       });
       
-      const sorted = filtered.sort((a, b) => {
-        const nameA = a.name || '';
-        const nameB = b.name || '';
-        
-        switch (sortBy) {
-          case 'name': return nameA.localeCompare(nameB);
-          case 'bundesland': return (a.region || '').localeCompare(b.region || '');
-          case 'role': return (a.role || '').localeCompare(b.role || '');
-          case 'pronouns': return (a.pronouns || '').localeCompare(b.pronouns || '');
-          default: return 0;
+      let sorted;
+      if (sortBy === 'random') {
+        // Session-stable random shuffle using Fisher-Yates with seeded random
+        sorted = [...filtered];
+        for (let i = sorted.length - 1; i > 0; i--) {
+          const j = Math.floor(seededRandom(randomSeed, i) * (i + 1));
+          [sorted[i], sorted[j]] = [sorted[j], sorted[i]];
         }
-      });
+      } else {
+        // Alphabetical sorting (immutable)
+        sorted = [...filtered].sort((a, b) => {
+          const nameA = a.name || '';
+          const nameB = b.name || '';
+          
+          switch (sortBy) {
+            case 'name-asc':
+              return nameA.localeCompare(nameB);
+            case 'name-desc':
+              return nameB.localeCompare(nameA);
+            case 'bundesland':
+              return (a.region || '').localeCompare(b.region || '');
+            case 'role':
+              return (a.role || '').localeCompare(b.role || '');
+            case 'pronouns':
+              return (a.pronouns || '').localeCompare(b.pronouns || '');
+            default:
+              return nameA.localeCompare(nameB);
+          }
+        });
+      }
       
       return {
         availableRegions: Array.from(regions).sort(),
@@ -163,43 +187,29 @@ export default function Participants() {
     }
   }, [allItems, searchTerm, filterRole, filterBundesland, sortBy]);
 
-  // Handle pagination based on search mode
+  // Handle pagination (always client-side)
   const paginatedItems = useMemo(() => {
-    if (hasSearchTerm) {
-      // Server-side search already handles pagination
+    // Client-side pagination
+    if (pageSize === 'all') {
       return filteredItems;
-    } else {
-      // Client-side pagination for fallback mode
-      if (pageSize === 'all') {
-        return filteredItems;
-      }
-      const startIndex = (currentPage - 1) * pageSize;
-      const endIndex = startIndex + pageSize;
-      return filteredItems.slice(startIndex, endIndex);
     }
-  }, [hasSearchTerm, filteredItems, currentPage, pageSize]);
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    return filteredItems.slice(startIndex, endIndex);
+  }, [filteredItems, currentPage, pageSize]);
 
-  // Pagination info based on search mode
+  // Pagination info (always client-side)
   const paginationInfo = useMemo(() => {
-    if (hasSearchTerm && searchResponse?.meta) {
-      // Use server-side pagination info
-      return {
-        totalItems: searchResponse.meta.totalCount,
-        totalPages: searchResponse.meta.totalPages,
-        currentPage: searchResponse.meta.currentPage
-      };
-    } else {
-      // Use client-side pagination info
-      const totalItems = filteredItems.length;
-      const totalPages = pageSize === 'all' ? 1 : Math.ceil(totalItems / pageSize);
-      
-      return {
-        totalItems,
-        totalPages,
-        currentPage
-      };
-    }
-  }, [hasSearchTerm, searchResponse, filteredItems.length, pageSize, currentPage]);
+    // Use client-side pagination info
+    const totalItems = filteredItems.length;
+    const totalPages = pageSize === 'all' ? 1 : Math.ceil(totalItems / pageSize);
+    
+    return {
+      totalItems,
+      totalPages,
+      currentPage
+    };
+  }, [filteredItems.length, pageSize, currentPage]);
 
   // Auto-reset filters if selected value no longer exists
   const resetInProgress = useRef(false);
@@ -237,22 +247,23 @@ export default function Participants() {
     setCurrentPage(1);
   }, [searchTerm, filterRole, filterBundesland, sortBy]);
 
-  const loading = hasSearchTerm ? searchLoading : (participantsLoading || teamsLoading);
-  const error = hasSearchTerm ? searchError : (participantsError || teamsError);
+  // Loading state (only one source)
+  const loading = participantsLoading || teamsLoading;
+  const error = participantsError || teamsError;
   
-  if (loading) return <LoadingSpinner size="xl" text="Teilnehmer*innen und Teams werden geladen..." />;
+  if (loading) return <LoadingSpinner size="xl" text="Wettbewerb-Teilnehmer*innen und Teams werden geladen..." />;
   if (error) return <div className="text-red-600">Fehler beim Laden der Daten: {error?.message || error}</div>;
 
   // Show offline status if not online
   if (!isOnline) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
-        <h1 className="sr-only">Teilnehmer*innen</h1>
+        <h1 className="sr-only">Wettbewerb-Teilnehmer*innen</h1>
         <div className="bg-yellow-100 dark:bg-yellow-900 border border-yellow-300 dark:border-yellow-700 rounded-lg p-4">
           <div className="flex items-center space-x-2">
             <span className="text-yellow-600 dark:text-yellow-300">⚠️</span>
             <span className="text-yellow-800 dark:text-yellow-200 font-medium">
-              Sie sind offline. Teilnehmer*innendaten werden aus dem Cache geladen.
+              Sie sind offline. Wettbewerb-Teilnehmer*innendaten werden aus dem Cache geladen.
             </span>
           </div>
           <div className="mt-2 text-sm text-yellow-700 dark:text-yellow-300">
@@ -263,18 +274,18 @@ export default function Participants() {
         </div>
         
         {/* Offline controls for accessibility testing */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+        <div className="page-header-card">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 space-y-4 sm:space-y-0">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Teilnehmer*innen</h1>
-              <p className="text-gray-600 dark:text-gray-400">Übersicht aller Poetry Slam Teilnehmer*innen und Crew-Mitglieder</p>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Wettbewerb-Teilnehmer*innen</h1>
+              <p className="text-gray-600 dark:text-gray-400">Übersicht aller Poetry Slam Wettbewerb-Teilnehmer*innen und SLAM25-Team-Mitglieder</p>
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
             <input
               type="text"
-              placeholder="Teilnehmer*innen suchen..."
+              placeholder="Wettbewerb-Teilnehmer*innen suchen..."
               disabled
               className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed"
             />
@@ -289,6 +300,20 @@ export default function Participants() {
               className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed"
             >
               <option value="all">Alle Bundesländer/Regionen</option>
+            </select>
+          </div>
+          
+          {/* Offline Sort Control */}
+          <div className="mb-4">
+            <label htmlFor="sort-select-offline" className="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
+              Sortierung
+            </label>
+            <select
+              id="sort-select-offline"
+              disabled
+              className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed max-w-xs"
+            >
+              <option value="random">🎲 Zufällige Reihenfolge</option>
             </select>
           </div>
         </div>
@@ -316,27 +341,45 @@ export default function Participants() {
       )}
 
       {/* Header */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+      <div className="page-header-card">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 space-y-4 sm:space-y-0">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Teilnehmer*innen</h1>
-            <p className="text-gray-600 dark:text-gray-400">Übersicht aller Poetry Slam Teilnehmer*innen und Crew-Mitglieder</p>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Wettbewerb-Teilnehmer*innen</h1>
+            <p className="text-gray-600 dark:text-gray-400">Übersicht aller Poetry Slam Wettbewerb-Teilnehmer*innen und SLAM25-Team-Mitglieder</p>
           </div>
+        </div>
+
+        {/* Sort Control */}
+        <div className="mb-4">
+          <label htmlFor="sort-select" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Sortierung
+          </label>
+          <select
+            id="sort-select"
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="filter-select max-w-xs"
+            aria-label="Sortierung"
+          >
+            <option value="random">🎲 Zufällige Reihenfolge</option>
+            <option value="name-asc">📝 Name (A-Z)</option>
+            <option value="name-desc">📝 Name (Z-A)</option>
+          </select>
         </div>
 
         {/* Search and Filter Controls */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
           <input
             type="text"
-            placeholder="Teilnehmer*innen und Teams suchen..."
+            placeholder="Wettbewerb-Teilnehmer*innen und Teams suchen..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+            className="search-input"
           />
           <select
             value={filterRole}
             onChange={(e) => setFilterRole(e.target.value)}
-            className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+            className="filter-select"
           >
             <option value="all">Alle Rollen</option>
             {availableRoles.map(role => (
@@ -346,7 +389,7 @@ export default function Participants() {
           <select
             value={filterBundesland}
             onChange={(e) => setFilterBundesland(e.target.value)}
-            className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+            className="filter-select"
           >
             <option value="all">Alle Bundesländer/Regionen</option>
             {availableRegions.map(bundesland => (
@@ -364,8 +407,26 @@ export default function Participants() {
               <Link
                 key={`${item.type}-${item.id}`}
                 to={item.type === 'team' ? `/teams/${item.slug}` : `/participants/${item.slug}`}
-                className={`block relative rounded-xl p-6 shadow-sm border hover:shadow-md transition-all duration-200 hover:-translate-y-1 cursor-pointer group ${colors.bg} ${colors.border}`}
+                className={`block relative rounded-xl p-6 border hover:shadow-md transition-all duration-200 hover:-translate-y-1 cursor-pointer group ${colors.bg} ${colors.border} ${colors.shadow || 'shadow-sm'} ${colors.glow || ''} ${colors.animation || ''} ${colors.premium || ''} ${(() => {
+                  // Add special crew styling
+                  if (item.type === 'participant') {
+                    let roles = [];
+                    if (Array.isArray(item.roles)) {
+                      roles = item.roles;
+                    } else if (item.role) {
+                      roles = item.role.includes(',') 
+                        ? item.role.split(',').map(r => r.trim())
+                        : [item.role];
+                    }
+                    
+                    const isCrew = roles.some(role => isCrewRole(role));
+                    
+                    return isCrew ? 'slam25-team-card-hover slam25-team-glow' : '';
+                  }
+                  return '';
+                })()}`}
               >
+                
                 <div className="flex items-start space-x-3 mb-4">
                   <div className="flex-1 min-w-0">
                     <h3 className={`font-semibold break-words ${colors.text}`}>{item.name}</h3>
@@ -382,7 +443,7 @@ export default function Participants() {
                               <div className="mt-2 space-y-1">
                                 {item.members.map((member, index) => (
                                   <div key={index} className="flex items-center space-x-2">
-                                    <span className="text-blue-500 dark:text-blue-400">•</span>
+                                    <span className="text-[#185757] dark:text-[#A2D2B9]">•</span>
                                     <span className="text-gray-700 dark:text-gray-300 truncate">{member.name}</span>
                                   </div>
                                 ))}
@@ -410,22 +471,24 @@ export default function Participants() {
                         );
                       }
                       
-                      // Normalize old "Supporter" to "Supporter*in" for display
-                      roles = roles.map(role => role === 'Supporter' ? 'Supporter*in' : role);
+                      // Filter out Jury roles and normalize Supporter
+                      roles = roles
+                        .filter(role => role !== 'Jury' && role !== 'Jury-Mitglied')
+                        .map(role => role === 'Supporter' ? 'Supporter*in' : role);
                       
                       if (roles.length === 0) return <span>Keine Rolle</span>;
                       
                       return roles.map((role, index) => {
-                        const emoji = role === 'Teilnehmer*in' ? '🎭' : 
-                                     role === 'Supporter*in' || role === 'Supporter' ? '🤝' : 
-                                     role === 'Team' ? '👥' :
-                                     role === 'Crew' ? '⚙️' :
+                        // Simple emoji mapping
+                        const emoji = role === 'Wettbewerb-Teilnehmer*in' ? '🎭' : 
+                                     role === 'Supporter*in' ? '🤝' : 
+                                     role === 'SLAM25-Team' ? '⚙️' :
                                      role === 'SLAM-MC' ? '🎤' :
-                                     role === 'Organisator*in' || role === 'Organisator' ? '🎯' :
-                                     role === 'Moderator*in' || role === 'Moderator' ? '🎤' :
-                                     role === 'Techniker*in' || role === 'Techniker' ? '🔧' :
-                                     role === 'Fotograf*in' || role === 'Fotograf' ? '📸' :
-                                     role === 'Videograf*in' || role === 'Videograf' ? '🎥' : '👤';
+                                     role === 'Organisator*in' ? '🎯' :
+                                     role === 'Moderator*in' ? '🎤' :
+                                     role === 'Techniker*in' ? '🔧' :
+                                     role === 'Fotograf*in' ? '📸' :
+                                     role === 'Videograf*in' ? '🎥' : '👤';
                         
                         return (
                           <span key={`role-${role}-${index}`} className="inline-block mr-1">
@@ -457,7 +520,7 @@ export default function Participants() {
                  </div>
                 {/* Always-visible bottom-right arrow (decorative) */}
                 <div className="absolute bottom-4 right-4" aria-hidden="true">
-                  <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5 text-[#185757] dark:text-[#A2D2B9] group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path>
                   </svg>
                 </div>
@@ -470,10 +533,10 @@ export default function Participants() {
           <div className="text-center py-12">
             <div className="text-4xl mb-4">👥</div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-              Keine Teilnehmer*innen oder Teams gefunden
+              Teilnehmer*innen kommt bald :)
             </h3>
             <p className="text-gray-600 dark:text-gray-400">
-              Versuchen Sie andere Suchkriterien oder fügen Sie einen neuen Teilnehmer*innen hinzu.
+              Bald werden hier alle Poetry Slam Teilnehmer*innen zu sehen sein!
             </p>
           </div>
         )}

@@ -2,7 +2,7 @@
  * Centralized Polling Configuration
  * 
  * Defines consistent polling intervals for real-time updates across the application.
- * Follows the simplified architecture principle of using simple polling instead of WebSockets.
+ * Follows the simplified architecture principle of using simple polling for real-time updates.
  */
 
 /**
@@ -10,13 +10,19 @@
  */
 export const POLLING_INTERVALS = {
   // Fast polling for critical real-time data
-  CRITICAL: 15 * 1000,        // 15 seconds - rounds, countdown
+  CRITICAL: 60 * 1000,        // 1 minute - rounds, countdown
   
   // Standard polling for admin data
-  ADMIN: 30 * 1000,           // 30 seconds - participants, news, teams
+  ADMIN: 5 * 60 * 1000,       // 5 minutes - participants, teams
   
-  // Slow polling for less critical data
-  STANDARD: 60 * 1000,        // 1 minute - city tips, info pages
+  // Medium polling for content data
+  MEDIUM: 5 * 60 * 1000,     // 5 minutes - news, info pages, timetable, city tips
+  
+  // Slow polling for static data
+  SLOW: 5 * 60 * 1000,       // 5 minutes - links, schnellzugriff
+  
+  // Very slow polling for settings
+  SETTINGS: 5 * 60 * 1000,    // 5 minutes - dashboard settings
   
   // No polling for static data
   NONE: false                 // No polling - static content
@@ -36,29 +42,45 @@ export function getPollingInterval(dataType, isAdmin = false) {
       case 'countdown':
         return POLLING_INTERVALS.CRITICAL;
       case 'participants':
-      case 'news':
       case 'teams':
         return POLLING_INTERVALS.ADMIN;
-      case 'cityTips':
+      case 'news':
       case 'infoPages':
-        return POLLING_INTERVALS.STANDARD;
+      case 'timetable':
+      case 'cityTips':
+        return POLLING_INTERVALS.MEDIUM;
+      case 'breakingNews':
+        return POLLING_INTERVALS.ADMIN;
+      case 'links':
+      case 'schnellzugriff':
+        return POLLING_INTERVALS.SLOW;
+      case 'dashboard-settings':
+        return POLLING_INTERVALS.SETTINGS;
       default:
         return POLLING_INTERVALS.NONE;
     }
   }
   
-  // Regular users get less frequent updates
+  // Regular users get same polling intervals
   switch (dataType) {
     case 'rounds':
     case 'countdown':
       return POLLING_INTERVALS.CRITICAL;
     case 'participants':
-    case 'news':
     case 'teams':
       return POLLING_INTERVALS.ADMIN;
-    case 'cityTips':
+    case 'news':
     case 'infoPages':
-      return POLLING_INTERVALS.STANDARD;
+    case 'timetable':
+    case 'cityTips':
+      return POLLING_INTERVALS.MEDIUM;
+    case 'breakingNews':
+      return POLLING_INTERVALS.ADMIN;
+    case 'links':
+    case 'schnellzugriff':
+      return POLLING_INTERVALS.SLOW;
+    case 'dashboard-settings':
+      return POLLING_INTERVALS.SETTINGS;
     default:
       return POLLING_INTERVALS.NONE;
   }
@@ -74,12 +96,15 @@ export function getPollingInterval(dataType, isAdmin = false) {
 export function getQueryConfig(dataType, isAdmin = false, options = {}) {
   const refetchInterval = getPollingInterval(dataType, isAdmin);
   
+  // Enable background polling for critical live event data
+  const enableBackgroundPolling = ['rounds', 'countdown', 'participants', 'teams', 'breakingNews'].includes(dataType);
+  
   return {
     staleTime: 5 * 60 * 1000,        // 5 minutes
     gcTime: 10 * 60 * 1000,          // 10 minutes
     refetchInterval,
     refetchOnWindowFocus: false,      // Don't refetch on window focus
-    refetchIntervalInBackground: false, // Don't poll in background
+    refetchIntervalInBackground: enableBackgroundPolling, // Poll in background for live events
     ...options
   };
 }

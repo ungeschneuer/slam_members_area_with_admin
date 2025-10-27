@@ -45,31 +45,15 @@ router.put('/', ...adminMiddleware(), async (req, res) => {
     // Sanitize input data to prevent XSS
     const sanitizedData = sanitizeEntity.countdown(req.body);
     
-    // Accept both camelCase and snake_case from the client
     const {
       title,
       subtitle,
       target_date,
-      targetDate,
       button_text,
-      buttonText,
       button_emoji,
-      buttonEmoji,
       button_link,
-      buttonLink,
-      is_active,
-      isActive
+      is_active
     } = sanitizedData;
-
-    const normalized = {
-      title: title ?? null,
-      subtitle: subtitle ?? null,
-      target_date: (target_date ?? targetDate) ?? null,
-      button_text: (button_text ?? buttonText) ?? null,
-      button_emoji: (button_emoji ?? buttonEmoji) ?? null,
-      button_link: (button_link ?? buttonLink) ?? null,
-      is_active: typeof is_active === 'boolean' ? is_active : (typeof isActive === 'boolean' ? isActive : true)
-    };
     
     const startTime = startTiming();
     
@@ -88,26 +72,26 @@ router.put('/', ...adminMiddleware(), async (req, res) => {
       WHERE is_active = true
       RETURNING *
     `, [
-      normalized.title,
-      normalized.subtitle,
-      normalized.target_date,
-      normalized.button_text,
-      normalized.button_emoji,
-      normalized.button_link,
-      normalized.is_active
+      title ?? null,
+      subtitle ?? null,
+      target_date ?? null,
+      button_text ?? null,
+      button_emoji ?? null,
+      button_link ?? null,
+      typeof is_active === 'boolean' ? is_active : true
     ]);
 
     // If no active row existed, insert a new configuration
     if (!result.rows || result.rows.length === 0) {
       // Insert new configuration with sensible defaults when not provided
       const fallback = {
-        title: normalized.title ?? 'Countdown zum SLAM25',
-        subtitle: normalized.subtitle ?? '28. Oktober 2025 • 12:00 Uhr (Berlin Zeit)',
-        target_date: normalized.target_date ?? '2025-10-28T10:00:00.000Z',
-        button_text: normalized.button_text ?? 'Zum Zeitplan',
-        button_emoji: normalized.button_emoji ?? '📅',
-        button_link: normalized.button_link ?? '/timetable',
-        is_active: typeof normalized.is_active === 'boolean' ? normalized.is_active : true,
+        title: title ?? 'Countdown zum SLAM25',
+        subtitle: subtitle ?? '28. Oktober 2025 • 12:00 Uhr (Berlin Zeit)',
+        target_date: target_date ?? '2025-10-28T10:00:00.000Z',
+        button_text: button_text ?? 'Zum Zeitplan',
+        button_emoji: button_emoji ?? '📅',
+        button_link: button_link ?? '/timetable',
+        is_active: typeof is_active === 'boolean' ? is_active : true,
       };
 
       result = await executeQuery(`
@@ -128,8 +112,8 @@ router.put('/', ...adminMiddleware(), async (req, res) => {
     const duration = endTiming(startTime);
     
     logger.info('Countdown config updated successfully', {
-      title: normalized.title,
-      is_active: normalized.is_active,
+      title: title,
+      is_active: is_active,
       duration: `${duration}ms`,
       queryType: 'UPDATE_COUNTDOWN_CONFIG'
     });
@@ -141,4 +125,4 @@ router.put('/', ...adminMiddleware(), async (req, res) => {
   }
 });
 
-export { router as countdownConfigRouter };
+export default router;

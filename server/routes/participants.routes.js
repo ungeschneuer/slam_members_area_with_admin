@@ -18,8 +18,11 @@ import { sanitizeEntity } from '../utils/sanitization.js';
 import { entityNormalizers } from '../utils/normalizers.js';
 import { participantSchema, participantBulkSchema } from '../../shared/schemas/participantSchema.js';
 import { ParticipantsService } from '../services/participantsService.js';
+import { generateSlug, generateUniqueSlug, validateSlugInput } from '../utils/slugUtils.js';
+import { generateUniqueSlugInTransaction, generateRequestIdFromReq } from '../services/slugGenerationService.js';
+import { executeTransaction } from '../config/database.js';
 
-const allowedRoles = ['Teilnehmer*in', 'Supporter*in', 'Crew', 'SLAM-MC'];
+const allowedRoles = ['Wettbewerb-Teilnehmer*in', 'Supporter*in', 'SLAM25-Team', 'SLAM-MC'];
 const allowedRegions = [
   'Bayern',
   'Baden-Württemberg',
@@ -232,33 +235,49 @@ router.get('/', async (req, res) => {
 });
 
 // Create participant (admin endpoint)
-router.post('/', ...adminMiddleware(), async (req, res) => { // Idempotency removed
-  // Sanitize input data to prevent XSS
-  const sanitizedData = sanitizeEntity.participant(req.body);
-  const { name, role, region, pronouns, instagram, slug } = sanitizedData;
-  
-  // Generate slug if not provided
-  const finalSlug = slug || name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
-  // Strict type guards
-  if (typeof name !== 'string' || typeof role !== 'string' || (region !== null && region !== undefined && typeof region !== 'string')) {
-    return sendErrorResponse(res, new Error('Validation failed'), 'Validation failed', 400);
+router.post('/', ...adminMiddleware(), async (req, res) => {
+  try {
+    // Sanitize input data to prevent XSS
+    const sanitizedData = sanitizeEntity.participant(req.body);
+    const { name, role, region, pronouns, instagram, slug } = sanitizedData;
+    
+    // Strict type guards
+    if (typeof name !== 'string' || typeof role !== 'string' || (region !== null && region !== undefined && typeof region !== 'string')) {
+      return sendErrorResponse(res, new Error('Validation failed'), 'Validation failed', 400);
+    }
+    
+    const startTime = startTiming();
+    
+        // Move slug generation inside transaction for atomicity
+        const participant = await executeTransaction(async (client) => {
+          // Generate unique slug using centralized service
+          const requestId = generateRequestIdFromReq(req);
+          const uniqueSlug = await generateUniqueSlugInTransaction(
+            client, 
+            name, 
+            'participants', 
+            requestId
+          );
+
+          // Create participant with unique slug
+          const result = await client.query(
+            'INSERT INTO participants (name, role, region, pronouns, instagram, slug) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+            [name, role, region, pronouns, entityNormalizers.participant({ instagram }).instagram, uniqueSlug]
+          );
+
+          return result.rows[0];
+        });
+    
+    const duration = endTiming(startTime);
+    
+    res.status(201).json({
+      success: true,
+      data: participant,
+      meta: { queryType: 'CREATE_PARTICIPANT', duration }
+    });
+  } catch (error) {
+    sendErrorResponse(res, error, 'Failed to create participant');
   }
-  
-  await executeCrudOperation(
-    'create',
-    'INSERT INTO participants (name, role, region, pronouns, instagram, slug) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-    [name, role, region, pronouns, entityNormalizers.participant({ instagram }).instagram, finalSlug],
-    'participants',
-    'CREATE_PARTICIPANT',
-    res
-  );
-  
-  // Store idempotency key after successful creation
-  if (req.idempotencyKey && res.statusCode === 201) {
-    // Idempotency removed
-  }
-  
-  // Cache clearing removed - using simple polling instead
 });
 
 // Update participant (admin endpoint)

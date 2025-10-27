@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useNews, useBreakingNews, useUpdateNews, useDeleteNews } from '../../hooks/index.js';
+import { useQueryClient } from '@tanstack/react-query';
 import authService from '../../services/authService.js';
-import { mapNewsFormToAPI } from '../../utils/formMappers.js';
 import LoadingSpinner from '../LoadingSpinner';
 import { useForm } from 'react-hook-form';
+import { handleLinkClick } from '../../utils/linkUtils.js';
 import TextInput from '../forms/TextInput.jsx';
 import SelectInput from '../forms/SelectInput.jsx';
 import MarkdownTextarea from '../forms/MarkdownTextarea.jsx';
@@ -13,9 +14,8 @@ import BreakingNewsCountdown from '../shared/BreakingNewsCountdown.jsx';
 // useSlugAutoGeneration hook removed as part of simplification
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { getAvailableContentFilterOptions, validateFilterValue } from '../../utils/filterUtils.js';
+import { validateFilterValue } from '../../utils/filterUtils.js';
 import { getNewsCategoryAdminOptions } from '../../utils/newsCategories.js';
-import { mapNewsAPIToForm } from '../../utils/formMappers.js';
 
 
 export default function AdminNews() {
@@ -24,6 +24,7 @@ export default function AdminNews() {
   const { data: breakingNewsData, isLoading: breakingNewsLoading, error: breakingNewsQueryError } = useBreakingNews();
   const updateNews = useUpdateNews();
   const deleteNews = useDeleteNews();
+  const queryClient = useQueryClient();
   const news = Array.isArray(newsData) ? newsData : [];
   const [editingNews, setEditingNews] = useState(null);
   const [uploading, setUploading] = useState(false);
@@ -33,7 +34,8 @@ export default function AdminNews() {
     category: z.enum(['announcement','workshops','prizes']),
     status: z.enum(['PUBLISHED','DRAFT']),
     date: z.string().min(1, 'Datum ist erforderlich'),
-    content: z.string().min(1, 'Inhalt ist erforderlich')
+    content: z.string().min(1, 'Inhalt ist erforderlich'),
+    priority: z.enum(['NORMAL', 'HIGH', 'URGENT']).optional().default('NORMAL')
   });
 
   const { register, handleSubmit, reset, setValue, watch, formState: { errors, isSubmitting } } = useForm({
@@ -44,7 +46,8 @@ export default function AdminNews() {
       category: 'announcement',
       status: 'PUBLISHED',
       date: new Date().toISOString().slice(0, 10),
-      content: ''
+      content: '',
+      priority: 'NORMAL'
     }
   });
 
@@ -77,21 +80,8 @@ export default function AdminNews() {
   // Use centralized category definitions
   const predefinedContentTypes = getNewsCategoryAdminOptions();
 
-  // Dynamic content types based on existing content (only published items)
-  const contentTypes = useMemo(() => {
-    // Get categories that have at least one published item
-    const categoriesInUse = new Set(
-      news
-        .filter(item => item.status === 'PUBLISHED' || item.is_published)
-        .map(item => item.category)
-        .filter(Boolean)
-    );
-    
-    // Return predefined options that have published content or are the "all" option
-    return predefinedContentTypes.filter(option => 
-      option.value === 'all' || categoriesInUse.has(option.value)
-    );
-  }, [news]);
+  // Admin forms show all predefined options
+  const contentTypes = predefinedContentTypes;
 
   // Auto-reset selected category if it no longer exists
   useEffect(() => {
@@ -112,26 +102,43 @@ export default function AdminNews() {
 
   const handleEditOpen = (newsItem) => {
     setEditingNews(newsItem);
-    // Map API data to form format
-    const formData = mapNewsAPIToForm(newsItem);
+    // Use API data directly (already in snake_case)
     reset({
-      title: formData.title,
-      slug: formData.slug || '',
-      category: formData.category,
-      status: formData.status || 'PUBLISHED',
-      date: formData.date,
-      content: formData.content
+      title: newsItem.title,
+      slug: newsItem.slug || '',
+      category: newsItem.category,
+      status: newsItem.status || 'PUBLISHED',
+      date: newsItem.date,
+      content: newsItem.content,
+      priority: newsItem.priority || 'NORMAL'
     });
   };
+
+  // Map form data to API format (camelCase to snake_case)
+  const mapFormToAPI = (formData) => ({
+    title: formData.title,
+    slug: formData.slug,
+    category: formData.category,
+    status: formData.status,
+    date: formData.date,
+    content: formData.content,
+    priority: formData.priority,
+    // Map camelCase form fields to snake_case database columns
+    published_at: formData.publishedAt || formData.date,
+    featured_image_url: formData.featuredImageUrl,
+    is_published: formData.isPublished || (formData.status === 'PUBLISHED'),
+    is_breaking_news: formData.isBreakingNews || false,
+    breaking_news_until: formData.breakingNewsUntil
+  });
 
   const onUpdateSubmit = async (data) => {
     if (!editingNews) return;
     try {
-      const apiData = mapNewsFormToAPI(data);
+      const apiData = mapFormToAPI(data);
       await updateNews.mutateAsync({ id: editingNews.id, ...apiData });
       setEditingNews(null);
     } catch (error) {
-      console.error('Error updating news:', error);
+      // Error updating news - handled by error state
     }
   };
 
@@ -140,7 +147,7 @@ export default function AdminNews() {
       try {
         await deleteNews.mutateAsync(id);
       } catch (error) {
-        console.error('Error deleting news:', error);
+        // Error deleting news - handled by error state
       }
     }
   };
@@ -167,8 +174,11 @@ export default function AdminNews() {
       const result = await response.json();
       // Update the editing news object with the new file path
       setEditingNews({...editingNews, featured_image_url: result.image.filePath});
+      
+      // Invalidate news queries to refresh data with new image
+      queryClient.invalidateQueries({ queryKey: ['news'] });
     } catch (err) {
-      console.error('Error uploading file:', err);
+      // Error uploading file - handled by alert
       alert('Fehler beim Hochladen der Datei');
     } finally {
       setUploading(false);
@@ -196,11 +206,15 @@ export default function AdminNews() {
                            `${data.breakingNewsDuration} Stunden`;
         setBreakingNewsSuccess(`Breaking News erfolgreich gesetzt für ${durationText}`);
         breakingNewsForm.reset();
+        
+        // Invalidate breaking news queries to refresh data
+        queryClient.invalidateQueries({ queryKey: ['breaking-news'] });
+        queryClient.invalidateQueries({ queryKey: ['news'] });
       } else {
         setBreakingNewsError(responseData.error || 'Fehler beim Setzen der Breaking News');
       }
     } catch (err) {
-      console.error('Error setting breaking news:', err);
+      // Error setting breaking news - handled by error state
       setBreakingNewsError('Fehler beim Setzen der Breaking News');
     }
   };
@@ -217,11 +231,15 @@ export default function AdminNews() {
       
       if (data.success) {
         setBreakingNewsSuccess('Breaking News erfolgreich entfernt');
+        
+        // Invalidate breaking news queries to refresh data
+        queryClient.invalidateQueries({ queryKey: ['breaking-news'] });
+        queryClient.invalidateQueries({ queryKey: ['news'] });
       } else {
         setBreakingNewsError(data.error || 'Fehler beim Entfernen der Breaking News');
       }
     } catch (err) {
-      console.error('Error clearing breaking news:', err);
+      // Error clearing breaking news - handled by error state
       setBreakingNewsError('Fehler beim Entfernen der Breaking News');
     }
   };
@@ -259,14 +277,14 @@ export default function AdminNews() {
         </div>
         <button
           onClick={() => navigate('/admin/news/new')}
-          className="mt-4 sm:mt-0 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          className="mt-4 sm:mt-0 w-full sm:w-auto min-h-[44px] btn-primary touch-manipulation active:scale-95"
         >
           Nachricht hinzufügen
         </button>
       </div>
 
       {/* Breaking News Management */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+      <div className="card-base p-6">
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
           Breaking News Verwaltung
         </h2>
@@ -286,7 +304,7 @@ export default function AdminNews() {
 
         {/* Current Breaking News */}
         {breakingNewsData && (
-          <div className="mb-6 p-4 bg-gradient-to-r from-red-50 to-orange-50 dark:from-red-900/20 dark:to-orange-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+          <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
             <h3 className="text-lg font-semibold text-red-900 dark:text-red-100 mb-2">
               Aktuelle Breaking News
             </h3>
@@ -312,7 +330,7 @@ export default function AdminNews() {
             </div>
             <button
               onClick={clearBreakingNews}
-              className="mt-3 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors duration-200"
+              className="mt-3 w-full sm:w-auto min-h-[44px] px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors duration-200 touch-manipulation active:scale-95"
             >
               Breaking News entfernen
             </button>
@@ -321,18 +339,18 @@ export default function AdminNews() {
 
         {/* Set New Breaking News */}
         <form onSubmit={handleBreakingNewsSubmit(setBreakingNewsArticle)} className="space-y-4">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+          <h3 className="heading-tertiary">
             Neue Breaking News setzen
           </h3>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Artikel auswählen *
               </label>
               <select
                 {...breakingNewsRegister('selectedNewsForBreaking')}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#A2D2B9] focus:border-transparent dark:bg-gray-700 dark:text-white"
               >
                 <option value="">Artikel auswählen...</option>
                 {news
@@ -356,7 +374,7 @@ export default function AdminNews() {
               </label>
               <select
                 {...breakingNewsRegister('breakingNewsDuration', { valueAsNumber: true })}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#A2D2B9] focus:border-transparent dark:bg-gray-700 dark:text-white"
               >
                 <option value={1}>1 Stunde</option>
                 <option value={6}>6 Stunden</option>
@@ -380,7 +398,7 @@ export default function AdminNews() {
           <button
             type="submit"
             disabled={breakingNewsIsSubmitting}
-            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg transition-colors duration-200"
+            className="w-full sm:w-auto min-h-[44px] px-6 py-2 bg-[#185757] hover:bg-[#0f3a3b] disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg transition-colors duration-200 touch-manipulation active:scale-95"
           >
             {breakingNewsIsSubmitting ? 'Setzen...' : 'Breaking News setzen'}
           </button>
@@ -388,7 +406,7 @@ export default function AdminNews() {
       </div>
 
       {/* Search and Filter */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+      <div className="card-base p-6">
         <SearchFilters
           searchTerm={searchTerm}
           onSearchChange={(e) => setSearchTerm(e.target.value)}
@@ -410,12 +428,12 @@ export default function AdminNews() {
       {/* News List */}
       <div className="space-y-4">
         {filteredNews.map((newsItem) => (
-          <div key={newsItem.id} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+          <div key={newsItem.id} className="card-base">
             <div className="p-6">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex-1">
                   <div className="flex items-center space-x-3 mb-2">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{newsItem.title}</h3>
+                    <h3 className="heading-tertiary">{newsItem.title}</h3>
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                                           contentTypes.find(c => c.value === newsItem.category)?.color || 'bg-gray-100 text-gray-800'
                   }`}>
@@ -437,16 +455,16 @@ export default function AdminNews() {
                   </p>
                   <p className="text-gray-700 dark:text-gray-300">{newsItem.content}</p>
                 </div>
-                <div className="flex flex-col sm:flex-row gap-2 mt-4 sm:mt-0 sm:ml-4">
+                <div className="flex flex-wrap gap-3 mt-4 sm:mt-0 sm:ml-4">
                   <button
                     onClick={() => handleEditOpen(newsItem)}
-                    className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
+                    className="min-h-[44px] min-w-[44px] px-4 py-2 text-[#185757] hover:text-[#0f3a3b] dark:text-[#A2D2B9] dark:hover:text-[#8BC4A3] transition-colors touch-manipulation active:scale-95 focus-visible:ring-2 focus-visible:ring-[#185757] rounded"
                   >
                     Bearbeiten
                   </button>
                   <button
                     onClick={() => handleDelete(newsItem.id)}
-                    className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+                    className="min-h-[44px] min-w-[44px] px-4 py-2 text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 transition-colors touch-manipulation active:scale-95 focus-visible:ring-2 focus-visible:ring-red-500 rounded"
                   >
                     Löschen
                   </button>
@@ -469,7 +487,7 @@ export default function AdminNews() {
       {/* Edit Modal */}
       {editingNews && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md sm:max-w-lg md:max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Nachricht bearbeiten</h2>
             <form onSubmit={handleSubmit(onUpdateSubmit)} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -477,6 +495,11 @@ export default function AdminNews() {
                 <TextInput label="Slug" name="slug" register={register} rules={{ required: 'Slug ist erforderlich' }} errors={errors} />
                 <SelectInput label="Inhaltstyp" name="category" register={register} rules={{ required: 'Inhaltstyp ist erforderlich' }} errors={errors} options={contentTypes.map(c => ({ value: c.value, label: c.label }))} />
                 <SelectInput label="Status" name="status" register={register} rules={{ required: 'Status ist erforderlich' }} errors={errors} options={[{ value: 'PUBLISHED', label: 'Veröffentlicht' }, { value: 'DRAFT', label: 'Entwurf' }]} />
+                <SelectInput label="Priorität" name="priority" register={register} errors={errors} options={[
+                  { value: 'NORMAL', label: 'Normal' },
+                  { value: 'HIGH', label: 'Hoch' },
+                  { value: 'URGENT', label: 'Dringend' }
+                ]} />
                 <TextInput label="Datum" name="date" type="date" register={register} rules={{ required: 'Datum ist erforderlich' }} errors={errors} />
               </div>
               <div>
@@ -502,7 +525,7 @@ export default function AdminNews() {
                   accept="image/*,.pdf"
                   onChange={handleFileUpload}
                   disabled={uploading}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#A2D2B9] focus:border-transparent dark:bg-gray-700 dark:text-white"
                 />
                 {uploading && <p className="text-sm text-gray-500 mt-1">Wird hochgeladen...</p>}
                 
@@ -516,9 +539,15 @@ export default function AdminNews() {
                         <span className="text-sm text-gray-600 dark:text-gray-400">PDF-Datei</span>
                         <a 
                           href={editingNews.featured_image_url} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:text-blue-800 text-sm"
+                          onClick={(e) => {
+                            const pdfLink = {
+                              url: editingNews.featured_image_url,
+                              title: 'PDF-Datei',
+                              is_external: true
+                            };
+                            handleLinkClick(pdfLink, e);
+                          }}
+                          className="text-[#185757] hover:text-[#0f3a3b] text-sm"
                         >
                           Anzeigen
                         </a>
@@ -534,9 +563,15 @@ export default function AdminNews() {
                           <p className="text-sm text-gray-600 dark:text-gray-400">Bild</p>
                           <a 
                             href={editingNews.featured_image_url} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="text-blue-600 hover:text-blue-800 text-sm"
+                            onClick={(e) => {
+                              const imageLink = {
+                                url: editingNews.featured_image_url,
+                                title: 'Bild',
+                                is_external: true
+                              };
+                              handleLinkClick(imageLink, e);
+                            }}
+                            className="text-[#185757] hover:text-[#0f3a3b] text-sm"
                           >
                             Anzeigen
                           </a>
@@ -555,18 +590,18 @@ export default function AdminNews() {
                   </div>
                 )}
               </div>
-              <div className="flex space-x-3">
+              <div className="flex flex-col sm:flex-row gap-3">
                 <button
                   type="submit"
                   disabled={isSubmitting || updateNews.isPending}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-70"
+                  className="w-full sm:w-auto min-h-[44px] px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-70 touch-manipulation active:scale-95"
                 >
                   {isSubmitting || updateNews.isPending ? 'Speichern...' : 'Änderungen speichern'}
                 </button>
                 <button
                   type="button"
                   onClick={() => setEditingNews(null)}
-                  className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                  className="w-full sm:w-auto min-h-[44px] px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors touch-manipulation active:scale-95"
                 >
                   Abbrechen
                 </button>

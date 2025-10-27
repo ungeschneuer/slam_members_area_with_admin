@@ -96,4 +96,4 @@ router.delete('/', ...adminMiddleware(), async (req, res) => {
   }
 });
 
-export { router as breakingNewsRouter };
+export default router;

@@ -165,8 +165,7 @@ export const entityNormalizers = {
     ...data,
     website: normalizeUrl(data.website),
     slug: normalizeSlug(data.slug),
-    opening_hours: normalizeJson(data.opening_hours, {}),
-    contact_info: normalizeJson(data.contact_info, {}),
+    opening_hours: normalizeString(data.opening_hours, ''),
     images: normalizeJson(data.images, [])
   }),
   

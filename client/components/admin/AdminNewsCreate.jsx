@@ -1,7 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCreateNews } from '../../hooks/index.js';
-import { mapNewsFormToAPI } from '../../utils/formMappers.js';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -37,12 +36,11 @@ export default function AdminNewsCreate() {
 
   async function onSubmit(data) {
     try {
-      const apiData = mapNewsFormToAPI(data);
-      await createNewsMutation.mutateAsync(apiData);
+      await createNewsMutation.mutateAsync(data);
       reset();
       navigate('/admin/news');
     } catch (err) {
-      console.error('Error adding news:', err);
+      // Error adding news - handled by error state
       setError('root', { type: 'server', message: 'Fehler beim Erstellen der News.' });
     }
   }

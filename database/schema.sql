@@ -437,8 +437,7 @@ CREATE TABLE public.city_tips (
     latitude numeric(10,8),
     longitude numeric(11,8),
     price_range character varying(50),
-    opening_hours jsonb,
-    contact_info jsonb,
+    opening_hours text,
     website character varying(255),
     images jsonb DEFAULT '[]'::jsonb,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
@@ -559,9 +558,7 @@ CREATE TABLE public.info_pages (
     display_order integer DEFAULT 0,
     status character varying(50) DEFAULT 'DRAFT'::character varying,
     featured_image_url text,
-    meta_description text,
     tags text[] DEFAULT '{}'::text[],
-    is_published boolean DEFAULT false,
     published_at timestamp without time zone,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
@@ -1059,7 +1056,7 @@ CREATE TABLE public.timetable_entries (
 -- Name: COLUMN timetable_entries.type; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON COLUMN public.timetable_entries.type IS 'Event type: team-round, individual-round, workshop, fun, aftershow, or general (legacy)';
+COMMENT ON COLUMN public.timetable_entries.type IS 'Event type: team-round, individual-round, workshop, fun, aftershow, panel, networking, or general (legacy)';
 
 
 --
@@ -1531,13 +1528,6 @@ CREATE INDEX idx_info_pages_created_at ON public.info_pages USING btree (created
 --
 
 CREATE INDEX idx_info_pages_display_order ON public.info_pages USING btree (display_order);
-
-
---
--- Name: idx_info_pages_published; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_info_pages_is_published ON public.info_pages USING btree (is_published);
 
 
 --
