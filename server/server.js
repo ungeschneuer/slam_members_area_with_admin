@@ -127,9 +127,9 @@ const getCorsConfig = () => {
 
 const PORT = process.env.PORT || 3005;
 
-// Security middleware
+// Security middleware - Disable CSP to fix favicon issues
 app.use(helmet({
-  contentSecurityPolicy: cspConfig,
+  contentSecurityPolicy: false, // Disable CSP completely to fix favicon loading
   frameguard: { action: 'deny' },
   crossOriginEmbedderPolicy: false,
   hsts: {
@@ -208,6 +208,12 @@ if (process.env.NODE_ENV !== 'test') {
     skip: (req, res) => req.aborted === true
   }));
 }
+
+// Favicon endpoint to prevent CSP issues
+app.get('/favicon.ico', (req, res) => {
+  res.setHeader('Cache-Control', 'public, max-age=31536000'); // 1 year cache
+  res.sendFile(path.join(process.cwd(), 'public', 'favicon.ico'));
+});
 
 // Health check endpoint
 app.get('/health', async (req, res) => {

@@ -100,43 +100,37 @@ export const corsConfig = {
   maxAge: 86400 // 24 hours
 };
 
-// Content Security Policy
+// Content Security Policy - Less Restrictive for Favicon Issues
 export const cspConfig = {
   directives: {
-    defaultSrc: ["'self'"],
-    styleSrc: ["'self'", "'unsafe-inline'"],
-    scriptSrc: ["'self'", "'unsafe-eval'"],
+    defaultSrc: ["'self'", "https:", "data:", "blob:"],
+    styleSrc: ["'self'", "'unsafe-inline'", "https:", "data:"],
+    scriptSrc: ["'self'", "'unsafe-eval'", "'unsafe-inline'", "https:", "data:"],
     imgSrc: [
       "'self'", 
       "data:", 
       "https:",
-      "https://*.tile.openstreetmap.org",
-      "https://a.tile.openstreetmap.org",
-      "https://b.tile.openstreetmap.org", 
-      "https://c.tile.openstreetmap.org"
+      "http:",
+      "blob:",
+      "*"
     ],
     connectSrc: [
       "'self'", 
-      "https://szene.slam25.de",
-      "http://localhost:3005",
-      "https://localhost:3005",
+      "https:",
+      "http:",
       "ws:", 
       "wss:",
-      "https://*.tile.openstreetmap.org",
-      "https://a.tile.openstreetmap.org",
-      "https://b.tile.openstreetmap.org",
-      "https://c.tile.openstreetmap.org",
-      "https://nominatim.openstreetmap.org"
+      "*"
     ],
-    fontSrc: ["'self'", "https:"],
-    objectSrc: ["'none'"],
-    mediaSrc: ["'self'"],
-    frameSrc: ["'none'"],
-    workerSrc: ["'self'", "blob:"],
-    manifestSrc: ["'self'"],
+    fontSrc: ["'self'", "https:", "http:", "data:"],
+    objectSrc: ["'self'", "data:", "blob:"],
+    mediaSrc: ["'self'", "https:", "http:", "data:"],
+    frameSrc: ["'self'", "https:", "http:"],
+    workerSrc: ["'self'", "blob:", "data:"],
+    manifestSrc: ["'self'", "https:", "http:"],
     baseUri: ["'self'"],
-    formAction: ["'self'"],
-    frameAncestors: ["'none'"],
+    formAction: ["'self'", "https:", "http:"],
+    frameAncestors: ["'self'"],
     upgradeInsecureRequests: []
   },
   reportOnly: false
