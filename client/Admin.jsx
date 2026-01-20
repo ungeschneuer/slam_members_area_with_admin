@@ -9,10 +9,13 @@ import LoginForm from './components/LoginForm.jsx';
 // Import all admin components
 import AdminDashboard from './components/admin/AdminDashboard.jsx';
 import AdminParticipants from './components/admin/AdminParticipants';
+import AdminParticipantsForm from './components/admin/AdminParticipantsForm.jsx';
 import TeamsAdmin from './components/admin/TeamsAdmin.jsx';
+import AdminTeamsForm from './components/admin/AdminTeamsForm.jsx';
 import AdminRounds from './components/admin/AdminRounds';
 import AdminNews from './components/admin/AdminNews';
 import AdminNewsCreate from './components/admin/AdminNewsCreate.jsx';
+import AdminNewsEdit from './components/admin/AdminNewsEdit.jsx';
 import AdminTimetable from './components/admin/AdminTimetable';
 import AdminCityTips from './components/admin/AdminCityTips';
 import AdminInfoPages from './components/admin/AdminInfoPages';
@@ -32,28 +35,36 @@ function AdminPanel() {
       <Routes>
         {/* Dashboard */}
         <Route path="/" element={<AdminDashboard />} />
-        
+
         {/* Competition */}
         <Route path="/participants" element={<AdminParticipants />} />
+        <Route path="/participants/new" element={<AdminParticipantsForm />} />
+        <Route path="/participants/:id/edit" element={<AdminParticipantsForm />} />
+
         <Route path="/teams" element={<TeamsAdmin />} />
+        <Route path="/teams/new" element={<AdminTeamsForm />} />
+        <Route path="/teams/:id/edit" element={<AdminTeamsForm />} />
+
         <Route path="/rounds" element={<AdminRounds />} />
         <Route path="/timetable" element={<AdminTimetable />} />
-        
+
         {/* Content */}
         <Route path="/news" element={<AdminNews />} />
         <Route path="/news/new" element={<AdminNewsCreate />} />
+        <Route path="/news/:id/edit" element={<AdminNewsEdit />} />
+
         <Route path="/city-tips" element={<AdminCityTips />} />
         <Route path="/info-pages" element={<AdminInfoPages />} />
-        
+
         {/* Settings */}
         <Route path="/links" element={<AdminLinks />} />
         <Route path="/schnellzugriff" element={<AdminSchnellzugriff />} />
         <Route path="/countdown" element={<AdminCountdown />} />
         <Route path="/user-password" element={<AdminUserPassword />} />
         <Route path="/site-settings" element={<AdminSiteSettings />} />
-        
+
         {/* System routes removed as part of simplification */}
-        
+
         {/* Redirect unknown routes to dashboard */}
         <Route path="*" element={<Navigate to="/admin" replace />} />
       </Routes>
