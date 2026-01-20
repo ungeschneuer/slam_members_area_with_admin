@@ -1,30 +1,22 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { API_URL } from '../config/api.js';
-import authService from '../services/authService.js';
+import { apiGet, apiPut } from '../utils/apiWrapper.js';
+import { COUNTDOWN_ENDPOINTS } from '../constants/apiEndpoints.js';
+import { createEntityQueryKeys, invalidateEntityQueries } from '../utils/queryKeyFactory.js';
 import { getQueryConfig } from '../config/polling.js';
 
 // Query keys for countdown
-export const countdownKeys = {
-  all: ['countdown'],
-  current: () => [...countdownKeys.all, 'current'],
-};
+export const countdownKeys = createEntityQueryKeys('countdown');
 
 // Hook to fetch countdown data
 export function useCountdown() {
   return useQuery({
-    queryKey: countdownKeys.current(),
+    queryKey: countdownKeys.lists(),
     queryFn: async () => {
-      const response = await fetch(`${API_URL}/countdown-config`, {
-        credentials: 'include'
-      });
-      if (!response.ok) {
-        throw new Error(`Failed to fetch countdown: ${response.statusText}`);
-      }
-      const result = await response.json();
+      const result = await apiGet(COUNTDOWN_ENDPOINTS.BASE);
       const raw = result?.data || result || null;
       if (!raw) return null;
 
-      // Return snake_case properties directly
+      // Return snake_case properties directly with fallback defaults
       return {
         title: raw.title ?? 'Countdown zum SLAM25',
         subtitle: raw.subtitle ?? '28. Oktober 2025 • 12:00 Uhr (Berlin Zeit)',
@@ -35,11 +27,9 @@ export function useCountdown() {
         is_active: raw.is_active ?? false,
       };
     },
-    // Use getQueryConfig FIRST, then override specific values
     ...getQueryConfig('countdown', false),
-    staleTime: 10 * 60 * 1000,  // 10 minutes (override for consistent caching)
+    staleTime: 10 * 60 * 1000,  // 10 minutes
     gcTime: 20 * 60 * 1000,     // 20 minutes
-    // refetchInterval from getQueryConfig will be 1 minute (CRITICAL)
   });
 }
 
@@ -48,19 +38,10 @@ export function useUpdateCountdown() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (countdownData) => {
-      const response = await authService.authenticatedRequest(
-        `${API_URL}/countdown-config`,
-        {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(countdownData)
-        }
-      );
-      const result = await response.json();
-      return result?.data || result;
+      return await apiPut(COUNTDOWN_ENDPOINTS.BASE, countdownData);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: countdownKeys.all });
+      invalidateEntityQueries(queryClient, 'countdown');
     },
   });
 }

@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import { API_URL } from '../config/api.js';
+import { apiGet } from '../utils/apiWrapper.js';
+import { PARTICIPANTS_ENDPOINTS } from '../constants/apiEndpoints.js';
 
 /**
  * Hook for server-side participants search
@@ -17,7 +18,7 @@ export function useParticipantsSearch(searchTerm, filters = {}, options = {}) {
     queryKey: ['participants', 'search', searchTerm, filters, page, limit],
     queryFn: async () => {
       const params = new URLSearchParams();
-      
+
       if (searchTerm?.trim()) {
         params.set('search', searchTerm.trim());
       }
@@ -30,27 +31,20 @@ export function useParticipantsSearch(searchTerm, filters = {}, options = {}) {
       params.set('page', page.toString());
       params.set('limit', limit.toString());
 
-      const response = await fetch(`${API_URL}/participants/search?${params}`, {
-        credentials: 'include'
-      });
+      const url = `${PARTICIPANTS_ENDPOINTS.SEARCH}?${params}`;
+      const result = await apiGet(url);
 
-      if (!response.ok) {
-        throw new Error(`Failed to search participants: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      
       if (result?.success === false) {
         console.warn('Participants search API returned error:', result.error);
-        return { 
-          data: [], 
-          meta: { 
-            totalCount: 0, 
-            currentPage: page, 
+        return {
+          data: [],
+          meta: {
+            totalCount: 0,
+            currentPage: page,
             totalPages: 0,
             searchTerm: searchTerm || '',
-            filters 
-          } 
+            filters
+          }
         };
       }
 
@@ -81,21 +75,14 @@ export function useParticipantsFilterOptions(searchTerm = '', baseFilters = {}) 
       params.set('limit', '1000'); // Get more results to analyze options
       params.set('page', '1');
 
-      const response = await fetch(`${API_URL}/participants/search?${params}`, {
-        credentials: 'include'
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to get filter options: ${response.statusText}`);
-      }
-
-      const result = await response.json();
+      const url = `${PARTICIPANTS_ENDPOINTS.SEARCH}?${params}`;
+      const result = await apiGet(url);
       const participants = result?.data?.data || [];
-      
+
       // Extract unique regions and roles from results
       const regions = [...new Set(participants.map(p => p.region).filter(Boolean))].sort();
       const roles = [...new Set(participants.map(p => p.role).filter(Boolean))].sort();
-      
+
       return { regions, roles };
     },
     enabled: searchTerm?.length >= 2,
