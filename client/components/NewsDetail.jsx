@@ -135,9 +135,9 @@ const NewsDetail = () => {
               />
             ) : (
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Bild</h3>
-                <img 
-                  src={article.featured_image_url} 
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Bild</h2>
+                <img
+                  src={article.featured_image_url}
                   alt={article.title}
                   className="w-full max-w-2xl mx-auto rounded-lg shadow-md"
                 />
