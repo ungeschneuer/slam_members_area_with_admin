@@ -18,8 +18,10 @@ import AdminNewsCreate from './components/admin/AdminNewsCreate.jsx';
 import AdminNewsEdit from './components/admin/AdminNewsEdit.jsx';
 import AdminTimetable from './components/admin/AdminTimetable';
 import AdminCityTips from './components/admin/AdminCityTips';
+import AdminCityTipsForm from './components/admin/AdminCityTipsForm.jsx';
 import AdminInfoPages from './components/admin/AdminInfoPages';
 import AdminLinks from './components/admin/AdminLinks';
+import AdminLinksForm from './components/admin/AdminLinksForm.jsx';
 import AdminSchnellzugriff from './components/admin/AdminSchnellzugriff.jsx';
 import AdminCountdown from './components/admin/AdminCountdown';
 import AdminUserPassword from './components/admin/AdminUserPassword.jsx';
@@ -54,10 +56,15 @@ function AdminPanel() {
         <Route path="/news/:id/edit" element={<AdminNewsEdit />} />
 
         <Route path="/city-tips" element={<AdminCityTips />} />
+        <Route path="/city-tips/new" element={<AdminCityTipsForm />} />
+        <Route path="/city-tips/:id/edit" element={<AdminCityTipsForm />} />
+
         <Route path="/info-pages" element={<AdminInfoPages />} />
 
         {/* Settings */}
         <Route path="/links" element={<AdminLinks />} />
+        <Route path="/links/new" element={<AdminLinksForm />} />
+        <Route path="/links/:id/edit" element={<AdminLinksForm />} />
         <Route path="/schnellzugriff" element={<AdminSchnellzugriff />} />
         <Route path="/countdown" element={<AdminCountdown />} />
         <Route path="/user-password" element={<AdminUserPassword />} />
