@@ -1,17 +1,24 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { API_URL } from '../config/api.js';
-import authService from '../services/authService.js';
+import { apiGet, apiPost, apiPut, apiDelete } from '../utils/apiWrapper.js';
+import { NEWS_ENDPOINTS, BREAKING_NEWS_ENDPOINTS } from '../constants/apiEndpoints.js';
+import {
+  createEntityQueryKeys,
+  invalidateEntityQueries,
+  createOnSuccessHandler,
+  updateOnSuccessHandler,
+  deleteOnSuccessHandler
+} from '../utils/queryKeyFactory.js';
 import { useEntityData } from './useEntityData.js';
 import { getQueryConfig } from '../config/polling.js';
 
 // Query keys for news
-export const newsKeys = {
-  all: ['news'],
-  lists: () => [...newsKeys.all, 'list'],
-  list: (filters) => [...newsKeys.lists(), { filters }],
-  details: () => [...newsKeys.all, 'detail'],
-  detail: (id) => [...newsKeys.details(), id],
-  breaking: () => [...newsKeys.all, 'breaking'],
+export const newsKeys = createEntityQueryKeys('news');
+
+// Breaking news keys (special case)
+export const breakingNewsKeys = {
+  all: ['breaking-news'],
+  lists: () => [...breakingNewsKeys.all, 'list'],
+  detail: (id) => [...breakingNewsKeys.all, 'detail', id]
 };
 
 // Hook to fetch all news
@@ -19,16 +26,7 @@ export function useNews(filters = {}, isAdmin = false) {
   return useEntityData(
     'news',
     async () => {
-      const response = await fetch(`${API_URL}/news`, {
-        credentials: 'include'
-      });
-      if (!response.ok) {
-        throw new Error(`Failed to fetch news: ${response.statusText}`);
-      }
-      const result = await response.json();
-      // Handle nested data structure or direct array
-      const data = result?.data?.data?.rows || result?.data?.rows || result?.data || result;
-      return Array.isArray(data) ? data : [];
+      return await apiGet(NEWS_ENDPOINTS.BASE);
     },
     { filters, ...getQueryConfig('news', isAdmin), isAdmin }
   );
@@ -40,14 +38,7 @@ export function useNewsItem(slug) {
     queryKey: newsKeys.detail(slug),
     queryFn: async () => {
       if (!slug) return null;
-      const response = await fetch(`${API_URL}/news/${slug}`, {
-        credentials: 'include'
-      });
-      if (!response.ok) {
-        throw new Error(`Failed to fetch news item: ${response.statusText}`);
-      }
-      const result = await response.json();
-      return result?.data || result || null;
+      return await apiGet(NEWS_ENDPOINTS.BY_SLUG(slug));
     },
     enabled: !!slug,
     ...getQueryConfig('news', false, { refetchInterval: false }), // Detail pages don't need polling
@@ -57,16 +48,9 @@ export function useNewsItem(slug) {
 // Hook to fetch breaking news
 export function useBreakingNews() {
   return useQuery({
-    queryKey: newsKeys.breaking(),
+    queryKey: breakingNewsKeys.lists(),
     queryFn: async () => {
-      const response = await fetch(`${API_URL}/breaking-news`, {
-        credentials: 'include'
-      });
-      if (!response.ok) {
-        throw new Error(`Failed to fetch breaking news: ${response.statusText}`);
-      }
-      const result = await response.json();
-      const data = result?.data || result || [];
+      const data = await apiGet(BREAKING_NEWS_ENDPOINTS.BASE);
       // Return the first breaking news item or null if none
       return Array.isArray(data) ? data[0] || null : data;
     },
@@ -77,29 +61,14 @@ export function useBreakingNews() {
 // Hook to create a news item
 export function useCreateNews() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (newsData) => {
-      const response = await authService.authenticatedRequest(
-        `${API_URL}/news`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(newsData)
-        }
-      );
-      const result = await response.json();
-      return result?.data || result;
+      return await apiPost(NEWS_ENDPOINTS.BASE, newsData);
     },
     onSuccess: (data) => {
-      // Invalidate all news-related queries to ensure admin components update
-      queryClient.invalidateQueries({ queryKey: ['news'] });
-      queryClient.invalidateQueries({ queryKey: newsKeys.lists() });
-      
-      // If we have the created news data, add it to the cache
-      if (data && data.id) {
-        queryClient.setQueryData(newsKeys.detail(data.id), data);
-      }
+      // Use factory helper for standardized invalidation
+      createOnSuccessHandler(queryClient, 'news')(data);
     },
   });
 }
@@ -107,25 +76,15 @@ export function useCreateNews() {
 // Hook to update a news item
 export function useUpdateNews() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async ({ id, ...newsData }) => {
-      const response = await authService.authenticatedRequest(
-        `${API_URL}/news/${id}`,
-        {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(newsData)
-        }
-      );
-      const result = await response.json();
-      return result?.data || result;
+      return await apiPut(NEWS_ENDPOINTS.BY_ID(id), newsData);
     },
     onSuccess: (data, variables) => {
-      // Invalidate all news-related queries to ensure admin components update
-      queryClient.invalidateQueries({ queryKey: ['news'] });
-      queryClient.invalidateQueries({ queryKey: newsKeys.lists() });
-      
+      // Use factory helper for standardized invalidation
+      updateOnSuccessHandler(queryClient, 'news')(data);
+
       // Update the specific news item in cache
       if (data && data.id) {
         queryClient.setQueryData(newsKeys.detail(variables.id), data);
@@ -137,25 +96,17 @@ export function useUpdateNews() {
 // Hook to delete a news item
 export function useDeleteNews() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (id) => {
-      const response = await authService.authenticatedRequest(
-        `${API_URL}/news/${id}`,
-        {
-          method: 'DELETE'
-        }
-      );
-      const result = await response.json();
-      return result?.data || result;
+      return await apiDelete(NEWS_ENDPOINTS.BY_ID(id));
     },
     onSuccess: (data, id) => {
       // Remove from cache
       queryClient.removeQueries({ queryKey: newsKeys.detail(id) });
-      
-      // Invalidate all news-related queries to ensure admin components update
-      queryClient.invalidateQueries({ queryKey: ['news'] });
-      queryClient.invalidateQueries({ queryKey: newsKeys.lists() });
+
+      // Use factory helper for standardized invalidation
+      deleteOnSuccessHandler(queryClient, 'news')();
     },
   });
 }
@@ -163,23 +114,18 @@ export function useDeleteNews() {
 // Hook to create breaking news
 export function useCreateBreakingNews() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (breakingNewsData) => {
-      const response = await authService.authenticatedRequest(
-        `${API_URL}/breaking-news/${breakingNewsData.id}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(breakingNewsData)
-        }
+      return await apiPost(
+        NEWS_ENDPOINTS.CREATE_BREAKING_NEWS(breakingNewsData.id),
+        breakingNewsData
       );
-      const result = await response.json();
-      return result?.data || result;
     },
     onSuccess: () => {
       // Invalidate both news and breaking news
-      queryClient.invalidateQueries({ queryKey: newsKeys.all });
+      invalidateEntityQueries(queryClient, 'news');
+      queryClient.invalidateQueries({ queryKey: breakingNewsKeys.all });
     },
   });
 }
@@ -187,23 +133,15 @@ export function useCreateBreakingNews() {
 // Hook to update breaking news
 export function useUpdateBreakingNews() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async ({ id, ...breakingNewsData }) => {
-      const response = await authService.authenticatedRequest(
-        `${API_URL}/breaking-news/${id}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(breakingNewsData)
-        }
-      );
-      const result = await response.json();
-      return result?.data || result;
+      return await apiPost(BREAKING_NEWS_ENDPOINTS.BY_ID(id), breakingNewsData);
     },
     onSuccess: () => {
       // Invalidate both news and breaking news
-      queryClient.invalidateQueries({ queryKey: newsKeys.all });
+      invalidateEntityQueries(queryClient, 'news');
+      queryClient.invalidateQueries({ queryKey: breakingNewsKeys.all });
     },
   });
 }
@@ -211,21 +149,15 @@ export function useUpdateBreakingNews() {
 // Hook to delete breaking news
 export function useDeleteBreakingNews() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (id) => {
-      const response = await authService.authenticatedRequest(
-        `${API_URL}/breaking-news`,
-        {
-          method: 'DELETE'
-        }
-      );
-      const result = await response.json();
-      return result?.data || result;
+      return await apiDelete(BREAKING_NEWS_ENDPOINTS.BASE);
     },
     onSuccess: () => {
       // Invalidate both news and breaking news
-      queryClient.invalidateQueries({ queryKey: newsKeys.all });
+      invalidateEntityQueries(queryClient, 'news');
+      queryClient.invalidateQueries({ queryKey: breakingNewsKeys.all });
     },
   });
 }

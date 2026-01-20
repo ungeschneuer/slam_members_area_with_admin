@@ -1,34 +1,28 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { API_URL } from '../config/api.js';
-import authService from '../services/authService.js';
+import { apiGet, apiPost, apiPut, apiDelete } from '../utils/apiWrapper.js';
+import { INFO_PAGES_ENDPOINTS } from '../constants/apiEndpoints.js';
+import {
+  createEntityQueryKeys,
+  createOnSuccessHandler,
+  updateOnSuccessHandler,
+  deleteOnSuccessHandler,
+  invalidateEntityQueries
+} from '../utils/queryKeyFactory.js';
 import { useEntityData } from './useEntityData.js';
 import { getQueryConfig } from '../config/polling.js';
 
 // Query keys for info pages
-export const infoPagesKeys = {
-  all: ['info-pages'],
-  lists: () => [...infoPagesKeys.all, 'list'],
-  list: (filters) => [...infoPagesKeys.lists(), { filters }],
-  details: () => [...infoPagesKeys.all, 'detail'],
-  detail: (id) => [...infoPagesKeys.details(), id],
-  bySlug: (slug) => [...infoPagesKeys.details(), 'slug', slug],
-};
+export const infoPagesKeys = createEntityQueryKeys('info-pages');
+
+// Add custom bySlug query key
+infoPagesKeys.bySlug = (slug) => [...infoPagesKeys.details(), 'slug', slug];
 
 // Hook to fetch all info pages (ADMIN ONLY - includes drafts)
 export function useInfoPages(filters = {}, isAdmin = false) {
   return useEntityData(
     'info-pages',
     async () => {
-      const response = await fetch(`${API_URL}/info-pages`, {
-        credentials: 'include'
-      });
-      if (!response.ok) {
-        throw new Error(`Failed to fetch info pages: ${response.statusText}`);
-      }
-      const result = await response.json();
-      // Handle nested data structure or direct array
-      const data = result?.data?.rows || result?.data || result || [];
-      return Array.isArray(data) ? data : [];
+      return await apiGet(INFO_PAGES_ENDPOINTS.BASE);
     },
     { filters, ...getQueryConfig('infoPages', isAdmin), isAdmin }
   );
@@ -39,16 +33,7 @@ export function usePublishedInfoPages(filters = {}) {
   return useEntityData(
     'info-pages-published',
     async () => {
-      const response = await fetch(`${API_URL}/info-pages/published`, {
-        credentials: 'include'
-      });
-      if (!response.ok) {
-        throw new Error(`Failed to fetch published info pages: ${response.statusText}`);
-      }
-      const result = await response.json();
-      // Handle nested data structure or direct array
-      const data = result?.data?.rows || result?.data || result || [];
-      return Array.isArray(data) ? data : [];
+      return await apiGet(INFO_PAGES_ENDPOINTS.PUBLISHED);
     },
     { filters, ...getQueryConfig('infoPages', false), isAdmin: false }
   );
@@ -60,14 +45,7 @@ export function useInfoPage(id) {
     queryKey: infoPagesKeys.detail(id),
     queryFn: async () => {
       if (!id) return null;
-      const response = await fetch(`${API_URL}/info-pages/${id}`, {
-        credentials: 'include'
-      });
-      if (!response.ok) {
-        throw new Error(`Failed to fetch info page: ${response.statusText}`);
-      }
-      const result = await response.json();
-      return result?.data || result || null;
+      return await apiGet(INFO_PAGES_ENDPOINTS.BY_ID(id));
     },
     enabled: !!id,
     ...getQueryConfig('infoPages', false, { refetchInterval: false }), // Detail pages don't need polling
@@ -80,15 +58,15 @@ export function useInfoPageBySlug(slug) {
     queryKey: infoPagesKeys.bySlug(slug),
     queryFn: async () => {
       if (!slug) return null;
-      const response = await fetch(`${API_URL}/info-pages/${slug}`, {
-        credentials: 'include'
-      });
-      if (response.status === 404) return null;
-      if (!response.ok) throw new Error(`Failed to fetch info page: ${response.statusText}`);
-      const result = await response.json();
-      // Handle nested data structure or direct object
-      const data = result?.data?.rows?.[0] || result?.data || result || null;
-      return data;
+      try {
+        const result = await apiGet(INFO_PAGES_ENDPOINTS.BY_SLUG(slug));
+        // Handle nested data structure or direct object
+        return result?.rows?.[0] || result || null;
+      } catch (error) {
+        // Return null for 404 errors
+        if (error.status === 404) return null;
+        throw error;
+      }
     },
     enabled: !!slug,
     ...getQueryConfig('infoPages', false, { refetchInterval: false }), // Detail pages don't need polling
@@ -98,34 +76,26 @@ export function useInfoPageBySlug(slug) {
 // Hook to create an info page
 export function useCreateInfoPage() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (infoPageData) => {
-      const response = await authService.authenticatedRequest(
-        `${API_URL}/info-pages`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(infoPageData)
-        }
-      );
-      const result = await response.json();
-      return result?.data || result;
+      return await apiPost(INFO_PAGES_ENDPOINTS.BASE, infoPageData);
     },
     onSuccess: (data) => {
-      // Invalidate all info-pages-related queries to ensure admin components update
-      queryClient.invalidateQueries({ queryKey: ['info-pages'] });
-      queryClient.invalidateQueries({ queryKey: infoPagesKeys.lists() });
-      // Also invalidate the specific query used by useEntityData
-      queryClient.invalidateQueries({ queryKey: ['info-pages', {}] });
-      // Invalidate ALL queries that start with 'info-pages' (more aggressive)
-      queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] === 'info-pages' });
-      
-      // If we have the created info page data, add it to the cache
+      // Use optimized factory helper (no need for expensive predicate)
+      invalidateEntityQueries(queryClient, 'info-pages');
+      invalidateEntityQueries(queryClient, 'info-pages-published');
+
+      // Set cache for detail and bySlug
       if (data?.data) {
         queryClient.setQueryData(infoPagesKeys.detail(data.data.id), data.data);
         if (data.data.slug) {
           queryClient.setQueryData(infoPagesKeys.bySlug(data.data.slug), data.data);
+        }
+      } else if (data?.id) {
+        queryClient.setQueryData(infoPagesKeys.detail(data.id), data);
+        if (data.slug) {
+          queryClient.setQueryData(infoPagesKeys.bySlug(data.slug), data);
         }
       }
     },
@@ -135,32 +105,26 @@ export function useCreateInfoPage() {
 // Hook to update an info page
 export function useUpdateInfoPage() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async ({ id, ...infoPageData }) => {
-      const response = await authService.authenticatedRequest(
-        `${API_URL}/info-pages/${id}`,
-        {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(infoPageData)
-        }
-      );
-      const result = await response.json();
-      return result?.data || result;
+      return await apiPut(INFO_PAGES_ENDPOINTS.BY_ID(id), infoPageData);
     },
     onSuccess: (data, variables) => {
-      // Invalidate all info-pages-related queries to ensure admin components update
-      queryClient.invalidateQueries({ queryKey: ['info-pages'] });
-      queryClient.invalidateQueries({ queryKey: infoPagesKeys.lists() });
-      // Also invalidate the specific query used by useEntityData
-      queryClient.invalidateQueries({ queryKey: ['info-pages', {}] });
-      
+      // Use optimized factory helper
+      updateOnSuccessHandler(queryClient, 'info-pages')(data);
+      invalidateEntityQueries(queryClient, 'info-pages-published');
+
       // Update the specific info page in cache
       if (data?.data) {
         queryClient.setQueryData(infoPagesKeys.detail(variables.id), data.data);
         if (data.data.slug) {
           queryClient.setQueryData(infoPagesKeys.bySlug(data.data.slug), data.data);
+        }
+      } else if (data?.id && variables.id) {
+        queryClient.setQueryData(infoPagesKeys.detail(variables.id), data);
+        if (data.slug) {
+          queryClient.setQueryData(infoPagesKeys.bySlug(data.slug), data);
         }
       }
     },
@@ -170,27 +134,18 @@ export function useUpdateInfoPage() {
 // Hook to delete an info page
 export function useDeleteInfoPage() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (id) => {
-      const response = await authService.authenticatedRequest(
-        `${API_URL}/info-pages/${id}`,
-        {
-          method: 'DELETE'
-        }
-      );
-      const result = await response.json();
-      return result?.data || result;
+      return await apiDelete(INFO_PAGES_ENDPOINTS.BY_ID(id));
     },
     onSuccess: (data, id) => {
       // Remove from cache
       queryClient.removeQueries({ queryKey: infoPagesKeys.detail(id) });
-      
-      // Invalidate all info-pages-related queries to ensure admin components update
-      queryClient.invalidateQueries({ queryKey: ['info-pages'] });
-      queryClient.invalidateQueries({ queryKey: infoPagesKeys.lists() });
-      // Also invalidate the specific query used by useEntityData
-      queryClient.invalidateQueries({ queryKey: ['info-pages', {}] });
+
+      // Use optimized factory helper
+      deleteOnSuccessHandler(queryClient, 'info-pages')();
+      invalidateEntityQueries(queryClient, 'info-pages-published');
     },
   });
 }
