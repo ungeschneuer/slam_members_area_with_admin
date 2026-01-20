@@ -46,6 +46,7 @@ export default function PaginationControls({
           value={pageSize}
           onChange={(e) => handlePageSizeChange(parseInt(e.target.value))}
           className="filter-select"
+          aria-label="Anzahl der Einträge pro Seite auswählen"
         >
           {pageSizeOptions.map(size => (
             <option key={size} value={size}>{size}</option>
@@ -72,27 +73,31 @@ export default function PaginationControls({
 
       {/* Page navigation */}
       {pageSize !== 'all' && totalPages > 1 && (
-        <div className="flex items-center space-x-2">
+        <nav aria-label="Seitennummerierung" className="flex items-center space-x-2">
           <button
+            type="button"
             onClick={() => handlePageChange(1)}
             disabled={currentPage === 1}
+            aria-disabled={currentPage === 1}
             className="pagination-btn"
-            aria-label="Erste Seite"
+            aria-label="Zur ersten Seite"
           >
             ««
           </button>
-          
+
           <button
+            type="button"
             onClick={() => handlePageChange(currentPage - 1)}
             disabled={currentPage === 1}
+            aria-disabled={currentPage === 1}
             className="pagination-btn"
-            aria-label="Vorherige Seite"
+            aria-label="Zur vorherigen Seite"
           >
             ‹
           </button>
 
           {/* Page numbers */}
-          <div className="flex space-x-1">
+          <div className="flex space-x-1" role="group" aria-label="Seiten">
             {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
               let pageNum;
               if (totalPages <= 5) {
@@ -108,9 +113,10 @@ export default function PaginationControls({
               return (
                 <button
                   key={pageNum}
+                  type="button"
                   onClick={() => handlePageChange(pageNum)}
                   className={currentPage === pageNum ? 'pagination-btn-active' : 'pagination-btn'}
-                  aria-label={`Seite ${pageNum}`}
+                  aria-label={`${currentPage === pageNum ? 'Aktuelle Seite, ' : ''}Seite ${pageNum}`}
                   aria-current={currentPage === pageNum ? 'page' : undefined}
                 >
                   {pageNum}
@@ -120,23 +126,27 @@ export default function PaginationControls({
           </div>
 
           <button
+            type="button"
             onClick={() => handlePageChange(currentPage + 1)}
             disabled={currentPage === totalPages}
+            aria-disabled={currentPage === totalPages}
             className="pagination-btn"
-            aria-label="Nächste Seite"
+            aria-label="Zur nächsten Seite"
           >
             ›
           </button>
-          
+
           <button
+            type="button"
             onClick={() => handlePageChange(totalPages)}
             disabled={currentPage === totalPages}
+            aria-disabled={currentPage === totalPages}
             className="pagination-btn"
-            aria-label="Letzte Seite"
+            aria-label="Zur letzten Seite"
           >
             »»
           </button>
-        </div>
+        </nav>
       )}
     </div>
   );

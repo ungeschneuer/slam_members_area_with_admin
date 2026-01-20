@@ -281,17 +281,18 @@ export default function InteractiveMap({ locations, onLocationClick, selectedLoc
         </div>
       )}
       
-      <div 
-        ref={mapRef} 
+      <div
+        ref={mapRef}
         className="w-full h-full rounded-lg overflow-hidden border-2 border-gray-200 dark:border-gray-600"
-        style={{ 
+        style={{
           zIndex: 1,
           position: 'relative',
           maxWidth: '100%',
           maxHeight: '100%'
         }}
-        role="img"
+        role="application"
         aria-label="Interaktive Karte von Chemnitz mit Standorten"
+        aria-roledescription="Interaktive Karte"
       />
       
       {/* Map Legend - Collapsible - Hidden on mobile */}

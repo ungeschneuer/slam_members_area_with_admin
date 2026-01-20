@@ -351,7 +351,7 @@ export default function Participants() {
       )}
 
       {/* Header */}
-      <div className="page-header-card">
+      <header className="page-header-card">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 space-y-4 sm:space-y-0">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Wettbewerb-Teilnehmer*innen</h1>
@@ -359,55 +359,84 @@ export default function Participants() {
           </div>
         </div>
 
-        {/* Sort Control */}
-        <div className="mb-4">
-          <label htmlFor="sort-select" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Sortierung
-          </label>
-          <select
-            id="sort-select"
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            className="filter-select max-w-xs"
-            aria-label="Sortierung"
-          >
-            <option value="random">🎲 Zufällige Reihenfolge</option>
-            <option value="name-asc">📝 Name (A-Z)</option>
-            <option value="name-desc">📝 Name (Z-A)</option>
-          </select>
-        </div>
-
         {/* Search and Filter Controls */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-          <input
-            type="text"
-            placeholder="Wettbewerb-Teilnehmer*innen und Teams suchen..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="search-input"
-          />
-          <select
-            value={filterRole}
-            onChange={(e) => setFilterRole(e.target.value)}
-            className="filter-select"
-          >
-            <option value="all">Alle Rollen</option>
-            {availableRoles.map(role => (
-              <option key={role} value={role}>{translateRole(role)}</option>
-            ))}
-          </select>
-          <select
-            value={filterBundesland}
-            onChange={(e) => setFilterBundesland(e.target.value)}
-            className="filter-select"
-          >
-            <option value="all">Alle Bundesländer/Regionen</option>
-            {availableRegions.map(bundesland => (
-              <option key={bundesland} value={bundesland}>{bundesland}</option>
-            ))}
-          </select>
-        </div>
+        <aside aria-label="Such- und Filteroptionen" className="mb-6">
+          <h2 className="sr-only">Suche und Filter</h2>
 
+          {/* Sort Control */}
+          <div className="mb-4">
+            <label htmlFor="sort-select" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Sortierung
+            </label>
+            <select
+              id="sort-select"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="filter-select max-w-xs"
+              aria-label="Sortierung auswählen"
+              aria-describedby="sort-help"
+            >
+              <option value="random">🎲 Zufällige Reihenfolge</option>
+              <option value="name-asc">📝 Name (A-Z)</option>
+              <option value="name-desc">📝 Name (Z-A)</option>
+            </select>
+            <p id="sort-help" className="sr-only">Wählen Sie, wie die Teilnehmer*innen sortiert werden sollen</p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div>
+              <label htmlFor="search-input" className="sr-only">Suche</label>
+              <input
+                id="search-input"
+                type="text"
+                placeholder="Wettbewerb-Teilnehmer*innen und Teams suchen..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="search-input"
+                aria-label="Nach Teilnehmer*innen und Teams suchen"
+                aria-describedby="search-help"
+              />
+              <p id="search-help" className="sr-only">Suchen Sie nach Name, Region oder Rolle</p>
+            </div>
+
+            <div>
+              <label htmlFor="filter-role" className="sr-only">Rollenfilter</label>
+              <select
+                id="filter-role"
+                value={filterRole}
+                onChange={(e) => setFilterRole(e.target.value)}
+                className="filter-select"
+                aria-label="Nach Rolle filtern"
+              >
+                <option value="all">Alle Rollen</option>
+                {availableRoles.map(role => (
+                  <option key={role} value={role}>{translateRole(role)}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="filter-region" className="sr-only">Regionsfilter</label>
+              <select
+                id="filter-region"
+                value={filterBundesland}
+                onChange={(e) => setFilterBundesland(e.target.value)}
+                className="filter-select"
+                aria-label="Nach Bundesland oder Region filtern"
+              >
+                <option value="all">Alle Bundesländer/Regionen</option>
+                {availableRegions.map(bundesland => (
+                  <option key={bundesland} value={bundesland}>{bundesland}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </aside>
+      </header>
+
+      {/* Results Section */}
+      <section aria-labelledby="results-heading">
+        <h2 id="results-heading" className="sr-only">Suchergebnisse</h2>
 
         {/* Participants and Teams Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -566,7 +595,7 @@ export default function Participants() {
             />
           </div>
         )}
-      </div>
+      </section>
     </div>
   );
 }
