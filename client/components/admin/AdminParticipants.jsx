@@ -17,7 +17,7 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ADMIN_PARTICIPANTS_LIMIT } from '../../config/api.js';
 import { ALLOWED_REGIONS } from '../../../shared/constants/regions.js';
-import { PARTICIPANT_ROLES } from '../../../shared/constants/PARTICIPANT_ROLES.js';
+import { PARTICIPANT_ROLES } from '../../../shared/constants/roles.js';
 
 export default function AdminParticipants() {
   // Pagination state
