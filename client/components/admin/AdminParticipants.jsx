@@ -16,6 +16,8 @@ import { downloadParticipantTemplate, downloadParticipantTemplateCSV, parseParti
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ADMIN_PARTICIPANTS_LIMIT } from '../../config/api.js';
+import { ALLOWED_REGIONS } from '../../../shared/constants/regions.js';
+import { PARTICIPANT_ROLES } from '../../../shared/constants/PARTICIPANT_ROLES.js';
 
 export default function AdminParticipants() {
   // Pagination state
@@ -86,37 +88,6 @@ export default function AdminParticipants() {
     }
   });
   const { register: registerEdit, handleSubmit: handleEditSubmit, reset: resetEdit, formState: { errors: editErrors, isSubmitting: isEditSubmitting } } = editForm;
-
-  const bundeslaender = [
-    'Bayern',
-    'Baden-Württemberg',
-    'Berlin-Brandenburg',
-    'Hamburg',
-    'Hessen',
-    'Mecklenburg-Vorpommern',
-    'Niedersachsen/Bremen',
-    'Nordrhein-Westfalen',
-    'Rheinland-Pfalz',
-    'Saarland',
-    'Sachsen',
-    'Sachsen-Anhalt',
-    'Schleswig-Holstein',
-    'Thüringen',
-    'Liechtenstein',
-    'Luxemburg',
-    'Österreich',
-    'Ostbelgien',
-    'Schweiz',
-    'Südtirol',
-    'Slam Alphas',
-    'BiPOC/Migra',
-    'i,Slam',
-    'TINte',
-    'U20',
-    'Chemnitz'
-  ];
-
-  const roles = ['Wettbewerb-Teilnehmer*in', 'Supporter*in', 'SLAM25-Team', 'SLAM-MC'];
 
   // Pronouns is now a free-form text field
 
@@ -511,8 +482,8 @@ export default function AdminParticipants() {
                 <TextInput label="" name="name" register={register} rules={{ required: 'Name ist erforderlich' }} errors={errors} placeholder="Name" />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <SelectInput label="" name="role" register={register} rules={{ required: 'Rolle ist erforderlich' }} errors={errors} options={[{ value: '', label: 'Rolle auswählen' }, ...roles.map(r => ({ value: r, label: r }))]} />
-                <SelectInput label="" name="region" register={register} errors={errors} options={[{ value: '', label: 'Bundesland/Region auswählen' }, ...bundeslaender.map(b => ({ value: b, label: b }))]} />
+                <SelectInput label="" name="role" register={register} rules={{ required: 'Rolle ist erforderlich' }} errors={errors} options={[{ value: '', label: 'Rolle auswählen' }, ...PARTICIPANT_ROLES.map(r => ({ value: r, label: r }))]} />
+                <SelectInput label="" name="region" register={register} errors={errors} options={[{ value: '', label: 'Bundesland/Region auswählen' }, ...ALLOWED_REGIONS.map(b => ({ value: b, label: b }))]} />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <TextInput label="" name="pronouns" register={register} errors={errors} placeholder="Pronomen (z.B. er/ihm, sie/ihr, they/them)" />
@@ -547,7 +518,7 @@ export default function AdminParticipants() {
             {
               value: roleFilter,
               onChange: (e) => setRoleFilter(e.target.value),
-              options: roles.map(role => ({ value: role, label: role })),
+              options: PARTICIPANT_ROLES.map(role => ({ value: role, label: role })),
               placeholder: 'Alle Rollen'
             },
             {
@@ -555,7 +526,7 @@ export default function AdminParticipants() {
               onChange: (e) => setRegionFilter(e.target.value),
               options: [
                 { value: 'none', label: 'Keine Region' },
-                ...bundeslaender.map(bundesland => ({ value: bundesland, label: bundesland }))
+                ...ALLOWED_REGIONS.map(bundesland => ({ value: bundesland, label: bundesland }))
               ],
               placeholder: 'Alle Regionen'
             }
@@ -709,7 +680,7 @@ export default function AdminParticipants() {
                   className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
                 >
                   <option value="">Rolle auswählen</option>
-                  {roles.map(role => (
+                  {PARTICIPANT_ROLES.map(role => (
                     <option key={role} value={role}>{role}</option>
                   ))}
                 </select>
@@ -724,7 +695,7 @@ export default function AdminParticipants() {
                   className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
                 >
                   <option value="">Bundesland/Region auswählen</option>
-                  {bundeslaender.map(bundesland => (
+                  {ALLOWED_REGIONS.map(bundesland => (
                     <option key={bundesland} value={bundesland}>{bundesland}</option>
                   ))}
                 </select>

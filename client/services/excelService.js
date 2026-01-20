@@ -1,6 +1,8 @@
 import * as XLSX from 'xlsx';
 import { z } from 'zod';
 import { generateSlug, generateUniqueSlug } from '../utils/slugUtils.js';
+import { ALLOWED_REGIONS } from '../../shared/constants/regions.js';
+import { PARTICIPANT_ROLES, ROLE_MAPPINGS, normalizeRoleName, exportRoleName } from '../../shared/constants/roles.js';
 
 // Column indices for Excel/CSV templates
 const TEMPLATE_COLUMNS = {
@@ -21,36 +23,8 @@ const participantSchema = z.object({
   instagram: z.string().optional()
 });
 
-// Allowed roles and regions (matching AdminParticipants.jsx)
-const allowedRoles = ['Teilnehmer*in', 'Supporter*in', 'Crew', 'SLAM-MC'];
-const allowedRegions = [
-  'Bayern',
-  'Baden-Württemberg',
-  'Berlin-Brandenburg',
-  'Hamburg',
-  'Hessen',
-  'Mecklenburg-Vorpommern',
-  'Niedersachsen/Bremen',
-  'Nordrhein-Westfalen',
-  'Rheinland-Pfalz',
-  'Saarland',
-  'Sachsen',
-  'Sachsen-Anhalt',
-  'Schleswig-Holstein',
-  'Thüringen',
-  'Liechtenstein',
-  'Luxemburg',
-  'Österreich',
-  'Ostbelgien',
-  'Schweiz',
-  'Südtirol',
-  'Slam Alphas',
-  'BiPOC/Migra',
-  'i,Slam',
-  'TINte',
-  'U20',
-  'Chemnitz'
-];
+// For Excel templates, we use simplified role names that map to standard roles
+const excelRoleNames = Object.keys(ROLE_MAPPINGS);
 
 /**
  * Generates an Excel template for participant import with data validation
@@ -104,7 +78,7 @@ export function generateParticipantTemplate() {
   const roleValidation = {
     type: 'list',
     allowBlank: false,
-    formula1: `"${allowedRoles.join(',')}"`,
+    formula1: `"${excelRoleNames.join(',')}"`,
     showErrorMessage: true,
     errorTitle: 'Ungültige Rolle',
     error: 'Bitte wählen Sie eine gültige Rolle aus der Liste aus.',
@@ -112,12 +86,12 @@ export function generateParticipantTemplate() {
     promptTitle: 'Rolle auswählen',
     prompt: 'Wählen Sie eine Rolle aus der Dropdown-Liste aus.'
   };
-  
+
   // Add data validation for Region column (column D, index 3)
   const regionValidation = {
     type: 'list',
     allowBlank: true,
-    formula1: `"${allowedRegions.join(',')}"`,
+    formula1: `"${ALLOWED_REGIONS.join(',')}"`,
     showErrorMessage: true,
     errorTitle: 'Ungültige Region',
     error: 'Bitte wählen Sie eine gültige Region aus der Liste aus.',
@@ -200,10 +174,10 @@ export function downloadParticipantTemplateCSV() {
     'Löschen Sie diese Anweisungszeile vor dem Import',
     '',
     'Erlaubte Rollen:',
-    allowedRoles.join(', '),
+    excelRoleNames.join(', '),
     '',
     'Erlaubte Regionen:',
-    allowedRegions.join(', ')
+    ALLOWED_REGIONS.join(', ')
   ].join('\n');
   
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -294,43 +268,49 @@ export async function parseParticipantCSV(file) {
               return;
             }
             
+            const rawRole = columns[TEMPLATE_COLUMNS.ROLE] || '';
+            const region = columns[TEMPLATE_COLUMNS.REGION] || '';
+
+            // Normalize role from Excel name to standard name
+            const normalizedRole = normalizeRoleName(rawRole);
+
             const participantData = {
               name,
               slug,
-              role: columns[TEMPLATE_COLUMNS.ROLE] || '',
-              region: columns[TEMPLATE_COLUMNS.REGION] || '',
+              role: normalizedRole,
+              region,
               pronouns: columns[TEMPLATE_COLUMNS.PRONOUNS] || '',
               instagram: columns[TEMPLATE_COLUMNS.INSTAGRAM] || ''
             };
-            
+
             // Validate with Zod schema
             const validationResult = participantSchema.safeParse(participantData);
-            
+
             if (validationResult.success) {
               // Additional validation for role and region
-              const roleValid = allowedRoles.includes(participantData.role);
-              const regionValid = !participantData.region || allowedRegions.includes(participantData.region);
-              
+              const roleValid = excelRoleNames.includes(rawRole) || PARTICIPANT_ROLES.includes(normalizedRole);
+              const regionValid = !region || ALLOWED_REGIONS.includes(region);
+
               if (!roleValid) {
                 errors.push({
                   row: rowNumber,
                   field: 'Rolle',
-                  value: participantData.role,
-                  message: `Ungültige Rolle. Erlaubte Werte: ${allowedRoles.join(', ')}`
+                  value: rawRole,
+                  message: `Ungültige Rolle. Erlaubte Werte: ${excelRoleNames.join(', ')}`
                 });
                 return;
               }
-              
+
               if (!regionValid) {
                 errors.push({
                   row: rowNumber,
                   field: 'Region',
-                  value: participantData.region,
-                  message: `Ungültige Region. Erlaubte Werte: ${allowedRegions.join(', ')}`
+                  value: region,
+                  message: `Ungültige Region. Erlaubte Werte: ${ALLOWED_REGIONS.join(', ')}`
                 });
                 return;
               }
-              
+
               validRows.push(participantData);
             } else {
               // Handle Zod validation errors
@@ -452,43 +432,49 @@ export async function parseParticipantExcel(file) {
               return;
             }
             
+            const rawRole = row[TEMPLATE_COLUMNS.ROLE]?.toString().trim() || '';
+            const region = row[TEMPLATE_COLUMNS.REGION]?.toString().trim() || '';
+
+            // Normalize role from Excel name to standard name
+            const normalizedRole = normalizeRoleName(rawRole);
+
             const participantData = {
               name,
               slug,
-              role: row[TEMPLATE_COLUMNS.ROLE]?.toString().trim() || '',
-              region: row[TEMPLATE_COLUMNS.REGION]?.toString().trim() || '',
+              role: normalizedRole,
+              region,
               pronouns: row[TEMPLATE_COLUMNS.PRONOUNS]?.toString().trim() || '',
               instagram: row[TEMPLATE_COLUMNS.INSTAGRAM]?.toString().trim() || ''
             };
-            
+
             // Validate with Zod schema
             const validationResult = participantSchema.safeParse(participantData);
-            
+
             if (validationResult.success) {
               // Additional validation for role and region
-              const roleValid = allowedRoles.includes(participantData.role);
-              const regionValid = !participantData.region || allowedRegions.includes(participantData.region);
-              
+              const roleValid = excelRoleNames.includes(rawRole) || PARTICIPANT_ROLES.includes(normalizedRole);
+              const regionValid = !region || ALLOWED_REGIONS.includes(region);
+
               if (!roleValid) {
                 errors.push({
                   row: rowNumber,
                   field: 'Rolle',
-                  value: participantData.role,
-                  message: `Ungültige Rolle. Erlaubte Werte: ${allowedRoles.join(', ')}`
+                  value: rawRole,
+                  message: `Ungültige Rolle. Erlaubte Werte: ${excelRoleNames.join(', ')}`
                 });
                 return;
               }
-              
+
               if (!regionValid) {
                 errors.push({
                   row: rowNumber,
                   field: 'Region',
-                  value: participantData.region,
-                  message: `Ungültige Region. Erlaubte Werte: ${allowedRegions.join(', ')}`
+                  value: region,
+                  message: `Ungültige Region. Erlaubte Werte: ${ALLOWED_REGIONS.join(', ')}`
                 });
                 return;
               }
-              
+
               validRows.push(participantData);
             } else {
               // Handle Zod validation errors
@@ -538,32 +524,32 @@ export async function parseParticipantExcel(file) {
  */
 export function validateParticipantRow(row, index) {
   const validationResult = participantSchema.safeParse(row);
-  
+
   if (validationResult.success) {
     // Additional validation for role and region
-    const roleValid = allowedRoles.includes(row.role);
-    const regionValid = !row.region || allowedRegions.includes(row.region);
-    
+    const roleValid = PARTICIPANT_ROLES.includes(row.role);
+    const regionValid = !row.region || ALLOWED_REGIONS.includes(row.region);
+
     const errors = [];
-    
+
     if (!roleValid) {
       errors.push({
         row: index + 1,
         field: 'Rolle',
         value: row.role,
-        message: `Ungültige Rolle. Erlaubte Werte: ${allowedRoles.join(', ')}`
+        message: `Ungültige Rolle. Erlaubte Werte: ${PARTICIPANT_ROLES.join(', ')}`
       });
     }
-    
+
     if (!regionValid && row.region) {
       errors.push({
         row: index + 1,
         field: 'Region',
         value: row.region,
-        message: `Ungültige Region. Erlaubte Werte: ${allowedRegions.join(', ')}`
+        message: `Ungültige Region. Erlaubte Werte: ${ALLOWED_REGIONS.join(', ')}`
       });
     }
-    
+
     return {
       isValid: errors.length === 0,
       errors
