@@ -1,20 +1,24 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { API_URL } from '../config/api.js';
+import { apiGet, apiPost, apiPut, apiDelete } from '../utils/apiWrapper.js';
+import { TEAMS_ENDPOINTS } from '../constants/apiEndpoints.js';
+import { createEntityQueryKeys, invalidateEntityQueries } from '../utils/queryKeyFactory.js';
 import { getQueryConfig } from '../config/polling.js';
+
+// Query keys for teams
+export const teamsKeys = createEntityQueryKeys('teams');
+
+// Add custom query keys for team-specific queries
+teamsKeys.bySlug = (slug) => [...teamsKeys.details(), 'slug', slug];
+teamsKeys.members = (teamId) => [...teamsKeys.all, teamId, 'members'];
+teamsKeys.byRound = (roundId) => [...teamsKeys.all, 'round', roundId];
+teamsKeys.byParticipant = (participantId) => [...teamsKeys.all, 'participant', participantId];
 
 // Fetch all teams
 export const useTeams = (isAdmin = false) => {
   return useQuery({
-    queryKey: ['teams'],
+    queryKey: teamsKeys.all,
     queryFn: async () => {
-      const response = await fetch(`${API_URL}/teams`, {
-        credentials: 'include',
-      });
-      if (!response.ok) {
-        throw new Error('Failed to fetch teams');
-      }
-      const result = await response.json();
-      return result?.data || result || [];
+      return await apiGet(TEAMS_ENDPOINTS.BASE);
     },
     ...getQueryConfig('teams', isAdmin),
   });
@@ -23,16 +27,9 @@ export const useTeams = (isAdmin = false) => {
 // Fetch single team by slug
 export const useTeamBySlug = (slug) => {
   return useQuery({
-    queryKey: ['teams', slug],
+    queryKey: teamsKeys.bySlug(slug),
     queryFn: async () => {
-      const response = await fetch(`${API_URL}/teams/${slug}`, {
-        credentials: 'include',
-      });
-      if (!response.ok) {
-        throw new Error('Failed to fetch team');
-      }
-      const result = await response.json();
-      return result?.data || result;
+      return await apiGet(TEAMS_ENDPOINTS.BY_SLUG(slug));
     },
     enabled: !!slug,
     staleTime: 5 * 60 * 1000,
@@ -42,16 +39,9 @@ export const useTeamBySlug = (slug) => {
 // Fetch team members
 export const useTeamMembers = (teamId) => {
   return useQuery({
-    queryKey: ['teams', teamId, 'members'],
+    queryKey: teamsKeys.members(teamId),
     queryFn: async () => {
-      const response = await fetch(`${API_URL}/teams/${teamId}/members`, {
-        credentials: 'include',
-      });
-      if (!response.ok) {
-        throw new Error('Failed to fetch team members');
-      }
-      const result = await response.json();
-      return result?.data || result || [];
+      return await apiGet(TEAMS_ENDPOINTS.MEMBERS(teamId));
     },
     enabled: !!teamId,
     staleTime: 5 * 60 * 1000,
@@ -61,16 +51,9 @@ export const useTeamMembers = (teamId) => {
 // Fetch teams by round
 export const useTeamsByRound = (roundId) => {
   return useQuery({
-    queryKey: ['teams', 'round', roundId],
+    queryKey: teamsKeys.byRound(roundId),
     queryFn: async () => {
-      const response = await fetch(`${API_URL}/teams/round/${roundId}`, {
-        credentials: 'include',
-      });
-      if (!response.ok) {
-        throw new Error('Failed to fetch teams for round');
-      }
-      const result = await response.json();
-      return result?.data || result || [];
+      return await apiGet(TEAMS_ENDPOINTS.BY_ROUND(roundId));
     },
     enabled: !!roundId,
     staleTime: 5 * 60 * 1000,
@@ -80,16 +63,9 @@ export const useTeamsByRound = (roundId) => {
 // Fetch participant teams
 export const useParticipantTeams = (participantId) => {
   return useQuery({
-    queryKey: ['teams', 'participant', participantId],
+    queryKey: teamsKeys.byParticipant(participantId),
     queryFn: async () => {
-      const response = await fetch(`${API_URL}/teams/participant/${participantId}`, {
-        credentials: 'include',
-      });
-      if (!response.ok) {
-        throw new Error('Failed to fetch participant teams');
-      }
-      const result = await response.json();
-      return result?.data || result || [];
+      return await apiGet(TEAMS_ENDPOINTS.BY_PARTICIPANT(participantId));
     },
     enabled: !!participantId,
     staleTime: 5 * 60 * 1000,
@@ -99,25 +75,13 @@ export const useParticipantTeams = (participantId) => {
 // Create team mutation
 export const useCreateTeam = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (teamData) => {
-      const response = await fetch(`${API_URL}/teams`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify(teamData),
-      });
-      if (!response.ok) {
-        throw new Error('Failed to create team');
-      }
-      const result = await response.json();
-      return result?.data || result;
+      return await apiPost(TEAMS_ENDPOINTS.BASE, teamData);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(['teams']);
+      invalidateEntityQueries(queryClient, 'teams');
     },
   });
 };
@@ -125,26 +89,18 @@ export const useCreateTeam = () => {
 // Update team mutation
 export const useUpdateTeam = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async ({ teamId, teamData }) => {
-      const response = await fetch(`${API_URL}/teams/${teamId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify(teamData),
-      });
-      if (!response.ok) {
-        throw new Error('Failed to update team');
-      }
-      const result = await response.json();
-      return result?.data || result;
+      return await apiPut(TEAMS_ENDPOINTS.BY_ID(teamId), teamData);
     },
     onSuccess: (data, variables) => {
-      queryClient.invalidateQueries(['teams']);
-      queryClient.invalidateQueries(['teams', variables.teamId]);
+      invalidateEntityQueries(queryClient, 'teams');
+
+      // Also invalidate specific team query
+      if (variables.teamId) {
+        queryClient.invalidateQueries({ queryKey: teamsKeys.detail(variables.teamId) });
+      }
     },
   });
 };
@@ -152,36 +108,14 @@ export const useUpdateTeam = () => {
 // Delete team mutation
 export const useDeleteTeam = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (teamId) => {
-      const response = await fetch(`${API_URL}/teams/${teamId}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-      if (!response.ok) {
-        let bodyText = '';
-        try {
-          bodyText = await response.text();
-          const parsed = bodyText ? JSON.parse(bodyText) : {};
-          const err = new Error(parsed?.error || parsed?.message || `Failed to delete team (${response.status})`);
-          err.status = response.status;
-          if (parsed?.details) err.details = parsed.details;
-          throw err;
-        } catch (e) {
-          if (e instanceof SyntaxError) {
-            const err = new Error(`Failed to delete team (${response.status})`);
-            err.status = response.status;
-            throw err;
-          }
-          throw e;
-        }
-      }
-      const result = await response.json();
-      return result?.data || result;
+      // apiDelete handles all error extraction automatically
+      return await apiDelete(TEAMS_ENDPOINTS.BY_ID(teamId));
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(['teams']);
+      invalidateEntityQueries(queryClient, 'teams');
     },
   });
 };
@@ -189,28 +123,19 @@ export const useDeleteTeam = () => {
 // Add team member mutation
 export const useAddTeamMember = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async ({ teamId, participantId }) => {
-      const response = await fetch(`${API_URL}/teams/${teamId}/members`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({ participant_id: participantId }),
-      });
-      if (!response.ok) {
-        throw new Error('Failed to add team member');
-      }
-      const result = await response.json();
-      return result?.data || result;
+      return await apiPost(TEAMS_ENDPOINTS.MEMBERS(teamId), { participant_id: participantId });
     },
     onSuccess: (data, variables) => {
-      queryClient.invalidateQueries(['teams']);
-      queryClient.invalidateQueries(['teams', variables.teamId]);
-      queryClient.invalidateQueries(['teams', variables.teamId, 'members']);
-      queryClient.invalidateQueries(['teams', 'participant', variables.participantId]);
+      // Invalidate all team queries
+      invalidateEntityQueries(queryClient, 'teams');
+
+      // Invalidate specific queries
+      queryClient.invalidateQueries({ queryKey: teamsKeys.detail(variables.teamId) });
+      queryClient.invalidateQueries({ queryKey: teamsKeys.members(variables.teamId) });
+      queryClient.invalidateQueries({ queryKey: teamsKeys.byParticipant(variables.participantId) });
     },
   });
 };
@@ -218,24 +143,19 @@ export const useAddTeamMember = () => {
 // Remove team member mutation
 export const useRemoveTeamMember = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async ({ teamId, participantId }) => {
-      const response = await fetch(`${API_URL}/teams/${teamId}/members/${participantId}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-      if (!response.ok) {
-        throw new Error('Failed to remove team member');
-      }
-      const result = await response.json();
-      return result?.data || result;
+      return await apiDelete(TEAMS_ENDPOINTS.REMOVE_MEMBER(teamId, participantId));
     },
     onSuccess: (data, variables) => {
-      queryClient.invalidateQueries(['teams']);
-      queryClient.invalidateQueries(['teams', variables.teamId]);
-      queryClient.invalidateQueries(['teams', variables.teamId, 'members']);
-      queryClient.invalidateQueries(['teams', 'participant', variables.participantId]);
+      // Invalidate all team queries
+      invalidateEntityQueries(queryClient, 'teams');
+
+      // Invalidate specific queries
+      queryClient.invalidateQueries({ queryKey: teamsKeys.detail(variables.teamId) });
+      queryClient.invalidateQueries({ queryKey: teamsKeys.members(variables.teamId) });
+      queryClient.invalidateQueries({ queryKey: teamsKeys.byParticipant(variables.participantId) });
     },
   });
 };
