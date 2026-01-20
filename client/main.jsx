@@ -7,28 +7,6 @@ import App from './App.jsx'
 import ErrorFallback from './components/ErrorFallback.jsx'
 import './index.css'
 
-
-
-
-// Initialize database services asynchronously
-async function initializeServices() {
-  try {
-    
-    // Database operations handled directly in hooks using fetch
-    
-    // Service registry removed; health monitoring is handled elsewhere
-    
-    // Services simplified - no complex initialization needed
-  } catch (error) {
-    // Service initialization failed - handled silently
-  }
-}
-
-// Initialize services with delay to ensure server is ready
-setTimeout(() => {
-  initializeServices();
-}, 2000); // Wait 2 seconds for server to be ready
-
 // CRITICAL: Unregister any existing service workers to prevent caching issues
 // Only run in production and once per session
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
