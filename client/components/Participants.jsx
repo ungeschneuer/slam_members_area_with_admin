@@ -323,19 +323,29 @@ export default function Participants() {
 
   return (
     <div data-testid="participants" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
+      {/* Screen reader announcement for search results */}
+      <div
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className="sr-only"
+      >
+        {filteredItems.length} {filteredItems.length === 1 ? 'Ergebnis gefunden' : 'Ergebnisse gefunden'}
+      </div>
+
       {/* Error and Success Messages */}
       {error && (
-        <ErrorMessage 
-          error={error} 
-          onRetry={() => window.location.reload()} 
+        <ErrorMessage
+          error={error}
+          onRetry={() => window.location.reload()}
           className="max-w-4xl mx-auto"
         />
       )}
-      
+
       {success && (
-        <SuccessMessage 
-          message={success} 
-          onDismiss={() => setSuccess(null)} 
+        <SuccessMessage
+          message={success}
+          onDismiss={() => setSuccess(null)}
           className="max-w-4xl mx-auto"
         />
       )}

@@ -299,11 +299,12 @@ export default function InteractiveMap({ locations, onLocationClick, selectedLoc
         <div className="p-3">
           <h3 className="font-semibold text-gray-900 dark:text-white mb-2 flex items-center justify-between">
             <span>Legende</span>
-            <button 
+            <button
+              type="button"
               className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
               aria-label="Legende ein-/ausblenden"
             >
-              📋
+              <span aria-hidden="true">📋</span>
             </button>
           </h3>
           <div className="space-y-1 max-h-48 overflow-y-auto">
@@ -334,7 +335,8 @@ export default function InteractiveMap({ locations, onLocationClick, selectedLoc
 
       {/* Map Controls */}
       <div className="absolute top-4 right-4 flex flex-col gap-2 z-10">
-        <button 
+        <button
+          type="button"
           className="bg-white dark:bg-gray-800 rounded-lg p-2 shadow-lg border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
           aria-label="Karte zurücksetzen"
           title="Karte zurücksetzen"
@@ -352,7 +354,7 @@ export default function InteractiveMap({ locations, onLocationClick, selectedLoc
             }
           }}
         >
-          🎯
+          <span aria-hidden="true">🎯</span>
         </button>
       </div>
 
