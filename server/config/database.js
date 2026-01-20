@@ -163,8 +163,12 @@ const getPoolConfig = () => {
     case 'production':
       return {
         ...baseConfig,
-        max: parseInt(process.env.DB_MAX_CONNECTIONS) || 2, // Uberspace file descriptor limit
-        min: parseInt(process.env.DB_MIN_CONNECTIONS) || 1, // Uberspace optimization
+        // Connection pool sizing for production
+        // Default increased from 2 to 15 for better concurrent request handling
+        // Can be overridden via DB_MAX_CONNECTIONS environment variable
+        // Note: Monitor pool utilization and adjust if needed on Uberspace
+        max: parseInt(process.env.DB_MAX_CONNECTIONS) || 15,
+        min: parseInt(process.env.DB_MIN_CONNECTIONS) || 3,
         acquireTimeoutMillis: 60000, // 1 minute
         idleTimeoutMillis: 300000, // 5 minutes
         connectionTimeoutMillis: 20000, // 20 seconds
