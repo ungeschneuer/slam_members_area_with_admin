@@ -40,7 +40,7 @@ export class RoundStatusService {
         return 'COMPLETED';
       }
     } catch (error) {
-      console.error('Error calculating round status:', error);
+      logger.error('Error calculating round status', { error: error.message, stack: error.stack });
       return 'SCHEDULED'; // Default to scheduled on error
     }
   }
@@ -100,7 +100,7 @@ export class RoundStatusService {
       
       return dateTime;
     } catch (error) {
-      console.error('Error creating round datetime:', error);
+      logger.error('Error creating round datetime', { error: error.message, stack: error.stack });
       // Return current time as fallback
       return new Date();
     }
@@ -135,7 +135,7 @@ export class RoundStatusService {
         seconds: Math.floor((diff % (1000 * 60)) / 1000)
       };
     } catch (error) {
-      console.error('Error calculating time until start:', error);
+      logger.error('Error calculating time until start', { error: error.message, stack: error.stack });
       return null;
     }
   }
@@ -174,7 +174,7 @@ export class RoundStatusService {
         seconds: Math.floor((diff % (1000 * 60)) / 1000)
       };
     } catch (error) {
-      console.error('Error calculating time until end:', error);
+      logger.error('Error calculating time until end', { error: error.message, stack: error.stack });
       return null;
     }
   }

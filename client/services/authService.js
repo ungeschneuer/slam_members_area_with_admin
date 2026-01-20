@@ -1,16 +1,18 @@
 /**
  * Unified Authentication Service for SLAM25
- * 
+ *
  * This is the SINGLE authentication service for the entire application.
  * Previously, there were multiple auth services (authService + adminAuthService),
  * but they have been consolidated into this single service.
- * 
+ *
  * Features:
  * - JWT-in-httpOnly-cookie authentication
  * - Automatic session management
  * - Role-based access control (admin/organizer)
  * - Event-driven authentication state changes
  */
+
+import logger from './logger.js';
 
 class AuthService {
   constructor() {
@@ -187,10 +189,10 @@ class AuthService {
    * Make authenticated request
    */
   async authenticatedRequest(url, options = {}) {
-    console.log('[AuthService] authenticatedRequest called:', { url, options });
-    
+    logger.debug('AuthService authenticatedRequest called', { url, options });
+
     if (!this.isAuthenticated) {
-      console.error('[AuthService] Not authenticated, throwing error');
+      logger.error('AuthService: Not authenticated, throwing error');
       throw new Error('Not authenticated');
     }
 
@@ -202,19 +204,19 @@ class AuthService {
       }
     };
 
-    console.log('[AuthService] Making request with options:', { ...defaultOptions, ...options });
-    
+    logger.debug('AuthService: Making request', { url, options: { ...defaultOptions, ...options } });
+
     const response = await fetch(url, { ...defaultOptions, ...options });
-    
-    console.log('[AuthService] Response received:', { 
-      status: response.status, 
+
+    logger.debug('AuthService: Response received', {
+      status: response.status,
       statusText: response.statusText,
-      url: response.url 
+      url: response.url
     });
 
     // Handle different HTTP status codes
     if (response.status === 401) {
-      console.warn('Session expired, logging out');
+      logger.warn('Session expired, logging out');
       await this.logout();
       throw new Error('Session expired');
     }
@@ -229,7 +231,7 @@ class AuthService {
         // If we can't parse JSON, use status text
         errorMessage = response.statusText || errorMessage;
       }
-      console.error('Client error in authenticated request:', {
+      logger.error('Client error in authenticated request', {
         url,
         status: response.status,
         statusText: response.statusText,
@@ -247,7 +249,7 @@ class AuthService {
       } catch (e) {
         errorMessage = response.statusText || errorMessage;
       }
-      console.error('Server error in authenticated request:', {
+      logger.error('Server error in authenticated request', {
         url,
         status: response.status,
         statusText: response.statusText,
@@ -289,7 +291,7 @@ class AuthService {
         detail: { isAuthenticated, user }
       }));
     } catch (error) {
-      console.warn('Failed to dispatch auth event:', error);
+      logger.warn('Failed to dispatch auth event', { error: error.message });
     }
   }
 
