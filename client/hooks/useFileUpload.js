@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { apiUpload } from '../utils/apiWrapper.js';
 
 /**
  * Unified file upload hook
@@ -50,7 +51,7 @@ export function useFileUpload() {
       setUploading(true);
       const formData = new FormData();
       formData.append(fieldName, file);
-      
+
       // Append additional data to FormData
       Object.entries(additionalData).forEach(([key, value]) => {
         if (value !== null && value !== undefined) {
@@ -58,18 +59,7 @@ export function useFileUpload() {
         }
       });
 
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        body: formData,
-        credentials: 'include'
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Upload failed');
-      }
-
-      const result = await response.json();
+      const result = await apiUpload(endpoint, formData);
       onSuccess?.(result);
       return result;
     } catch (err) {
