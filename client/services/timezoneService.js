@@ -3,6 +3,9 @@
  * Provides timezone-aware time utilities for the frontend
  */
 
+import { apiGet } from '../utils/apiWrapper.js';
+import { SETTINGS_ENDPOINTS } from '../constants/apiEndpoints.js';
+
 // Cache for timezone configuration to reduce API calls
 let timezoneCache = null;
 let cacheTimestamp = 0;
@@ -21,27 +24,16 @@ async function getTimezoneConfig() {
   }
   
   try {
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3005/api';
-    const response = await fetch(`${apiUrl}/settings`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      signal: AbortSignal.timeout(5000)
+    const data = await apiGet(SETTINGS_ENDPOINTS.BASE, {
+      timeout: 5000
     });
-    
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-    
-    const data = await response.json();
-    
+
     if (data.success && data.data) {
       timezoneCache = data.data;
       cacheTimestamp = now;
       return data.data;
     }
-    
+
     throw new Error('Invalid response format');
   } catch (error) {
     // Failed to fetch timezone configuration - using fallback

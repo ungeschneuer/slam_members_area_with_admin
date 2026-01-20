@@ -1,70 +1,30 @@
-// Rounds API service
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3005/api';
+// Rounds API service - refactored to use centralized utilities
+import { apiGet, apiPost, apiPut, apiDelete } from '../utils/apiWrapper.js';
+import { ROUNDS_ENDPOINTS } from '../constants/apiEndpoints.js';
 
 export const roundsService = {
   // Get all rounds
   async getRounds() {
-    const response = await fetch(`${API_URL}/rounds`, {
-      credentials: 'include'
-    });
-    if (!response.ok) {
-      throw new Error(`Failed to fetch rounds: ${response.statusText}`);
-    }
-    return response.json();
+    return await apiGet(ROUNDS_ENDPOINTS.BASE);
   },
 
   // Get single round by ID
   async getRound(id) {
-    const response = await fetch(`${API_URL}/rounds/${id}`, {
-      credentials: 'include'
-    });
-    if (!response.ok) {
-      throw new Error(`Failed to fetch round: ${response.statusText}`);
-    }
-    return response.json();
+    return await apiGet(ROUNDS_ENDPOINTS.BY_ID(id));
   },
 
   // Create new round
   async createRound(roundData) {
-    const response = await fetch(`${API_URL}/rounds`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      credentials: 'include',
-      body: JSON.stringify(roundData)
-    });
-    if (!response.ok) {
-      throw new Error(`Failed to create round: ${response.statusText}`);
-    }
-    return response.json();
+    return await apiPost(ROUNDS_ENDPOINTS.BASE, roundData);
   },
 
   // Update round
   async updateRound(id, roundData) {
-    const response = await fetch(`${API_URL}/rounds/${id}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      credentials: 'include',
-      body: JSON.stringify(roundData)
-    });
-    if (!response.ok) {
-      throw new Error(`Failed to update round: ${response.statusText}`);
-    }
-    return response.json();
+    return await apiPut(ROUNDS_ENDPOINTS.BY_ID(id), roundData);
   },
 
   // Delete round
   async deleteRound(id) {
-    const response = await fetch(`${API_URL}/rounds/${id}`, {
-      method: 'DELETE',
-      credentials: 'include'
-    });
-    if (!response.ok) {
-      throw new Error(`Failed to delete round: ${response.statusText}`);
-    }
-    return response.json();
+    return await apiDelete(ROUNDS_ENDPOINTS.BY_ID(id));
   }
 };

@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useUserPasswordStatus, useSetUserPassword } from '../../hooks/index.js';
 
 const schema = z.object({
   password: z.string().min(6, 'Passwort muss mindestens 6 Zeichen lang sein'),
@@ -12,8 +13,8 @@ const schema = z.object({
 });
 
 export default function AdminUserPassword() {
-  const [isProtected, setIsProtected] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const { data: statusData, isLoading: statusLoading } = useUserPasswordStatus();
+  const setUserPassword = useSetUserPassword();
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
 
@@ -21,56 +22,22 @@ export default function AdminUserPassword() {
     resolver: zodResolver(schema)
   });
 
-  // Check current protection status
-  useEffect(() => {
-    const checkStatus = async () => {
-      try {
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/settings/user-password/status`);
-        const data = await response.json();
-        
-        if (data.success) {
-          setIsProtected(data.data.isProtected);
-        }
-      } catch (error) {
-        // Failed to check protection status
-      }
-    };
-
-    checkStatus();
-  }, []);
+  const isProtected = statusData?.isProtected ?? null;
 
   const onSubmit = async (data) => {
-    setIsLoading(true);
     setError('');
     setSuccess('');
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/settings/user-password`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ password: data.password }),
-        credentials: 'include'
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        setSuccess('Passwort erfolgreich gesetzt! Alle Benutzer müssen sich neu anmelden.');
-        setIsProtected(true);
-        reset();
-      } else {
-        setError(result.error || 'Fehler beim Setzen des Passworts');
-      }
-    } catch (error) {
-      setError('Netzwerkfehler beim Setzen des Passworts');
-    } finally {
-      setIsLoading(false);
+      await setUserPassword.mutateAsync({ password: data.password });
+      setSuccess('Passwort erfolgreich gesetzt! Alle Benutzer müssen sich neu anmelden.');
+      reset();
+    } catch (err) {
+      setError('Fehler beim Setzen des Passworts');
     }
   };
 
-  if (isProtected === null) {
+  if (statusLoading || isProtected === null) {
     return (
       <div className="flex items-center justify-center p-8">
         <div className="text-center">
@@ -199,13 +166,13 @@ export default function AdminUserPassword() {
           <div className="flex justify-end">
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={setUserPassword.isPending}
               className="px-6 py-2 bg-[#185757] dark:bg-[#A2D2B9] text-white dark:text-gray-900 rounded-lg hover:bg-[#0f3a3b] dark:hover:bg-[#8BC4A3] focus:ring-2 focus:ring-[#A2D2B9] dark:focus:ring-[#185757] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center"
             >
-              {isLoading && (
+              {setUserPassword.isPending && (
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
               )}
-              {isLoading ? 'Speichere...' : (isProtected ? 'Passwort ändern' : 'Passwort setzen')}
+              {setUserPassword.isPending ? 'Speichere...' : (isProtected ? 'Passwort ändern' : 'Passwort setzen')}
             </button>
           </div>
         </form>

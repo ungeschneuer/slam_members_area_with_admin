@@ -11,6 +11,8 @@ export * from './useLinks.js';
 export * from './useSchnellzugriff.js';
 export * from './useCountdown.js';
 export * from './useDashboardSettings.js';
+export * from './useUserPassword.js';
+export * from './useSettings.js';
 export * from './useEntityData.js';
 export * from './usePageTitle.js';
 

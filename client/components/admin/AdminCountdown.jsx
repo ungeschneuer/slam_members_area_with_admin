@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useCountdown, useUpdateCountdown } from '../../hooks/index.js';
+import { useCountdown, useUpdateCountdown, useSettings } from '../../hooks/index.js';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -9,43 +9,27 @@ import { getTimezoneOffsetFor } from '../../services/timezoneService.js';
 
 export default function AdminCountdown() {
   const navigate = useNavigate();
-  
-  // Use TanStack Query for countdown configuration
+
+  // Use TanStack Query for countdown configuration and settings
   const { data: countdownData, isLoading: loading, error: dataError } = useCountdown();
+  const { data: settingsData } = useSettings();
   const updateCountdown = useUpdateCountdown();
-  
+
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
-  const [timezoneName, setTimezoneName] = useState('Berlin Zeit');
 
-  // Fetch timezone name for display
-  useEffect(() => {
-    const fetchTimezoneName = async () => {
-      try {
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/settings`);
-        const data = await response.json();
-        
-        if (data.success && data.data.timezone) {
-          const timezone = data.data.timezone;
-          // Convert timezone to readable name
-          const timezoneNames = {
-            'Europe/Berlin': 'Berlin Zeit',
-            'Europe/London': 'London Zeit',
-            'Europe/Paris': 'Paris Zeit',
-            'America/New_York': 'New York Zeit',
-            'America/Los_Angeles': 'Los Angeles Zeit',
-            'Asia/Tokyo': 'Tokyo Zeit',
-            'Australia/Sydney': 'Sydney Zeit'
-          };
-          setTimezoneName(timezoneNames[timezone] || `${timezone} Zeit`);
-        }
-      } catch (error) {
-        // Failed to fetch timezone configuration - using fallback
-      }
-    };
-    
-    fetchTimezoneName();
-  }, []);
+  // Get timezone name from settings
+  const timezone = settingsData?.timezone || 'Europe/Berlin';
+  const timezoneNames = {
+    'Europe/Berlin': 'Berlin Zeit',
+    'Europe/London': 'London Zeit',
+    'Europe/Paris': 'Paris Zeit',
+    'America/New_York': 'New York Zeit',
+    'America/Los_Angeles': 'Los Angeles Zeit',
+    'Asia/Tokyo': 'Tokyo Zeit',
+    'Australia/Sydney': 'Sydney Zeit'
+  };
+  const timezoneName = timezoneNames[timezone] || `${timezone} Zeit`;
 
   const schema = z.object({
     title: z.string().min(1, 'Titel ist erforderlich'),
@@ -70,16 +54,12 @@ export default function AdminCountdown() {
     }
   });
 
-  // Update form when countdownData changes
+  // Update form when countdownData or settings changes
   useEffect(() => {
     if (!countdownData) return;
-    
+
     const fetchAndFormat = async () => {
       try {
-        // Get configured timezone from API
-        const settingsResponse = await fetch(`${import.meta.env.VITE_API_URL}/settings`);
-        const settings = await settingsResponse.json();
-        const timezone = settings?.data?.timezone || 'Europe/Berlin';
         
         const mapped = {
           title: countdownData.title ?? 'Countdown zum SLAM25',
@@ -139,10 +119,6 @@ export default function AdminCountdown() {
     setSuccess(null);
 
     try {
-      // Get configured timezone from API
-      const settingsResponse = await fetch(`${import.meta.env.VITE_API_URL}/settings`);
-      const settings = await settingsResponse.json();
-      const timezone = settings?.data?.timezone || 'Europe/Berlin';
       
       const dateTimeStr = data.target_date; // "2025-10-28T12:00"
       

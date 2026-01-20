@@ -1,50 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import ErrorBoundary from './ErrorBoundary.jsx';
+import { useUserPasswordStatus } from '../hooks/index.js';
 
 export default function UserPasswordGate({ children }) {
   const { isUserAuthenticated, isAdmin, userLogin } = useAuth();
-  const [isProtected, setIsProtected] = useState(null); // null = loading, true/false = status
+  const { data: statusData, isLoading: statusLoading, error: statusError } = useUserPasswordStatus();
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Check if password protection is enabled
-  useEffect(() => {
-    const checkProtectionStatus = async () => {
-      try {
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/settings/user-password/status`);
-        
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        
-        const data = await response.json();
-        
-        // Runtime validation of API response
-        if (data && typeof data === 'object' && 
-            data.success === true && 
-            data.data && 
-            typeof data.data === 'object' && 
-            typeof data.data.isProtected === 'boolean') {
-          setIsProtected(data.data.isProtected);
-        } else {
-          // Invalid API response format
-          setIsProtected(false); // Default to no protection on invalid response
-        }
-      } catch (error) {
-        // Failed to check protection status
-        // Show error state instead of defaulting to no protection
-        setIsProtected('error');
-      }
-    };
-
-    checkProtectionStatus();
-  }, []);
+  const isProtected = statusData?.isProtected ?? null;
 
   // If still loading protection status
-  if (isProtected === null) {
+  if (statusLoading || isProtected === null) {
     return (
       <div className="min-h-screen bg-[#A2D2B9] flex items-center justify-center">
         <div className="text-center">
@@ -56,7 +26,7 @@ export default function UserPasswordGate({ children }) {
   }
 
   // If API error occurred
-  if (isProtected === 'error') {
+  if (statusError) {
     return (
       <div className="min-h-screen bg-[#A2D2B9] flex items-center justify-center p-4">
         <div className="w-full max-w-sm">

@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useNews, useBreakingNews, useUpdateNews, useDeleteNews } from '../../hooks/index.js';
+import { useNews, useBreakingNews, useUpdateNews, useDeleteNews, useUpdateBreakingNews, useDeleteBreakingNews } from '../../hooks/index.js';
 import { useQueryClient } from '@tanstack/react-query';
-import authService from '../../services/authService.js';
 import LoadingSpinner from '../LoadingSpinner';
 import { useForm } from 'react-hook-form';
 import { handleLinkClick } from '../../utils/linkUtils.js';
@@ -24,6 +23,8 @@ export default function AdminNews() {
   const { data: breakingNewsData, isLoading: breakingNewsLoading, error: breakingNewsQueryError } = useBreakingNews();
   const updateNews = useUpdateNews();
   const deleteNews = useDeleteNews();
+  const updateBreakingNews = useUpdateBreakingNews();
+  const deleteBreakingNews = useDeleteBreakingNews();
   const queryClient = useQueryClient();
   const news = Array.isArray(newsData) ? newsData : [];
   const [editingNews, setEditingNews] = useState(null);
@@ -189,30 +190,20 @@ export default function AdminNews() {
   const setBreakingNewsArticle = async (data) => {
     try {
       setBreakingNewsError(null);
-      
-      const response = await authService.authenticatedRequest(`${import.meta.env.VITE_API_URL}/breaking-news/${data.selectedNewsForBreaking}`, {
-        method: 'POST',
-        body: JSON.stringify({ duration: parseInt(data.breakingNewsDuration) })
+
+      await updateBreakingNews.mutateAsync({
+        id: data.selectedNewsForBreaking,
+        duration: parseInt(data.breakingNewsDuration)
       });
-      
-      const responseData = await response.json();
-      
-      if (responseData.success) {
-        const durationText = data.breakingNewsDuration === 1 ? '1 Stunde' : 
-                           data.breakingNewsDuration === 24 ? '24 Stunden (1 Tag)' :
-                           data.breakingNewsDuration === 48 ? '48 Stunden (2 Tage)' :
-                           data.breakingNewsDuration === 72 ? '72 Stunden (3 Tage)' :
-                           data.breakingNewsDuration === 168 ? '1 Woche' :
-                           `${data.breakingNewsDuration} Stunden`;
-        setBreakingNewsSuccess(`Breaking News erfolgreich gesetzt für ${durationText}`);
-        breakingNewsForm.reset();
-        
-        // Invalidate breaking news queries to refresh data
-        queryClient.invalidateQueries({ queryKey: ['breaking-news'] });
-        queryClient.invalidateQueries({ queryKey: ['news'] });
-      } else {
-        setBreakingNewsError(responseData.error || 'Fehler beim Setzen der Breaking News');
-      }
+
+      const durationText = data.breakingNewsDuration === 1 ? '1 Stunde' :
+                         data.breakingNewsDuration === 24 ? '24 Stunden (1 Tag)' :
+                         data.breakingNewsDuration === 48 ? '48 Stunden (2 Tage)' :
+                         data.breakingNewsDuration === 72 ? '72 Stunden (3 Tage)' :
+                         data.breakingNewsDuration === 168 ? '1 Woche' :
+                         `${data.breakingNewsDuration} Stunden`;
+      setBreakingNewsSuccess(`Breaking News erfolgreich gesetzt für ${durationText}`);
+      breakingNewsForm.reset();
     } catch (err) {
       // Error setting breaking news - handled by error state
       setBreakingNewsError('Fehler beim Setzen der Breaking News');
@@ -222,22 +213,10 @@ export default function AdminNews() {
   const clearBreakingNews = async () => {
     try {
       setBreakingNewsError(null);
-      
-      const response = await authService.authenticatedRequest(`${import.meta.env.VITE_API_URL}/breaking-news`, {
-        method: 'DELETE'
-      });
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        setBreakingNewsSuccess('Breaking News erfolgreich entfernt');
-        
-        // Invalidate breaking news queries to refresh data
-        queryClient.invalidateQueries({ queryKey: ['breaking-news'] });
-        queryClient.invalidateQueries({ queryKey: ['news'] });
-      } else {
-        setBreakingNewsError(data.error || 'Fehler beim Entfernen der Breaking News');
-      }
+
+      await deleteBreakingNews.mutateAsync();
+
+      setBreakingNewsSuccess('Breaking News erfolgreich entfernt');
     } catch (err) {
       // Error clearing breaking news - handled by error state
       setBreakingNewsError('Fehler beim Entfernen der Breaking News');
