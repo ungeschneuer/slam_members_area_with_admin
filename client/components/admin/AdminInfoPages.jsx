@@ -15,7 +15,11 @@ const infoPageSchema = z.object({
   excerpt: z.string().optional(),
   category: z.enum(['general', 'rules', 'chemnitz', 'weiteres']),
   display_order: z.number().min(0),
-  status: z.enum(['DRAFT', 'PUBLISHED', 'ARCHIVED'])
+  status: z.enum(['DRAFT', 'PUBLISHED', 'ARCHIVED']),
+  additionalLinks: z.array(z.object({
+    title: z.string().optional().default(''),
+    url: z.string().optional().default('')
+  })).optional().default([])
   // NO file fields, NO tags - handled separately
 });
 
@@ -27,6 +31,7 @@ function AdminInfoPages() {
   // Direct useForm - no abstractions
   const form = useForm({
     resolver: zodResolver(infoPageSchema),
+    mode: 'onChange',
     defaultValues: {
       title: '',
       slug: '',
@@ -34,15 +39,16 @@ function AdminInfoPages() {
       excerpt: '',
       category: 'general',
       display_order: 0,
-      status: 'DRAFT'
+      status: 'DRAFT',
+      additionalLinks: []
     }
   });
 
-  const { register, handleSubmit, reset, setValue, watch, formState: { errors, isSubmitting } } = form;
+  const { control, register, handleSubmit, reset, setValue, watch, formState: { errors, isSubmitting } } = form;
 
   // Additional links management
   const { fields: linkFields, append: appendLink, remove: removeLink } = useFieldArray({
-    control: form.control,
+    control,
     name: 'additionalLinks'
   });
 

@@ -38,8 +38,8 @@ export default function News() {
 
   const filteredNews = news.filter(item => {
     const matchesCategory = selectedCategory === 'all' || item.category === selectedCategory;
-    const matchesSearch = item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         item.content.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = (item.title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (item.content || '').toLowerCase().includes(searchTerm.toLowerCase());
     return matchesCategory && matchesSearch;
   });
 

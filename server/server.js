@@ -6,7 +6,7 @@ import morgan from 'morgan';
 import compression from 'compression';
 import path from 'path';
 // Rate limiting configuration
-import { rateLimitConfig, cspConfig } from './config/security.js';
+import { rateLimitConfig } from './config/security.js';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import { createServer } from 'http';
@@ -127,9 +127,9 @@ const getCorsConfig = () => {
 
 const PORT = process.env.PORT || 3005;
 
-// Security middleware - Disable CSP to fix favicon issues
+// Security middleware - Disable CSP to avoid limitations
 app.use(helmet({
-  contentSecurityPolicy: false, // Disable CSP completely to fix favicon loading
+  contentSecurityPolicy: false, // Disable CSP entirely
   frameguard: { action: 'deny' },
   crossOriginEmbedderPolicy: false,
   hsts: {
@@ -212,7 +212,13 @@ if (process.env.NODE_ENV !== 'test') {
 // Favicon endpoint to prevent CSP issues
 app.get('/favicon.ico', (req, res) => {
   res.setHeader('Cache-Control', 'public, max-age=31536000'); // 1 year cache
-  res.sendFile(path.join(process.cwd(), 'public', 'favicon.ico'));
+  res.setHeader('Content-Type', 'image/x-icon');
+  res.sendFile(path.join(process.cwd(), 'public', 'favicon.ico'), (err) => {
+    if (err) {
+      console.error('Favicon error:', err);
+      res.status(404).end();
+    }
+  });
 });
 
 // Health check endpoint

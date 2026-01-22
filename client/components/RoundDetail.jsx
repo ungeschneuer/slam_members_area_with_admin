@@ -148,7 +148,7 @@ const RoundDetail = () => {
           
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-8">
             <div className="flex items-start space-x-4">
-              <div className={`w-16 h-16 bg-${getContentTypeGradient('round')} rounded-full flex items-center justify-center text-white text-2xl font-bold`}>
+              <div className={`w-12 h-12 sm:w-16 sm:h-16 bg-${getContentTypeGradient('round')} rounded-full flex items-center justify-center text-white text-lg sm:text-2xl font-bold`}>
                 {getContentTypeIcon('round')}
               </div>
               <div className="flex-1">

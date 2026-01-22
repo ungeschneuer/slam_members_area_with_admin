@@ -268,7 +268,7 @@ CREATE FUNCTION public.update_info_pages_updated_at() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
-    NEW."updatedAt" = CURRENT_TIMESTAMP;
+    NEW.updated_at = CURRENT_TIMESTAMP;
     RETURN NEW;
 END;
 $$;
@@ -279,6 +279,20 @@ $$;
 --
 
 CREATE FUNCTION public.update_links_updated_at() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: update_teams_updated_at(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.update_teams_updated_at() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
@@ -451,6 +465,13 @@ CREATE TABLE public.city_tips (
 
 
 --
+-- Name: TABLE city_tips; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.city_tips IS 'City tips table - is_featured column removed on 2025-01-23';
+
+
+--
 -- Name: countdown_config; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -557,12 +578,59 @@ CREATE TABLE public.info_pages (
     category character varying(100) DEFAULT 'general'::character varying,
     display_order integer DEFAULT 0,
     status character varying(50) DEFAULT 'DRAFT'::character varying,
-    featured_image_url text,
+    file_url text,
     tags text[] DEFAULT '{}'::text[],
     published_at timestamp without time zone,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    pdf_url text,
+    file_type character varying(10),
+    file_description text,
+    additional_links jsonb DEFAULT '[]'::jsonb,
+    CONSTRAINT info_pages_file_type_check CHECK (((file_type)::text = ANY ((ARRAY['image'::character varying, 'pdf'::character varying])::text[])))
 );
+
+
+--
+-- Name: COLUMN info_pages.status; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.info_pages.status IS 'Publication status: DRAFT, PUBLISHED, ARCHIVED. Use status = ''PUBLISHED'' to filter published pages.';
+
+
+--
+-- Name: COLUMN info_pages.file_url; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.info_pages.file_url IS 'Universal file URL - can be image or PDF';
+
+
+--
+-- Name: COLUMN info_pages.pdf_url; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.info_pages.pdf_url IS 'URL path to uploaded PDF file for this info page';
+
+
+--
+-- Name: COLUMN info_pages.file_type; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.info_pages.file_type IS 'Type of file: image or pdf';
+
+
+--
+-- Name: COLUMN info_pages.file_description; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.info_pages.file_description IS 'Custom description text for the uploaded file';
+
+
+--
+-- Name: COLUMN info_pages.additional_links; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.info_pages.additional_links IS 'Array of additional links with title and URL';
 
 
 --
@@ -745,8 +813,16 @@ CREATE TABLE public.news (
     published_at timestamp without time zone,
     is_breaking_news boolean DEFAULT false,
     breaking_news_until timestamp without time zone,
-    slug character varying(255) NOT NULL
+    slug character varying(255) NOT NULL,
+    CONSTRAINT chk_news_priority CHECK (((priority)::text = ANY ((ARRAY['NORMAL'::character varying, 'HIGH'::character varying, 'URGENT'::character varying])::text[])))
 );
+
+
+--
+-- Name: COLUMN news.priority; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.news.priority IS 'Priority level: NORMAL, HIGH, URGENT. Defaults to NORMAL.';
 
 
 --
@@ -782,8 +858,16 @@ CREATE TABLE public.participants (
     instagram character varying(255),
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-    slug character varying(255) NOT NULL
+    slug character varying(255) NOT NULL,
+    CONSTRAINT participants_role_check CHECK (((role)::text = ANY ((ARRAY['Wettbewerb-Teilnehmer*in'::character varying, 'Supporter*in'::character varying, 'SLAM25-Team'::character varying, 'SLAM-MC'::character varying, 'Moderator*in'::character varying, 'Techniker*in'::character varying, 'Fotograf*in'::character varying, 'Videograf*in'::character varying, 'Organisator*in'::character varying, 'Feature'::character varying, 'DJ'::character varying])::text[])))
 );
+
+
+--
+-- Name: COLUMN participants.role; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.participants.role IS 'Role of the participant: Teilnehmer*in, Supporter*in, Crew, SLAM-MC, Moderator, Technik, Fotograf*in, Feature, DJ';
 
 
 --
@@ -814,11 +898,13 @@ CREATE TABLE public.round_assignments (
     id integer NOT NULL,
     round_id integer NOT NULL,
     participant_id integer,
-    team_id integer,
     roles jsonb DEFAULT '[]'::jsonb NOT NULL,
     metadata jsonb DEFAULT '{}'::jsonb,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    team_id integer,
+    CONSTRAINT check_participant_or_team CHECK ((((participant_id IS NOT NULL) AND (team_id IS NULL)) OR ((participant_id IS NULL) AND (team_id IS NOT NULL)))),
+    CONSTRAINT round_assignments_participant_or_team CHECK ((((participant_id IS NOT NULL) AND (team_id IS NULL)) OR ((participant_id IS NULL) AND (team_id IS NOT NULL))))
 );
 
 
@@ -853,7 +939,6 @@ CREATE TABLE public.rounds (
     address text,
     description text,
     after_play_report text,
-    photos_cloud_url text,
     competition_type character varying(100) DEFAULT 'Einzelwettbewerb'::character varying,
     total_jury_members integer DEFAULT 5,
     status character varying(50) DEFAULT 'SCHEDULED'::character varying,
@@ -865,8 +950,16 @@ CREATE TABLE public.rounds (
     end_time time without time zone NOT NULL,
     version integer DEFAULT 1,
     groups jsonb DEFAULT '[]'::jsonb,
+    photos_cloud_url text,
     CONSTRAINT rounds_time_check CHECK ((end_time > start_time))
 );
+
+
+--
+-- Name: COLUMN rounds.status; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.rounds.status IS 'Round status: confirmed, tentative, upcoming, active, completed, cancelled, postponed';
 
 
 --
@@ -887,6 +980,66 @@ CREATE SEQUENCE public.rounds_id_seq
 --
 
 ALTER SEQUENCE public.rounds_id_seq OWNED BY public.rounds.id;
+
+
+--
+-- Name: schema_migrations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.schema_migrations (
+    id integer NOT NULL,
+    migration_name character varying(255) NOT NULL,
+    applied_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    execution_time_ms integer DEFAULT 0
+);
+
+
+--
+-- Name: TABLE schema_migrations; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.schema_migrations IS 'Tracks which database migrations have been applied';
+
+
+--
+-- Name: COLUMN schema_migrations.migration_name; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.schema_migrations.migration_name IS 'Name of the migration file (e.g., 20250126143052_add_user_preferences.sql)';
+
+
+--
+-- Name: COLUMN schema_migrations.applied_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.schema_migrations.applied_at IS 'When the migration was applied';
+
+
+--
+-- Name: COLUMN schema_migrations.execution_time_ms; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.schema_migrations.execution_time_ms IS 'How long the migration took to execute in milliseconds';
+
+
+--
+-- Name: schema_migrations_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.schema_migrations_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: schema_migrations_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.schema_migrations_id_seq OWNED BY public.schema_migrations.id;
 
 
 --
@@ -1029,6 +1182,74 @@ ALTER SEQUENCE public.settings_id_seq OWNED BY public.settings.id;
 
 
 --
+-- Name: team_members; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.team_members (
+    id integer NOT NULL,
+    team_id integer NOT NULL,
+    participant_id integer NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
+-- Name: team_members_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.team_members_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: team_members_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.team_members_id_seq OWNED BY public.team_members.id;
+
+
+--
+-- Name: teams; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.teams (
+    id integer NOT NULL,
+    name character varying(255) NOT NULL,
+    slug character varying(255) NOT NULL,
+    role character varying(100) DEFAULT 'Team'::character varying NOT NULL,
+    instagram character varying(255),
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
+-- Name: teams_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.teams_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: teams_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.teams_id_seq OWNED BY public.teams.id;
+
+
+--
 -- Name: timetable_entries; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1045,10 +1266,12 @@ CREATE TABLE public.timetable_entries (
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     end_time time without time zone,
-    internal_link character varying(255),
     round_id integer,
     slug character varying(255) NOT NULL,
-    additional_links jsonb DEFAULT '[]'::jsonb
+    additional_links jsonb DEFAULT '[]'::jsonb,
+    address text,
+    sort_order integer DEFAULT 0,
+    CONSTRAINT check_slug_not_empty CHECK (((slug IS NOT NULL) AND ((slug)::text <> ''::text)))
 );
 
 
@@ -1056,7 +1279,21 @@ CREATE TABLE public.timetable_entries (
 -- Name: COLUMN timetable_entries.type; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON COLUMN public.timetable_entries.type IS 'Event type: team-round, individual-round, workshop, fun, aftershow, panel, networking, or general (legacy)';
+COMMENT ON COLUMN public.timetable_entries.type IS 'Event type: team-round, individual-round, workshop, fun, aftershow, or general (legacy)';
+
+
+--
+-- Name: COLUMN timetable_entries.slug; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.timetable_entries.slug IS 'Unique slug for timetable events. Cannot be NULL or empty string.';
+
+
+--
+-- Name: COLUMN timetable_entries.address; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.timetable_entries.address IS 'Optional address field for timetable events';
 
 
 --
@@ -1232,6 +1469,13 @@ ALTER TABLE ONLY public.rounds ALTER COLUMN id SET DEFAULT nextval('public.round
 
 
 --
+-- Name: schema_migrations id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.schema_migrations ALTER COLUMN id SET DEFAULT nextval('public.schema_migrations_id_seq'::regclass);
+
+
+--
 -- Name: schnellzugriff_links id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -1243,6 +1487,20 @@ ALTER TABLE ONLY public.schnellzugriff_links ALTER COLUMN id SET DEFAULT nextval
 --
 
 ALTER TABLE ONLY public.settings ALTER COLUMN id SET DEFAULT nextval('public.settings_id_seq'::regclass);
+
+
+--
+-- Name: team_members id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.team_members ALTER COLUMN id SET DEFAULT nextval('public.team_members_id_seq'::regclass);
+
+
+--
+-- Name: teams id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.teams ALTER COLUMN id SET DEFAULT nextval('public.teams_id_seq'::regclass);
 
 
 --
@@ -1371,19 +1629,27 @@ ALTER TABLE ONLY public.round_assignments
 
 
 --
--- Name: round_assignments round_assignments_round_id_participant_id_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.round_assignments
-    ADD CONSTRAINT round_assignments_round_id_participant_id_key UNIQUE (round_id, participant_id);
-
-
---
 -- Name: rounds rounds_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.rounds
     ADD CONSTRAINT rounds_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: schema_migrations schema_migrations_migration_name_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.schema_migrations
+    ADD CONSTRAINT schema_migrations_migration_name_key UNIQUE (migration_name);
+
+
+--
+-- Name: schema_migrations schema_migrations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.schema_migrations
+    ADD CONSTRAINT schema_migrations_pkey PRIMARY KEY (id);
 
 
 --
@@ -1408,6 +1674,38 @@ ALTER TABLE ONLY public.settings
 
 ALTER TABLE ONLY public.settings
     ADD CONSTRAINT settings_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: team_members team_members_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.team_members
+    ADD CONSTRAINT team_members_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: team_members team_members_team_id_participant_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.team_members
+    ADD CONSTRAINT team_members_team_id_participant_id_key UNIQUE (team_id, participant_id);
+
+
+--
+-- Name: teams teams_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.teams
+    ADD CONSTRAINT teams_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: teams teams_slug_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.teams
+    ADD CONSTRAINT teams_slug_key UNIQUE (slug);
 
 
 --
@@ -1473,7 +1771,6 @@ ALTER TABLE ONLY public.users
 CREATE INDEX idx_city_tips_category ON public.city_tips USING btree (category);
 
 
-
 --
 -- Name: idx_city_tips_name; Type: INDEX; Schema: public; Owner: -
 --
@@ -1510,6 +1807,13 @@ CREATE INDEX idx_countdown_config_updated ON public.countdown_config USING btree
 
 
 --
+-- Name: idx_info_pages_additional_links; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_info_pages_additional_links ON public.info_pages USING gin (additional_links);
+
+
+--
 -- Name: idx_info_pages_category; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1524,10 +1828,17 @@ CREATE INDEX idx_info_pages_created_at ON public.info_pages USING btree (created
 
 
 --
--- Name: idx_info_pages_order; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_info_pages_display_order; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_info_pages_display_order ON public.info_pages USING btree (display_order);
+
+
+--
+-- Name: idx_info_pages_pdf_url; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_info_pages_pdf_url ON public.info_pages USING btree (pdf_url) WHERE (pdf_url IS NOT NULL);
 
 
 --
@@ -1601,7 +1912,14 @@ CREATE INDEX idx_news_category ON public.news USING btree (category);
 
 
 --
--- Name: idx_news_publishedat; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_news_priority; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_news_priority ON public.news USING btree (priority);
+
+
+--
+-- Name: idx_news_published_at; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_news_published_at ON public.news USING btree (published_at);
@@ -1671,6 +1989,13 @@ CREATE INDEX idx_round_assignments_participant ON public.round_assignments USING
 
 
 --
+-- Name: idx_round_assignments_participant_unique; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_round_assignments_participant_unique ON public.round_assignments USING btree (round_id, participant_id) WHERE (participant_id IS NOT NULL);
+
+
+--
 -- Name: idx_round_assignments_roles; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1685,7 +2010,28 @@ CREATE INDEX idx_round_assignments_round ON public.round_assignments USING btree
 
 
 --
--- Name: idx_rounds_competitiontype; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_round_assignments_team; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_round_assignments_team ON public.round_assignments USING btree (team_id);
+
+
+--
+-- Name: idx_round_assignments_team_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_round_assignments_team_id ON public.round_assignments USING btree (team_id);
+
+
+--
+-- Name: idx_round_assignments_team_unique; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_round_assignments_team_unique ON public.round_assignments USING btree (round_id, team_id) WHERE (team_id IS NOT NULL);
+
+
+--
+-- Name: idx_rounds_competition_type; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_rounds_competition_type ON public.rounds USING btree (competition_type);
@@ -1727,10 +2073,17 @@ CREATE INDEX idx_rounds_title ON public.rounds USING btree (title);
 
 
 --
--- Name: idx_rounds_totaljurymembers; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_rounds_total_jury_members; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_rounds_total_jury_members ON public.rounds USING btree (total_jury_members);
+
+
+--
+-- Name: idx_schema_migrations_name; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_schema_migrations_name ON public.schema_migrations USING btree (migration_name);
 
 
 --
@@ -1762,6 +2115,55 @@ CREATE INDEX idx_settings_key ON public.settings USING btree (key);
 
 
 --
+-- Name: idx_team_members_participant; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_team_members_participant ON public.team_members USING btree (participant_id);
+
+
+--
+-- Name: idx_team_members_participant_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_team_members_participant_id ON public.team_members USING btree (participant_id);
+
+
+--
+-- Name: idx_team_members_team; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_team_members_team ON public.team_members USING btree (team_id);
+
+
+--
+-- Name: idx_team_members_team_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_team_members_team_id ON public.team_members USING btree (team_id);
+
+
+--
+-- Name: idx_teams_created_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_teams_created_at ON public.teams USING btree (created_at);
+
+
+--
+-- Name: idx_teams_name; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_teams_name ON public.teams USING btree (name);
+
+
+--
+-- Name: idx_teams_slug; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_teams_slug ON public.teams USING btree (slug);
+
+
+--
 -- Name: idx_timetable_additional_links; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1780,6 +2182,13 @@ CREATE INDEX idx_timetable_date ON public.timetable_entries USING btree (date);
 --
 
 CREATE INDEX idx_timetable_entries_round_id ON public.timetable_entries USING btree (round_id);
+
+
+--
+-- Name: idx_timetable_entries_slug; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_timetable_entries_slug ON public.timetable_entries USING btree (slug);
 
 
 --
@@ -1808,6 +2217,13 @@ CREATE INDEX idx_timetable_participants_role ON public.timetable_participants US
 --
 
 CREATE INDEX idx_timetable_slug ON public.timetable_entries USING btree (slug);
+
+
+--
+-- Name: idx_timetable_sort_order; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_timetable_sort_order ON public.timetable_entries USING btree (sort_order);
 
 
 --
@@ -1902,6 +2318,20 @@ CREATE TRIGGER audit_schnellzugriff_links_changes AFTER INSERT OR DELETE OR UPDA
 
 
 --
+-- Name: team_members audit_team_members_changes; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER audit_team_members_changes AFTER INSERT OR DELETE OR UPDATE ON public.team_members FOR EACH ROW EXECUTE FUNCTION public.log_changes();
+
+
+--
+-- Name: teams audit_teams_changes; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER audit_teams_changes AFTER INSERT OR DELETE OR UPDATE ON public.teams FOR EACH ROW EXECUTE FUNCTION public.log_changes();
+
+
+--
 -- Name: timetable_entries audit_timetable_entries_changes; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -1927,6 +2357,13 @@ CREATE TRIGGER participants_audit_trigger AFTER INSERT OR DELETE OR UPDATE ON pu
 --
 
 CREATE TRIGGER rounds_version_trigger BEFORE UPDATE ON public.rounds FOR EACH ROW EXECUTE FUNCTION public.increment_round_version();
+
+
+--
+-- Name: teams teams_updated_at_trigger; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER teams_updated_at_trigger BEFORE UPDATE ON public.teams FOR EACH ROW EXECUTE FUNCTION public.update_teams_updated_at();
 
 
 --
@@ -1972,6 +2409,20 @@ CREATE TRIGGER update_rounds_updated_at BEFORE UPDATE ON public.rounds FOR EACH 
 
 
 --
+-- Name: team_members update_team_members_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER update_team_members_updated_at BEFORE UPDATE ON public.team_members FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+
+--
+-- Name: teams update_teams_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER update_teams_updated_at BEFORE UPDATE ON public.teams FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+
+--
 -- Name: timetable_entries update_timetable_updated_at; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -1984,79 +2435,6 @@ CREATE TRIGGER update_timetable_updated_at BEFORE UPDATE ON public.timetable_ent
 
 CREATE TRIGGER users_audit_trigger AFTER INSERT OR DELETE OR UPDATE ON public.users FOR EACH ROW EXECUTE FUNCTION public.audit_trigger_function();
 
-
---
--- Name: teams; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.teams (
-    id integer NOT NULL,
-    name character varying(255) NOT NULL,
-    slug character varying(255) NOT NULL,
-    role character varying(100) NOT NULL,
-    instagram character varying(255),
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
-);
-
---
--- Name: team_members; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.team_members (
-    id integer NOT NULL,
-    team_id integer NOT NULL,
-    participant_id integer NOT NULL,
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
-);
-
---
--- Name: teams_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE public.teams_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
---
--- Name: teams_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE public.teams_id_seq OWNED BY public.teams.id;
-
---
--- Name: team_members_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE public.team_members_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
---
--- Name: team_members_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE public.team_members_id_seq OWNED BY public.team_members.id;
-
---
--- Name: teams id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.teams ALTER COLUMN id SET DEFAULT nextval('public.teams_id_seq'::regclass);
-
---
--- Name: team_members id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.team_members ALTER COLUMN id SET DEFAULT nextval('public.team_members_id_seq'::regclass);
 
 --
 -- Name: round_assignments round_assignments_participant_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -2072,6 +2450,30 @@ ALTER TABLE ONLY public.round_assignments
 
 ALTER TABLE ONLY public.round_assignments
     ADD CONSTRAINT round_assignments_round_id_fkey FOREIGN KEY (round_id) REFERENCES public.rounds(id) ON DELETE CASCADE;
+
+
+--
+-- Name: round_assignments round_assignments_team_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.round_assignments
+    ADD CONSTRAINT round_assignments_team_id_fkey FOREIGN KEY (team_id) REFERENCES public.teams(id) ON DELETE CASCADE;
+
+
+--
+-- Name: team_members team_members_participant_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.team_members
+    ADD CONSTRAINT team_members_participant_id_fkey FOREIGN KEY (participant_id) REFERENCES public.participants(id) ON DELETE CASCADE;
+
+
+--
+-- Name: team_members team_members_team_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.team_members
+    ADD CONSTRAINT team_members_team_id_fkey FOREIGN KEY (team_id) REFERENCES public.teams(id) ON DELETE CASCADE;
 
 
 --
@@ -2096,122 +2498,6 @@ ALTER TABLE ONLY public.timetable_participants
 
 ALTER TABLE ONLY public.timetable_participants
     ADD CONSTRAINT timetable_participants_timetable_entry_id_fkey FOREIGN KEY (timetable_entry_id) REFERENCES public.timetable_entries(id) ON DELETE CASCADE;
-
-
---
--- Name: teams teams_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.teams
-    ADD CONSTRAINT teams_pkey PRIMARY KEY (id);
-
-
---
--- Name: team_members team_members_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.team_members
-    ADD CONSTRAINT team_members_pkey PRIMARY KEY (id);
-
-
---
--- Name: teams teams_slug_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.teams
-    ADD CONSTRAINT teams_slug_key UNIQUE (slug);
-
-
---
--- Name: team_members team_members_team_id_participant_id_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.team_members
-    ADD CONSTRAINT team_members_team_id_participant_id_key UNIQUE (team_id, participant_id);
-
-
---
--- Name: team_members team_members_participant_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.team_members
-    ADD CONSTRAINT team_members_participant_id_fkey FOREIGN KEY (participant_id) REFERENCES public.participants(id) ON DELETE CASCADE;
-
-
---
--- Name: team_members team_members_team_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.team_members
-    ADD CONSTRAINT team_members_team_id_fkey FOREIGN KEY (team_id) REFERENCES public.teams(id) ON DELETE CASCADE;
-
-
---
--- Name: round_assignments round_assignments_team_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.round_assignments
-    ADD CONSTRAINT round_assignments_team_id_fkey FOREIGN KEY (team_id) REFERENCES public.teams(id) ON DELETE CASCADE;
-
-
---
--- Name: round_assignments round_assignments_participant_or_team; Type: CHECK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.round_assignments
-    ADD CONSTRAINT round_assignments_participant_or_team CHECK (((participant_id IS NOT NULL) AND (team_id IS NULL)) OR ((participant_id IS NULL) AND (team_id IS NOT NULL)));
-
-
---
--- Name: idx_teams_slug; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_teams_slug ON public.teams USING btree (slug);
-
-
-
-
---
--- Name: idx_team_members_team; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_team_members_team ON public.team_members USING btree (team_id);
-
-
---
--- Name: idx_team_members_participant; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_team_members_participant ON public.team_members USING btree (participant_id);
-
-
---
--- Name: idx_round_assignments_team; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_round_assignments_team ON public.round_assignments USING btree (team_id);
-
-
---
--- Name: update_teams_updated_at(); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE OR REPLACE FUNCTION public.update_teams_updated_at()
- RETURNS trigger
- LANGUAGE plpgsql
-AS $function$
-BEGIN
-    NEW.updated_at = CURRENT_TIMESTAMP;
-    RETURN NEW;
-END;
-$function$;
-
-
---
--- Name: teams teams_updated_at_trigger; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER teams_updated_at_trigger BEFORE UPDATE ON public.teams FOR EACH ROW EXECUTE FUNCTION public.update_teams_updated_at();
 
 
 --

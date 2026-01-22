@@ -13,8 +13,8 @@ export default function TeamMemberSelector({
   const filteredParticipants = useMemo(() => {
     if (!searchTerm) return participants;
     return participants.filter(p => 
-      p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.region.toLowerCase().includes(searchTerm.toLowerCase())
+      (p.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (p.region || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [participants, searchTerm]);
 

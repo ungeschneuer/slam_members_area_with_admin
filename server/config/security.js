@@ -100,41 +100,7 @@ export const corsConfig = {
   maxAge: 86400 // 24 hours
 };
 
-// Content Security Policy - Less Restrictive for Favicon Issues
-export const cspConfig = {
-  directives: {
-    defaultSrc: ["'self'", "https:", "data:", "blob:"],
-    styleSrc: ["'self'", "'unsafe-inline'", "https:", "data:"],
-    scriptSrc: ["'self'", "'unsafe-eval'", "'unsafe-inline'", "https:", "data:"],
-    imgSrc: [
-      "'self'", 
-      "data:", 
-      "https:",
-      "http:",
-      "blob:",
-      "*"
-    ],
-    connectSrc: [
-      "'self'", 
-      "https:",
-      "http:",
-      "ws:", 
-      "wss:",
-      "*"
-    ],
-    fontSrc: ["'self'", "https:", "http:", "data:"],
-    objectSrc: ["'self'", "data:", "blob:"],
-    mediaSrc: ["'self'", "https:", "http:", "data:"],
-    frameSrc: ["'self'", "https:", "http:"],
-    workerSrc: ["'self'", "blob:", "data:"],
-    manifestSrc: ["'self'", "https:", "http:"],
-    baseUri: ["'self'"],
-    formAction: ["'self'", "https:", "http:"],
-    frameAncestors: ["'self'"],
-    upgradeInsecureRequests: []
-  },
-  reportOnly: false
-};
+// CSP disabled - No content security policy limitations
 
 // File upload security
 export const fileUploadConfig = {

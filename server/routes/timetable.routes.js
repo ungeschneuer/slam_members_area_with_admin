@@ -153,6 +153,10 @@ router.post('/', ...adminMiddleware(), ...validateTimetableEvent, async (req, re
   try {
     // Sanitize input data to prevent XSS
     const sanitizedData = sanitizeEntity.timetable(req.body);
+    // Accept both camelCase and snake_case for detailed description
+    if (!sanitizedData.detailedDescription && sanitizedData.detailed_description) {
+      sanitizedData.detailedDescription = sanitizedData.detailed_description;
+    }
     const normalizedData = normalizeData(sanitizedData, {
       title: { type: 'string', fallback: '' },
       description: { type: 'string', fallback: '' },
@@ -223,6 +227,10 @@ router.put('/:id', ...adminMiddleware(), ...validateTimetableEventId, ...validat
     
     // Sanitize input data to prevent XSS
     const sanitizedData = sanitizeEntity.timetable(req.body);
+    // Accept both camelCase and snake_case for detailed description
+    if (!sanitizedData.detailedDescription && sanitizedData.detailed_description) {
+      sanitizedData.detailedDescription = sanitizedData.detailed_description;
+    }
     const normalizedData = normalizeData(sanitizedData, {
       title: { type: 'string', fallback: '' },
       description: { type: 'string', fallback: '' },

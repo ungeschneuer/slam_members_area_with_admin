@@ -46,6 +46,8 @@
   </head>
   <body class="bg-gray-100">
     <div id="root"></div>
+    <!-- ServiceWorker cleanup to prevent NS_ERROR_CORRUPTED_CONTENT -->
+    <script src="/sw-cleanup.js"></script>
     <!-- Suppress source map errors in development -->
     <script src="/suppress-sourcemap-errors.js"></script>
     <script type="module" src="/client/main.jsx"></script>

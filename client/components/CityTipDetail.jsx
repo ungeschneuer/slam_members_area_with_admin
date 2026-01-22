@@ -16,7 +16,7 @@ const CityTipDetail = () => {
   const { data: cityTip, isLoading: loading, error } = useCityTipBySlug(slug);
   
   // Set dynamic page title
-  usePageTitle(cityTip?.title || 'Laden...');
+  usePageTitle(cityTip?.name || cityTip?.title || 'Laden...');
   
   const [showFullDescription, setShowFullDescription] = useState(false);
   const mapContainerRef = useRef(null);

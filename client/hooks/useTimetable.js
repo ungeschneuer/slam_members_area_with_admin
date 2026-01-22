@@ -173,13 +173,13 @@ export function useAddTimetableParticipant() {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async ({ entryId, participantId }) => {
+    mutationFn: async ({ entryId, participantId, role }) => {
       const response = await authService.authenticatedRequest(
         `${API_URL}/timetable/${entryId}/participants`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ participantId })
+          body: JSON.stringify({ participantId, role })
         }
       );
       const result = await response.json();

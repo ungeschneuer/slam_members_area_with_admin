@@ -211,8 +211,8 @@ export const validateTimetableEntry = [
   body('type')
     .notEmpty()
     .withMessage('Type is required')
-    .isIn(['team-round', 'individual-round', 'workshop', 'fun', 'aftershow', 'panel', 'networking', 'general', 'technical', 'registration', 'party', 'celebration'])
-    .withMessage('Type must be one of: team-round, individual-round, workshop, fun, aftershow, panel, networking, general, technical, registration, party, celebration'),
+    .isIn(['team-round', 'individual-round', 'workshop', 'fun', 'aftershow', 'panel', 'networking', 'general', 'technical', 'registration', 'party', 'celebration', 'akkreditierung', 'festivalzentrum'])
+    .withMessage('Type must be one of: team-round, individual-round, workshop, fun, aftershow, panel, networking, general, technical, registration, party, celebration, akkreditierung, festivalzentrum'),
   
   body('status')
     .optional()

@@ -3,6 +3,8 @@
  * Provides functions to generate available filter options and validate filter values
  */
 
+import { getRoleDisplayLabel } from '@shared/constants/roles.js';
+
 /**
  * Get available filter options based on data and predefined options
  * @param {Array} data - Array of data items to filter
@@ -229,17 +231,8 @@ export function extractParticipantRoles(participant) {
  * @returns {string} German translation of the role
  */
 export function translateRole(role) {
-  // Simple role translation - database is migrated to use consistent role names
-  const roleTranslations = {
-    'participant': 'Wettbewerb-Teilnehmer*in',
-    'supporter': 'Supporter*in',
-    'jury': 'Jury',
-    'moderator': 'Moderator*in',
-    'feature_artist': 'Feature Artist',
-    'team': 'Team'
-  };
-  
-  return roleTranslations[role] || role;
+  // Use centralized role translation
+  return getRoleDisplayLabel(role);
 }
 
 /**

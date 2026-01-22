@@ -82,13 +82,13 @@ export default function Participants() {
     if (fullName.toLowerCase().includes(searchLower)) return true;
     
     // Check other fields in order of likelihood
-    if (item.region?.toLowerCase().includes(searchLower)) return true;
-    if (item.role?.toLowerCase().includes(searchLower)) return true;
-    if (item.pronouns?.toLowerCase().includes(searchLower)) return true;
+    if ((item.region || '').toLowerCase().includes(searchLower)) return true;
+    if ((item.role || '').toLowerCase().includes(searchLower)) return true;
+    if ((item.pronouns || '').toLowerCase().includes(searchLower)) return true;
     
     // Only search team members if other fields don't match (most expensive operation)
     if (item.members && item.members.some(member => 
-      member.name.toLowerCase().includes(searchLower)
+      (member.name || '').toLowerCase().includes(searchLower)
     )) return true;
     
     return false;
@@ -278,7 +278,7 @@ export default function Participants() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 space-y-4 sm:space-y-0">
             <div>
               <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Wettbewerb-Teilnehmer*innen</h1>
-              <p className="text-gray-600 dark:text-gray-400">Übersicht aller Poetry Slam Wettbewerb-Teilnehmer*innen und SLAM25-Team-Mitglieder</p>
+              <p className="text-gray-600 dark:text-gray-400">Übersicht aller Teilnehmer*innen des Festivals und SLAM25-Team-Mitglieder</p>
             </div>
           </div>
 
@@ -345,7 +345,7 @@ export default function Participants() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 space-y-4 sm:space-y-0">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Wettbewerb-Teilnehmer*innen</h1>
-            <p className="text-gray-600 dark:text-gray-400">Übersicht aller Poetry Slam Wettbewerb-Teilnehmer*innen und SLAM25-Team-Mitglieder</p>
+            <p className="text-gray-600 dark:text-gray-400">Übersicht aller Teilnehmer*innen des Festivals und SLAM25-Team-Mitglieder</p>
           </div>
         </div>
 

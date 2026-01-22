@@ -92,8 +92,8 @@ export default function AdminNews() {
   }, [contentTypes]); // Only depend on contentTypes to prevent loops
 
   const filteredNews = news.filter(item => {
-    const matchesSearch = item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         item.content.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = (item.title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (item.content || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategory === 'all' || item.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
