@@ -55,7 +55,8 @@ export default function ConsolidatedAdminTable({
   sortable = true,
   className = '',
   showHeader = true,
-  loadingRows = 5
+  loadingRows = 5,
+  caption = null
 }) {
   const [sortField, setSortField] = useState(null);
   const [sortDirection, setSortDirection] = useState('asc');
@@ -148,12 +149,15 @@ export default function ConsolidatedAdminTable({
             {onSelectionChange && (
               <div className="flex items-center space-x-2 pb-3 border-b border-gray-200 dark:border-gray-700">
                 <input
+                  id={`select-row-mobile-${row.id || index}`}
                   type="checkbox"
                   checked={selectedRows.includes(index)}
                   onChange={(e) => handleSelectRow(index, e.target.checked)}
                   className="h-4 w-4 text-[#185757] focus:ring-[#A2D2B9] border-gray-300 rounded"
                 />
-                <span className="text-sm text-gray-600 dark:text-gray-400">Auswählen</span>
+                <label htmlFor={`select-row-mobile-${row.id || index}`} className="text-sm text-gray-600 dark:text-gray-400 cursor-pointer">
+                  Auswählen
+                </label>
               </div>
             )}
             
@@ -182,32 +186,46 @@ export default function ConsolidatedAdminTable({
       {/* Desktop: Table view */}
       <div className="hidden md:block overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+          {/* Table Caption for screen readers */}
+          {caption && (
+            <caption className="sr-only">
+              {caption}
+            </caption>
+          )}
+
           {/* Header */}
           {showHeader && (
             <thead className="bg-gray-50 dark:bg-gray-700">
               <tr>
                 {onSelectionChange && (
-                  <th className="px-4 py-3 text-left">
+                  <th scope="col" className="px-4 py-3 text-left">
+                    <label className="sr-only" htmlFor="select-all-rows">
+                      Alle Zeilen auswählen
+                    </label>
                     <input
+                      id="select-all-rows"
                       type="checkbox"
                       checked={selectedRows.length === data.length && data.length > 0}
                       onChange={(e) => handleSelectAll(e.target.checked)}
                       className="h-4 w-4 text-[#185757] focus:ring-[#A2D2B9] border-gray-300 rounded"
+                      aria-label="Alle Zeilen auswählen"
                     />
                   </th>
                 )}
                 {columns.map((column, index) => (
                   <th
                     key={index}
+                    scope="col"
                     className={`px-4 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider ${
                       sortable && column.sortable !== false ? 'cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600' : ''
                     }`}
                     onClick={() => sortable && column.sortable !== false && handleSort(column.key)}
+                    aria-sort={sortField === column.key ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
                   >
                     <div className="flex items-center space-x-1">
                       <span>{column.label}</span>
                       {sortable && column.sortable !== false && sortField === column.key && (
-                        <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                        <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
                           {sortDirection === 'asc' ? (
                             <path fillRule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clipRule="evenodd" />
                           ) : (
@@ -219,7 +237,7 @@ export default function ConsolidatedAdminTable({
                   </th>
                 ))}
                 {actions && (
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                  <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">
                     Aktionen
                   </th>
                 )}
@@ -239,12 +257,17 @@ export default function ConsolidatedAdminTable({
               >
                 {onSelectionChange && (
                   <td className="px-4 py-4">
+                    <label className="sr-only" htmlFor={`select-row-${row.id || index}`}>
+                      Zeile {index + 1} auswählen
+                    </label>
                     <input
+                      id={`select-row-${row.id || index}`}
                       type="checkbox"
                       checked={selectedRows.includes(index)}
                       onChange={(e) => handleSelectRow(index, e.target.checked)}
                       className="h-4 w-4 text-[#185757] focus:ring-[#A2D2B9] border-gray-300 rounded"
                       onClick={(e) => e.stopPropagation()}
+                      aria-label={`Zeile ${index + 1} auswählen`}
                     />
                   </td>
                 )}
