@@ -133,13 +133,16 @@ export default function AdminParticipantsForm() {
         await createParticipant.mutateAsync(payload);
       }
 
-      // Navigate back to list
+      // Navigate back to list (only on success)
       navigate('/admin/participants');
     } catch (err) {
+      // Error is already handled by mutation's onError (shows toast)
+      // Just set form error to show inline message as well
       setError('root', {
         type: 'server',
         message: isEditMode ? 'Fehler beim Aktualisieren des Teilnehmers.' : 'Fehler beim Erstellen des Teilnehmers.'
       });
+      // Don't navigate away on error - stay on form
     }
   };
 
