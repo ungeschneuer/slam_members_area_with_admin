@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { promisify } from 'util';
+import logger from '../config/logger.js';
 
 const unlink = promisify(fs.unlink);
 const exists = promisify(fs.exists);
@@ -24,7 +25,7 @@ export async function safeDeleteFile(filePath) {
     return false;
   } catch (error) {
     // Log error but don't throw - file cleanup is not critical
-    console.error('Error deleting file:', filePath, error.message);
+    logger.error('Error deleting file', { filePath, error: error.message });
     return false;
   }
 }

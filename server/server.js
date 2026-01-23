@@ -27,7 +27,7 @@ const envFile = process.env.NODE_ENV === 'production' ? '.env.production' : '.en
 dotenv.config({ path: envFile });
 
 // Log which env file was loaded (for debugging)
-console.log(`Loaded environment from: ${envFile} (NODE_ENV=${process.env.NODE_ENV})`);
+logger.info(`Loaded environment from: ${envFile} (NODE_ENV=${process.env.NODE_ENV})`);
 
 // Warn if using development secrets in production
 if (process.env.NODE_ENV === 'production') {

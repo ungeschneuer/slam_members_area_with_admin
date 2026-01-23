@@ -1,20 +1,23 @@
 /**
  * Unified Authentication Service for SLAM25
- * 
+ *
  * This is the SINGLE authentication service for the entire application.
  * Previously, there were multiple auth services (authService + adminAuthService),
  * but they have been consolidated into this single service.
- * 
+ *
  * Features:
  * - JWT-in-httpOnly-cookie authentication
  * - Automatic session management
  * - Role-based access control (admin/organizer)
  * - Event-driven authentication state changes
+ * - Uses Axios with interceptors for all HTTP requests
  */
+
+import api, { getErrorMessage } from './api.js';
+import logger from './logger.js';
 
 class AuthService {
   constructor() {
-    this.baseURL = import.meta.env.VITE_API_URL;
     this.user = null;
     this.isAuthenticated = false;
     this.initializationPromise = null;
@@ -29,16 +32,16 @@ class AuthService {
     if (this.isInitializing && this.initializationPromise) {
       return this.initializationPromise;
     }
-    
+
     // If already initialized and authenticated, return immediately
     if (this.isAuthenticated && this.user) {
       return true;
     }
-    
+
     // Start initialization
     this.isInitializing = true;
     this.initializationPromise = this._performInit();
-    
+
     try {
       const result = await this.initializationPromise;
       return result;
@@ -47,7 +50,7 @@ class AuthService {
       this.initializationPromise = null;
     }
   }
-  
+
   /**
    * Internal initialization method
    */
@@ -60,12 +63,12 @@ class AuthService {
       // Not authenticated or session expired - this is normal
       this.user = null;
       this.isAuthenticated = false;
-      
+
       // Only log if it's not an expected authentication failure
       if (!error.message.includes('Not authenticated')) {
         // Auth initialization failed - handled silently
       }
-      
+
       return false;
     }
   }
@@ -75,37 +78,25 @@ class AuthService {
    */
   async login(identifier, password, rememberMe = false) {
     try {
-      const response = await fetch(`${this.baseURL}/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include', // Important: Include cookies in requests
-        body: JSON.stringify({
-          identifier,
-          password,
-          rememberMe
-        })
+      const { data } = await api.post('/auth/login', {
+        identifier,
+        password,
+        rememberMe
       });
 
-      const data = await response.json();
+      // Login successful
+      this.user = data.user;
+      this.isAuthenticated = true;
 
-      if (response.ok) {
-        this.user = data.user;
-        this.isAuthenticated = true;
-        
-        // Login successful
-        
-        // Dispatch auth change event
-        this.dispatchAuthEvent(true, this.user);
-        
-        return { success: true, user: this.user };
-      } else {
-        return { success: false, error: data.error || 'Login failed' };
-      }
+      // Dispatch auth change event
+      this.dispatchAuthEvent(true, this.user);
+
+      return { success: true, user: this.user };
+
     } catch (error) {
-      // Login error - handled by error state
-      return { success: false, error: 'Network error' };
+      const errorMessage = getErrorMessage(error);
+      logger.warn('Login failed', { error: errorMessage });
+      return { success: false, error: errorMessage };
     }
   }
 
@@ -115,19 +106,15 @@ class AuthService {
   async logout() {
     try {
       // Call logout endpoint to clear server-side session
-      await fetch(`${this.baseURL}/auth/logout`, {
-        method: 'POST',
-        credentials: 'include'
-      });
+      await api.post('/auth/logout');
     } catch (error) {
       // Logout error - handled by error state
+      logger.debug('Logout endpoint error (continuing anyway)', { error: error.message });
     } finally {
       // Clear local state
       this.user = null;
       this.isAuthenticated = false;
-      
-      // Logged out successfully
-      
+
       // Dispatch auth change event
       this.dispatchAuthEvent(false, null);
 
@@ -146,37 +133,26 @@ class AuthService {
    */
   async getCurrentUser() {
     try {
-      const response = await fetch(`${this.baseURL}/auth/me`, {
-        method: 'GET',
-        credentials: 'include'
-      });
+      const { data } = await api.get('/auth/me');
 
-      if (response.ok) {
-        const data = await response.json();
-        this.user = data.user;
-        this.isAuthenticated = true;
-        
-        // Dispatch auth change event
-        this.dispatchAuthEvent(true, this.user);
-        
-        return this.user;
-      } else if (response.status === 401) {
-        // 401 is expected when not authenticated - don't log as error
+      this.user = data.user;
+      this.isAuthenticated = true;
+
+      // Dispatch auth change event
+      this.dispatchAuthEvent(true, this.user);
+
+      return this.user;
+
+    } catch (error) {
+      // 401 is expected when not authenticated
+      if (error.response?.status === 401) {
         this.user = null;
         this.isAuthenticated = false;
         throw new Error('Not authenticated');
-      } else {
-        // Other errors should be logged
-        // Authentication error - handled by error state
-        this.user = null;
-        this.isAuthenticated = false;
-        throw new Error('Authentication failed');
       }
-    } catch (error) {
-      // Only log network errors, not expected 401s
-      if (error.name !== 'TypeError' && !error.message.includes('Not authenticated')) {
-        // Get current user error - handled by error state
-      }
+
+      // Other errors
+      logger.error('Get current user error', { error: getErrorMessage(error) });
       this.user = null;
       this.isAuthenticated = false;
       throw error;
@@ -185,78 +161,56 @@ class AuthService {
 
   /**
    * Make authenticated request
+   *
+   * Note: With Axios interceptors, this method is now simplified.
+   * The interceptor handles token refresh automatically.
+   *
+   * @deprecated Consider using the api client directly instead
    */
   async authenticatedRequest(url, options = {}) {
-    console.log('[AuthService] authenticatedRequest called:', { url, options });
-    
+    logger.debug('AuthService authenticatedRequest called', { url, options });
+
     if (!this.isAuthenticated) {
-      console.error('[AuthService] Not authenticated, throwing error');
+      logger.error('AuthService: Not authenticated, throwing error');
       throw new Error('Not authenticated');
     }
 
-    const defaultOptions = {
-      credentials: 'include', // Important: Include cookies
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
+    try {
+      // Determine method and extract body if present
+      const method = (options.method || 'GET').toLowerCase();
+      const config = {
+        ...options,
+        headers: options.headers || {}
+      };
+
+      // Handle different HTTP methods
+      let response;
+      if (method === 'get' || method === 'delete') {
+        response = await api[method](url, config);
+      } else if (method === 'post' || method === 'put' || method === 'patch') {
+        const body = options.body ? JSON.parse(options.body) : undefined;
+        response = await api[method](url, body, config);
+      } else {
+        response = await api.request({ url, ...config });
       }
-    };
 
-    console.log('[AuthService] Making request with options:', { ...defaultOptions, ...options });
-    
-    const response = await fetch(url, { ...defaultOptions, ...options });
-    
-    console.log('[AuthService] Response received:', { 
-      status: response.status, 
-      statusText: response.statusText,
-      url: response.url 
-    });
-
-    // Handle different HTTP status codes
-    if (response.status === 401) {
-      console.warn('Session expired, logging out');
-      await this.logout();
-      throw new Error('Session expired');
-    }
-
-    // Handle client errors (400-499)
-    if (response.status >= 400 && response.status < 500) {
-      let errorMessage = `Client error: ${response.status}`;
-      try {
-        const errorData = await response.json();
-        errorMessage = errorData.error || errorData.message || errorMessage;
-      } catch (e) {
-        // If we can't parse JSON, use status text
-        errorMessage = response.statusText || errorMessage;
-      }
-      console.error('Client error in authenticated request:', {
-        url,
+      // Return response in fetch-compatible format
+      return {
+        ok: true,
         status: response.status,
         statusText: response.statusText,
-        error: errorMessage
-      });
-      throw new Error(errorMessage);
-    }
+        json: async () => response.data,
+        text: async () => JSON.stringify(response.data)
+      };
 
-    // Handle server errors (500-599)
-    if (response.status >= 500) {
-      let errorMessage = `Server error: ${response.status}`;
-      try {
-        const errorData = await response.json();
-        errorMessage = errorData.error || errorData.message || errorMessage;
-      } catch (e) {
-        errorMessage = response.statusText || errorMessage;
+    } catch (error) {
+      if (error.response?.status === 401) {
+        logger.warn('Session expired, logging out');
+        await this.logout();
       }
-      console.error('Server error in authenticated request:', {
-        url,
-        status: response.status,
-        statusText: response.statusText,
-        error: errorMessage
-      });
-      throw new Error(errorMessage);
-    }
 
-    return response;
+      throw new Error(getErrorMessage(error));
+    }
   }
 
   /**
@@ -289,7 +243,7 @@ class AuthService {
         detail: { isAuthenticated, user }
       }));
     } catch (error) {
-      console.warn('Failed to dispatch auth event:', error);
+      logger.warn('Failed to dispatch auth event', { error: error.message });
     }
   }
 
@@ -304,11 +258,11 @@ class AuthService {
       user: this.user
     };
   }
-  
+
   /**
    * Check if authentication is currently being initialized
    */
-  isInitializing() {
+  isInitializingAuth() {
     return this.isInitializing;
   }
 }

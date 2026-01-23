@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
-import tokenRefreshService from './services/tokenRefreshService.js';
+// Token refresh now handled by Axios interceptors in services/api.js
 import Admin from './Admin';
 import MemberDashboard from './components/MemberDashboard';
 import Participants from './components/Participants';
