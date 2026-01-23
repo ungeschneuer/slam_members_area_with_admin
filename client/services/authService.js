@@ -168,17 +168,14 @@ class AuthService {
    * @deprecated Consider using the api client directly instead
    */
   async authenticatedRequest(url, options = {}) {
-    console.log('[DEBUG] authenticatedRequest called - isAuthenticated:', this.isAuthenticated, 'url:', url);
     logger.debug('AuthService authenticatedRequest called', { url, options });
 
     if (!this.isAuthenticated) {
-      console.log('[DEBUG] authenticatedRequest: Not authenticated, throwing error');
       logger.error('AuthService: Not authenticated, throwing error');
       throw new Error('Not authenticated');
     }
 
     try {
-      console.log('[DEBUG] authenticatedRequest: About to call axios');
       // Determine method and extract body if present
       const method = (options.method || 'GET').toLowerCase();
       const config = {
@@ -197,8 +194,6 @@ class AuthService {
         response = await api.request({ url, ...config });
       }
 
-      console.log('[DEBUG] authenticatedRequest: Axios call completed:', response);
-
       // Return response in fetch-compatible format
       return {
         ok: true,
@@ -209,7 +204,6 @@ class AuthService {
       };
 
     } catch (error) {
-      console.log('[DEBUG] authenticatedRequest: Caught error:', error);
       if (error.response?.status === 401) {
         logger.warn('Session expired, logging out');
         await this.logout();
