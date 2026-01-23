@@ -17,7 +17,7 @@ import logger from './logger.js';
 // Create axios instance with default configuration
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3005/api',
-  timeout: 30000, // 30 seconds
+  timeout: 10000, // 10 seconds (reduced from 30 for better UX)
   withCredentials: true, // Important: Include cookies for JWT
   headers: {
     'Content-Type': 'application/json'
