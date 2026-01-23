@@ -4,7 +4,7 @@ import { useCreateNews } from '../../hooks/index.js';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { getNewsCategoryFormOptions } from '../../utils/newsCategories.js';
+import { getNewsCategoryFormOptions } from "../../../shared/constants/categories.js";
 import MarkdownTextarea from '../forms/MarkdownTextarea.jsx';
 
 const schema = z.object({

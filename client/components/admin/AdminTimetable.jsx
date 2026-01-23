@@ -10,7 +10,7 @@ import { createValidationSchema, getDefaultValues } from '../../../shared/schema
 import { getRoleOptions, getStatusOptions } from '../../utils/adminFormSchemas.js';
 import { generateSlug } from '../../utils/slugUtils.js';
 import { getSlugConfig } from '../../../server/config/slugConfig.js';
-import { getRoundStatusColor } from '../../utils/categoryTranslations.js';
+import { getRoundStatusColor } from "../../../shared/constants/categories.js";
 import ParticipantDropdown from './ParticipantDropdown.jsx';
 import { ADMIN_PARTICIPANTS_LIMIT } from '../../config/api.js';
 import { formatDateForDisplay, isValidDateString } from '../../utils/dateUtils.js';

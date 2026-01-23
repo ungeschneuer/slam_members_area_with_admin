@@ -4,7 +4,7 @@ import { useCityTips, useDeleteCityTip } from '../../hooks/useCityTips.js';
 import LoadingSpinner from '../LoadingSpinner.jsx';
 import { ErrorMessage, SuccessMessage } from '../StatusMessages.jsx';
 import ConsolidatedAdminTable from './ConsolidatedAdminTable.jsx';
-import { getCategoryOptions } from '../../../shared/constants/cityTipsCategories.js';
+import { getCategoryOptions } from '../../../shared/constants/categories.js';
 import { getCategoryIcon, getCategoryColor } from '../../utils/categoryUtils.js';
 
 export default function AdminCityTips() {

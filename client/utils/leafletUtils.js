@@ -57,7 +57,7 @@ export const createDefaultIcon = (options = {}) => {
 };
 
 // Import shared constants for consistency
-import { getCategoryByValue, getCategoryHexColor } from '../../shared/constants/cityTipsCategories.js';
+import { getCategoryByValue, getCategoryHexColor } from '../../shared/constants/categories.js';
 
 // Custom marker icons for different categories
 export const createCustomIcon = (category) => {

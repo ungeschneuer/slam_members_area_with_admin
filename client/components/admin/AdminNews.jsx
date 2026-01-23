@@ -5,7 +5,7 @@ import LoadingSpinner from '../LoadingSpinner';
 import { ErrorMessage, SuccessMessage } from '../StatusMessages.jsx';
 import ConsolidatedAdminTable from './ConsolidatedAdminTable.jsx';
 import { formatDate } from '../../utils/detailViewUtils.js';
-import { getNewsCategoryLabel } from '../../utils/newsCategories.js';
+import { getNewsCategoryLabel } from "../../../shared/constants/categories.js";
 
 export default function AdminNews() {
   const navigate = useNavigate();

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useParticipants, useRounds, useTimetable, useParticipantTeams, usePageTitle } from '../hooks/index.js';
-import { translateRoundStatus, getRoundStatusIcon, getRoundStatusColor } from '../utils/categoryTranslations.js';
+import { translateRoundStatus, getRoundStatusIcon, getRoundStatusColor } from "../../shared/constants/categories.js";
 import { isCrewRole, getCrewRoleLabel } from '../utils/crewRoleUtils.js';
 import { 
   formatTime, 

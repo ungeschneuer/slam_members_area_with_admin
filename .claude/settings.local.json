@@ -28,7 +28,11 @@
       "Bash(gh pr comment:*)",
       "Bash(gh pr merge:*)",
       "Bash(gh pr view:*)",
-      "Bash(git pull:*)"
+      "Bash(git pull:*)",
+      "Bash(npm run build:*)",
+      "Bash(ls:*)",
+      "Bash(grep:*)",
+      "Bash(xargs sed -i '' 's|from.*cityTipsCategories\\\\.js.*|from \"\"../../shared/constants/categories.js\"\";|g')"
     ]
   }
 }

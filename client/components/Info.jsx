@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { usePublishedInfoPages, useInfoPageBySlug, usePageTitle } from '../hooks/index.js';
 import LoadingSpinner from './LoadingSpinner.jsx';
-import { translateCategory } from '../utils/categoryTranslations.js';
+import { translateCategory } from "../../shared/constants/categories.js";
 import MarkdownRenderer from './shared/MarkdownRenderer.jsx';
 import PDFDisplay from './shared/PDFDisplay.jsx';
 import { getPDFUrl, hasPDF } from '../utils/pdfUtils.js';

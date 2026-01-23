@@ -7,7 +7,7 @@ import { FadeIn, StaggeredContainer } from './Transitions.jsx';
 import { DashboardSkeleton } from './SkeletonLoader.jsx';
 import { ErrorMessage, SuccessMessage } from './StatusMessages.jsx';
 import { createTimezoneAwareCountdown } from '../services/timezoneService.js';
-import { translateRoundStatus, getRoundStatusIcon, getRoundStatusColor } from '../utils/categoryTranslations.js';
+import { translateRoundStatus, getRoundStatusIcon, getRoundStatusColor } from '../../shared/constants/categories.js';
 import { getLinkProps, handleLinkClick } from '../utils/linkUtils.js';
 import { getRegionFlag } from '../utils/detailViewUtils.js';
 import { getCategoryColor } from '../utils/categoryUtils.js';

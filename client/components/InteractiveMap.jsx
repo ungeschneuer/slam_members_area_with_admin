@@ -8,7 +8,7 @@ import {
   createMarkerWithPopup,
   isValidCoordinates 
 } from '../utils/leafletUtils.js';
-import { getCategoryByValue, getCategoryHexColor } from '../../shared/constants/cityTipsCategories.js';
+import { getCategoryByValue, getCategoryHexColor } from '../../shared/constants/categories.js';
 
 export default function InteractiveMap({ locations, onLocationClick, selectedLocation, availableCategories = [] }) {
   const mapRef = useRef(null);

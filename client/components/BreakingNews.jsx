@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useBreakingNews } from '../hooks/index.js';
 import BreakingNewsCountdown from './shared/BreakingNewsCountdown.jsx';
 import { formatDateInConfiguredTimezone } from '../services/timezoneService.js';
-import { getNewsCategoryLabel, getNewsCategoryIcon } from '../utils/newsCategories.js';
+import { getNewsCategoryLabel, getNewsCategoryIcon } from "../../shared/constants/categories.js";
 
 const BreakingNews = () => {
   const { data: breakingNews = null, isLoading: loading, error } = useBreakingNews();

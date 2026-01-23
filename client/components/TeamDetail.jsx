@@ -6,10 +6,10 @@ import { useRounds } from '../hooks/useRounds.js';
 import { useTimetable } from '../hooks/useTimetable.js';
 import { usePageTitle } from '../hooks/index.js';
 import { 
-  translateRoundStatus, 
-  getRoundStatusIcon, 
-  getRoundStatusColor 
-} from '../utils/categoryTranslations.js';
+  translateRoundStatus,
+  getRoundStatusIcon,
+  getRoundStatusColor
+} from '../../shared/constants/categories.js';
 import { 
   formatTime, 
   formatDate, 

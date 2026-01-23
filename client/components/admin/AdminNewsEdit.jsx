@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
-import { getNewsCategoryFormOptions } from '../../utils/newsCategories.js';
+import { getNewsCategoryFormOptions } from "../../../shared/constants/categories.js";
 import { handleLinkClick } from '../../utils/linkUtils.js';
 import MarkdownTextarea from '../forms/MarkdownTextarea.jsx';
 import LoadingSpinner from '../LoadingSpinner';
