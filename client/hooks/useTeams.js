@@ -1,6 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { API_URL } from '../config/api.js';
 import { getQueryConfig } from '../config/polling.js';
+import logger from '../services/logger.js';
+import { useToast } from '../contexts/ToastContext.jsx';
 
 // Fetch all teams
 export const useTeams = (isAdmin = false) => {
@@ -99,112 +101,180 @@ export const useParticipantTeams = (participantId) => {
 // Create team mutation
 export const useCreateTeam = () => {
   const queryClient = useQueryClient();
-  
+  const { showErrorToast } = useToast();
+
   return useMutation({
     mutationFn: async (teamData) => {
-      const response = await fetch(`${API_URL}/teams`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify(teamData),
-      });
-      if (!response.ok) {
-        throw new Error('Failed to create team');
+      try {
+        const response = await fetch(`${API_URL}/teams`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify(teamData),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to create team');
+        }
+
+        const result = await response.json().catch(() => {
+          throw new Error('Ungültige Serverantwort');
+        });
+
+        if (!result.success && result.error) {
+          throw new Error(result.error);
+        }
+
+        return result?.data || result;
+      } catch (error) {
+        logger.error('Create team error', { error: error.message });
+        throw error;
       }
-      const result = await response.json();
-      return result?.data || result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries(['teams']);
     },
+    onError: (error) => {
+      logger.error('Create team mutation error', { error: error.message });
+      showErrorToast('Fehler beim Erstellen des Teams: ' + (error.message || 'Unbekannter Fehler'));
+    }
   });
 };
 
 // Update team mutation
 export const useUpdateTeam = () => {
   const queryClient = useQueryClient();
-  
+  const { showErrorToast } = useToast();
+
   return useMutation({
     mutationFn: async ({ teamId, teamData }) => {
-      const response = await fetch(`${API_URL}/teams/${teamId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify(teamData),
-      });
-      if (!response.ok) {
-        throw new Error('Failed to update team');
+      try {
+        const response = await fetch(`${API_URL}/teams/${teamId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify(teamData),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to update team');
+        }
+
+        const result = await response.json().catch(() => {
+          throw new Error('Ungültige Serverantwort');
+        });
+
+        if (!result.success && result.error) {
+          throw new Error(result.error);
+        }
+
+        return result?.data || result;
+      } catch (error) {
+        logger.error('Update team error', { error: error.message });
+        throw error;
       }
-      const result = await response.json();
-      return result?.data || result;
     },
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries(['teams']);
       queryClient.invalidateQueries(['teams', variables.teamId]);
     },
+    onError: (error) => {
+      logger.error('Update team mutation error', { error: error.message });
+      showErrorToast('Fehler beim Aktualisieren des Teams: ' + (error.message || 'Unbekannter Fehler'));
+    }
   });
 };
 
 // Delete team mutation
 export const useDeleteTeam = () => {
   const queryClient = useQueryClient();
-  
+  const { showErrorToast } = useToast();
+
   return useMutation({
     mutationFn: async (teamId) => {
-      const response = await fetch(`${API_URL}/teams/${teamId}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-      if (!response.ok) {
-        let bodyText = '';
-        try {
-          bodyText = await response.text();
-          const parsed = bodyText ? JSON.parse(bodyText) : {};
-          const err = new Error(parsed?.error || parsed?.message || `Failed to delete team (${response.status})`);
-          err.status = response.status;
-          if (parsed?.details) err.details = parsed.details;
-          throw err;
-        } catch (e) {
-          if (e instanceof SyntaxError) {
-            const err = new Error(`Failed to delete team (${response.status})`);
+      try {
+        const response = await fetch(`${API_URL}/teams/${teamId}`, {
+          method: 'DELETE',
+          credentials: 'include',
+        });
+
+        if (!response.ok) {
+          let bodyText = '';
+          try {
+            bodyText = await response.text();
+            const parsed = bodyText ? JSON.parse(bodyText) : {};
+            const err = new Error(parsed?.error || parsed?.message || `Failed to delete team (${response.status})`);
             err.status = response.status;
+            if (parsed?.details) err.details = parsed.details;
             throw err;
+          } catch (e) {
+            if (e instanceof SyntaxError) {
+              const err = new Error(`Failed to delete team (${response.status})`);
+              err.status = response.status;
+              throw err;
+            }
+            throw e;
           }
-          throw e;
         }
+
+        const result = await response.json().catch(() => {
+          throw new Error('Ungültige Serverantwort');
+        });
+
+        return result?.data || result;
+      } catch (error) {
+        logger.error('Delete team error', { error: error.message });
+        throw error;
       }
-      const result = await response.json();
-      return result?.data || result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries(['teams']);
     },
+    onError: (error) => {
+      logger.error('Delete team mutation error', { error: error.message });
+      showErrorToast('Fehler beim Löschen des Teams: ' + (error.message || 'Unbekannter Fehler'));
+    }
   });
 };
 
 // Add team member mutation
 export const useAddTeamMember = () => {
   const queryClient = useQueryClient();
-  
+  const { showErrorToast } = useToast();
+
   return useMutation({
     mutationFn: async ({ teamId, participantId }) => {
-      const response = await fetch(`${API_URL}/teams/${teamId}/members`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({ participant_id: participantId }),
-      });
-      if (!response.ok) {
-        throw new Error('Failed to add team member');
+      try {
+        const response = await fetch(`${API_URL}/teams/${teamId}/members`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({ participant_id: participantId }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to add team member');
+        }
+
+        const result = await response.json().catch(() => {
+          throw new Error('Ungültige Serverantwort');
+        });
+
+        if (!result.success && result.error) {
+          throw new Error(result.error);
+        }
+
+        return result?.data || result;
+      } catch (error) {
+        logger.error('Add team member error', { error: error.message });
+        throw error;
       }
-      const result = await response.json();
-      return result?.data || result;
     },
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries(['teams']);
@@ -212,24 +282,43 @@ export const useAddTeamMember = () => {
       queryClient.invalidateQueries(['teams', variables.teamId, 'members']);
       queryClient.invalidateQueries(['teams', 'participant', variables.participantId]);
     },
+    onError: (error) => {
+      logger.error('Add team member mutation error', { error: error.message });
+      showErrorToast('Fehler beim Hinzufügen des Teammitglieds: ' + (error.message || 'Unbekannter Fehler'));
+    }
   });
 };
 
 // Remove team member mutation
 export const useRemoveTeamMember = () => {
   const queryClient = useQueryClient();
-  
+  const { showErrorToast } = useToast();
+
   return useMutation({
     mutationFn: async ({ teamId, participantId }) => {
-      const response = await fetch(`${API_URL}/teams/${teamId}/members/${participantId}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-      if (!response.ok) {
-        throw new Error('Failed to remove team member');
+      try {
+        const response = await fetch(`${API_URL}/teams/${teamId}/members/${participantId}`, {
+          method: 'DELETE',
+          credentials: 'include',
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to remove team member');
+        }
+
+        const result = await response.json().catch(() => {
+          throw new Error('Ungültige Serverantwort');
+        });
+
+        if (!result.success && result.error) {
+          throw new Error(result.error);
+        }
+
+        return result?.data || result;
+      } catch (error) {
+        logger.error('Remove team member error', { error: error.message });
+        throw error;
       }
-      const result = await response.json();
-      return result?.data || result;
     },
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries(['teams']);
@@ -237,5 +326,9 @@ export const useRemoveTeamMember = () => {
       queryClient.invalidateQueries(['teams', variables.teamId, 'members']);
       queryClient.invalidateQueries(['teams', 'participant', variables.participantId]);
     },
+    onError: (error) => {
+      logger.error('Remove team member mutation error', { error: error.message });
+      showErrorToast('Fehler beim Entfernen des Teammitglieds: ' + (error.message || 'Unbekannter Fehler'));
+    }
   });
 };
