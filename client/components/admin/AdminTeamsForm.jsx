@@ -91,6 +91,9 @@ export default function AdminTeamsForm() {
         const membersToAdd = selectedMembers.filter(id => !existingMembers.includes(id));
         const membersToRemove = existingMembers.filter(id => !selectedMembers.includes(id));
 
+        // Collect member operation errors
+        const memberErrors = [];
+
         // Add new members
         for (const participantId of membersToAdd) {
           try {
@@ -99,7 +102,9 @@ export default function AdminTeamsForm() {
               participantId
             });
           } catch (error) {
-            console.error(`Failed to add member ${participantId}:`, error);
+            const participant = eligibleParticipants.find(p => p.id === participantId);
+            const name = participant?.name || `ID ${participantId}`;
+            memberErrors.push(`Fehler beim Hinzufügen von ${name}: ${error.message || 'Unbekannter Fehler'}`);
           }
         }
 
@@ -111,12 +116,26 @@ export default function AdminTeamsForm() {
               participantId
             });
           } catch (error) {
-            console.error(`Failed to remove member ${participantId}:`, error);
+            const participant = eligibleParticipants.find(p => p.id === participantId);
+            const name = participant?.name || `ID ${participantId}`;
+            memberErrors.push(`Fehler beim Entfernen von ${name}: ${error.message || 'Unbekannter Fehler'}`);
           }
+        }
+
+        // Don't close form if there were member errors
+        if (memberErrors.length > 0) {
+          setError('root', {
+            type: 'server',
+            message: `Team wurde aktualisiert, aber es gab Probleme mit Mitgliedern:\n${memberErrors.join('\n')}`
+          });
+          return; // Don't navigate away
         }
       } else {
         // Create new team
         const result = await createTeamMutation.mutateAsync(payload);
+
+        // Collect member operation errors
+        const memberErrors = [];
 
         // Add selected members
         if (selectedMembers.length > 0 && result?.id) {
@@ -127,13 +146,24 @@ export default function AdminTeamsForm() {
                 participantId
               });
             } catch (error) {
-              console.error(`Failed to add member ${participantId}:`, error);
+              const participant = eligibleParticipants.find(p => p.id === participantId);
+              const name = participant?.name || `ID ${participantId}`;
+              memberErrors.push(`Fehler beim Hinzufügen von ${name}: ${error.message || 'Unbekannter Fehler'}`);
             }
           }
         }
+
+        // Don't close form if there were member errors
+        if (memberErrors.length > 0) {
+          setError('root', {
+            type: 'server',
+            message: `Team wurde erstellt, aber es gab Probleme beim Hinzufügen von Mitgliedern:\n${memberErrors.join('\n')}`
+          });
+          return; // Don't navigate away
+        }
       }
 
-      // Navigate back to list
+      // Navigate back to list only if no member errors
       navigate('/admin/teams');
     } catch (err) {
       setError('root', {

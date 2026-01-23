@@ -10,6 +10,7 @@ import { handleLinkClick } from '../../utils/linkUtils.js';
 import MarkdownTextarea from '../forms/MarkdownTextarea.jsx';
 import LoadingSpinner from '../LoadingSpinner';
 import { ErrorMessage } from '../StatusMessages.jsx';
+import { apiUpload } from '../../services/apiClient.js';
 
 const schema = z.object({
   title: z.string().min(1, 'Titel ist erforderlich'),
@@ -94,17 +95,7 @@ export default function AdminNewsEdit() {
       const formData = new FormData();
       formData.append('image', file);
 
-      const response = await fetch(`/api/news/${id}/upload-image`, {
-        method: 'POST',
-        body: formData,
-        credentials: 'include'
-      });
-
-      if (!response.ok) {
-        throw new Error('Upload failed');
-      }
-
-      const result = await response.json();
+      const result = await apiUpload(`/news/${id}/upload-image`, formData);
       setCurrentImageUrl(result.image.filePath);
 
       // Invalidate news queries to refresh data with new image
