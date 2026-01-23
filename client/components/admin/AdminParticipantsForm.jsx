@@ -103,6 +103,7 @@ export default function AdminParticipantsForm() {
   }, [isEditMode, currentParticipant, reset]);
 
   const onSubmit = async (data) => {
+    console.log('[DEBUG] Form onSubmit called with data:', data);
     try {
       // Normalize Instagram handle
       const instagramNormalized = data.instagram ? (() => {
@@ -130,6 +131,7 @@ export default function AdminParticipantsForm() {
           slug: generateUniqueSlug(data.name, existingSlugs),
           instagram: instagramNormalized
         };
+        console.log('[DEBUG] Calling createParticipant.mutateAsync with payload:', payload);
         await createParticipant.mutateAsync(payload);
       }
 
