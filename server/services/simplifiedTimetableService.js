@@ -249,10 +249,9 @@ export class SimplifiedTimetableService {
         JSON.stringify(entryData.additional_links || []),
         entryData.slug
       ];
-      
-      console.log('INSERT with client - params:', params);
-      console.log('INSERT with client - entryData:', entryData);
-      
+
+      logger.debug('INSERT timetable entry', { params, entryData });
+
       const entryResult = await client.query(entryQuery, params);
       const entry = entryResult.rows[0];
       
@@ -291,10 +290,9 @@ export class SimplifiedTimetableService {
         JSON.stringify(entryData.additional_links || []),
         entryData.slug
       ];
-      
-      console.log('INSERT standalone - params:', params);
-      console.log('INSERT standalone - entryData:', entryData);
-      
+
+      logger.debug('INSERT standalone timetable entry', { params, entryData });
+
       const entryResult = await client.query(entryQuery, params);
       const entry = entryResult.rows[0];
       

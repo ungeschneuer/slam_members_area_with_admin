@@ -74,7 +74,7 @@ const BreakingNews = () => {
         {/* Mobile Layout */}
         <div className="block sm:hidden py-3">
           <div className="flex items-center space-x-2 mb-2">
-            <span className="text-2xl animate-pulse">🚨</span>
+            <span className="text-xl sm:text-2xl animate-pulse">🚨</span>
             <span className="font-bold text-sm uppercase tracking-wide">
               Eilmeldung
             </span>

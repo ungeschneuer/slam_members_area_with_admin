@@ -2,10 +2,19 @@
 -- Date: 2025-10-27
 -- Description: Adds constraint to ensure slug field is never NULL or empty string
 
--- Add CHECK constraint for slug field
-ALTER TABLE timetable_entries 
-ADD CONSTRAINT check_slug_not_empty 
-CHECK (slug IS NOT NULL AND slug != '');
+-- Add CHECK constraint for slug field (if not already exists)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint 
+        WHERE conname = 'check_slug_not_empty' 
+        AND conrelid = 'timetable_entries'::regclass
+    ) THEN
+        ALTER TABLE timetable_entries 
+        ADD CONSTRAINT check_slug_not_empty 
+        CHECK (slug IS NOT NULL AND slug != '');
+    END IF;
+END $$;
 
 -- Update any existing records with empty slug values (should not be any based on verification)
 -- This is a safety measure in case any records somehow have empty slugs

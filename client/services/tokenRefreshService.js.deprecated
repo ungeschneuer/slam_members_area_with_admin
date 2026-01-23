@@ -1,6 +1,8 @@
 // Token Refresh Service
 // Handles automatic token refresh for seamless user experience
 
+import logger from './logger.js';
+
 class TokenRefreshService {
   constructor() {
     this.isRefreshing = false;
@@ -104,14 +106,14 @@ class TokenRefreshService {
       });
 
       if (response.ok) {
-        console.log('Token refreshed successfully');
+        logger.debug('Token refreshed successfully');
         return true;
       } else {
-        console.error('Token refresh failed');
+        logger.error('Token refresh failed');
         return false;
       }
     } catch (error) {
-      console.error('Token refresh error:', error);
+      logger.error('Token refresh error', { error: error.message });
       return false;
     }
   }
@@ -139,7 +141,7 @@ class TokenRefreshService {
       }
       return false;
     } catch (error) {
-      console.error('Auth status check failed:', error);
+      logger.error('Auth status check failed', { error: error.message });
       return false;
     }
   }

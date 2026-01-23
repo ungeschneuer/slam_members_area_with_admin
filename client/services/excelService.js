@@ -1,6 +1,7 @@
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { z } from 'zod';
 import { generateSlug, generateUniqueSlug } from '../utils/slugUtils.js';
+import { ALLOWED_PARTICIPANT_ROLES } from '@shared/constants/roles.js';
 
 // Column indices for Excel/CSV templates
 const TEMPLATE_COLUMNS = {
@@ -22,7 +23,8 @@ const participantSchema = z.object({
 });
 
 // Allowed roles and regions (matching AdminParticipants.jsx)
-const allowedRoles = ['Teilnehmer*in', 'Supporter*in', 'Crew', 'SLAM-MC'];
+// Use centralized role constants
+const allowedRoles = ALLOWED_PARTICIPANT_ROLES;
 const allowedRegions = [
   'Bayern',
   'Baden-Württemberg',
@@ -54,24 +56,25 @@ const allowedRegions = [
 
 /**
  * Generates an Excel template for participant import with data validation
- * @returns {Blob} Excel file as Blob
+ * @returns {Promise<Blob>} Excel file as Blob
  */
-export function generateParticipantTemplate() {
+export async function generateParticipantTemplate() {
   // Create workbook
-  const wb = XLSX.utils.book_new();
-  
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet('Teilnehmer');
+
   // Define headers
   const headers = ['Name', 'Rolle', 'Region', 'Pronomen', 'Instagram'];
-  
+
   // Create sample data row
   const sampleData = [
     'Max Mustermann',
-    'Teilnehmer*in',
+    'Wettbewerb-Teilnehmer*in',
     'Berlin',
     'er/ihm',
     '@max_mustermann'
   ];
-  
+
   // Create instructions row
   const instructions = [
     'ANLEITUNG: Füllen Sie die Zeilen mit Teilnehmerdaten aus. Erste Zeile ist ein Beispiel.',
@@ -80,85 +83,69 @@ export function generateParticipantTemplate() {
     'Pronomen und Instagram sind optional',
     'Löschen Sie diese Anweisungszeile vor dem Import'
   ];
-  
-  // Create worksheet data
-  const wsData = [
-    headers,
-    sampleData,
-    instructions
-  ];
-  
-  // Create worksheet
-  const ws = XLSX.utils.aoa_to_sheet(wsData);
-  
+
+  // Add rows to worksheet
+  worksheet.addRow(headers);
+  worksheet.addRow(sampleData);
+  worksheet.addRow(instructions);
+
   // Set column widths
-  ws['!cols'] = [
-    { wch: 20 }, // Name
-    { wch: 15 }, // Rolle
-    { wch: 20 }, // Region
-    { wch: 15 }, // Pronomen
-    { wch: 20 }  // Instagram
+  worksheet.columns = [
+    { width: 20 }, // Name
+    { width: 15 }, // Rolle
+    { width: 20 }, // Region
+    { width: 15 }, // Pronomen
+    { width: 20 }  // Instagram
   ];
-  
-  // Add data validation for Role column (column C, index 2)
-  const roleValidation = {
-    type: 'list',
-    allowBlank: false,
-    formula1: `"${allowedRoles.join(',')}"`,
-    showErrorMessage: true,
-    errorTitle: 'Ungültige Rolle',
-    error: 'Bitte wählen Sie eine gültige Rolle aus der Liste aus.',
-    showInputMessage: true,
-    promptTitle: 'Rolle auswählen',
-    prompt: 'Wählen Sie eine Rolle aus der Dropdown-Liste aus.'
-  };
-  
-  // Add data validation for Region column (column D, index 3)
-  const regionValidation = {
-    type: 'list',
-    allowBlank: true,
-    formula1: `"${allowedRegions.join(',')}"`,
-    showErrorMessage: true,
-    errorTitle: 'Ungültige Region',
-    error: 'Bitte wählen Sie eine gültige Region aus der Liste aus.',
-    showInputMessage: true,
-    promptTitle: 'Region auswählen',
-    prompt: 'Wählen Sie eine Region aus der Dropdown-Liste aus (optional).'
-  };
-  
-  // Apply validation to all data rows (starting from row 3, excluding header and sample)
-  // We'll apply to a reasonable range (rows 3-1000)
-  for (let row = 3; row <= 1000; row++) {
-    // Role validation (column B, index 1)
-    const roleCell = XLSX.utils.encode_cell({ r: row - 1, c: TEMPLATE_COLUMNS.ROLE });
-    if (!ws[roleCell]) {
-      ws[roleCell] = { t: 's', v: '' };
+
+  // Add data validation for Role column (column B)
+  worksheet.getColumn(2).eachCell((cell, rowNumber) => {
+    if (rowNumber > 2) { // Skip header and sample data row
+      cell.dataValidation = {
+        type: 'list',
+        allowBlank: false,
+        formulae: [`"${allowedRoles.join(',')}"`],
+        showErrorMessage: true,
+        errorStyle: 'error',
+        errorTitle: 'Ungültige Rolle',
+        error: 'Bitte wählen Sie eine gültige Rolle aus der Liste aus.',
+        showInputMessage: true,
+        promptTitle: 'Rolle auswählen',
+        prompt: 'Wählen Sie eine Rolle aus der Dropdown-Liste aus.'
+      };
     }
-    ws[roleCell].dv = roleValidation;
-    
-    // Region validation (column C, index 2)
-    const regionCell = XLSX.utils.encode_cell({ r: row - 1, c: TEMPLATE_COLUMNS.REGION });
-    if (!ws[regionCell]) {
-      ws[regionCell] = { t: 's', v: '' };
+  });
+
+  // Add data validation for Region column (column C)
+  worksheet.getColumn(3).eachCell((cell, rowNumber) => {
+    if (rowNumber > 2) { // Skip header and sample data row
+      cell.dataValidation = {
+        type: 'list',
+        allowBlank: true,
+        formulae: [`"${allowedRegions.join(',')}"`],
+        showErrorMessage: true,
+        errorStyle: 'warning',
+        errorTitle: 'Ungültige Region',
+        error: 'Bitte wählen Sie eine gültige Region aus der Liste aus.',
+        showInputMessage: true,
+        promptTitle: 'Region auswählen',
+        prompt: 'Wählen Sie eine Region aus der Dropdown-Liste aus (optional).'
+      };
     }
-    ws[regionCell].dv = regionValidation;
-  }
-  
-  // Add worksheet to workbook
-  XLSX.utils.book_append_sheet(wb, ws, 'Teilnehmer');
-  
-  // Generate Excel file
-  const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-  
-  return new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  });
+
+  // Generate Excel file buffer
+  const buffer = await workbook.xlsx.writeBuffer();
+
+  return new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
 }
 
 /**
  * Downloads the participant template as Excel
  */
-export function downloadParticipantTemplate() {
+export async function downloadParticipantTemplate() {
   try {
-    const template = generateParticipantTemplate();
+    const template = await generateParticipantTemplate();
     const url = URL.createObjectURL(template);
     const link = document.createElement('a');
     link.href = url;
@@ -181,12 +168,12 @@ export function downloadParticipantTemplateCSV() {
   const headers = ['Name', 'Rolle', 'Region', 'Pronomen', 'Instagram'];
   const sampleData = [
     'Max Mustermann',
-    'Teilnehmer*in',
+    'Wettbewerb-Teilnehmer*in',
     'Berlin',
     'er/ihm',
     '@max_mustermann'
   ];
-  
+
   // Create CSV content
   const csvContent = [
     headers.join(','),
@@ -205,7 +192,7 @@ export function downloadParticipantTemplateCSV() {
     'Erlaubte Regionen:',
     allowedRegions.join(', ')
   ].join('\n');
-  
+
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -231,24 +218,24 @@ export async function parseParticipantCSV(file) {
   if (file.size > MAX_FILE_SIZE) {
     throw new Error(`Datei ist zu groß. Maximum: ${MAX_FILE_SIZE / (1024 * 1024)}MB`);
   }
-  
+
   // Check file type
   if (!file.type.includes('text/csv') && !file.name.match(/\.csv$/i)) {
     throw new Error('Nur CSV-Dateien (.csv) sind erlaubt');
   }
-  
+
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    
+
     reader.onload = (e) => {
       try {
         const csvText = e.target.result;
         const lines = csvText.split('\n').filter(line => line.trim() !== '');
-        
+
         // Skip instruction lines
-        const dataLines = lines.filter(line => 
-          !line.includes('ANLEITUNG:') && 
-          !line.includes('Erlaubte Rollen:') && 
+        const dataLines = lines.filter(line =>
+          !line.includes('ANLEITUNG:') &&
+          !line.includes('Erlaubte Rollen:') &&
           !line.includes('Erlaubte Regionen:') &&
           !line.includes('Füllen Sie die Zeilen') &&
           !line.includes('Slug wird automatisch') &&
@@ -257,28 +244,28 @@ export async function parseParticipantCSV(file) {
           !line.includes('Pronomen und Instagram') &&
           !line.includes('Löschen Sie diese')
         );
-        
+
         // Check row limit
         if (dataLines.length > MAX_ROWS) {
           throw new Error(`Zu viele Zeilen. Maximum: ${MAX_ROWS} Zeilen`);
         }
-        
+
         // Parse CSV data
         const validRows = [];
         const errors = [];
         const batchSlugs = []; // Track slugs within this batch
-        
+
         dataLines.forEach((line, index) => {
           if (index === 0) return; // Skip header
-          
+
           const rowNumber = index + 1;
           const columns = line.split(',').map(col => col.trim().replace(/"/g, ''));
-          
+
           if (columns.length < 4) return; // Skip incomplete rows
-          
+
           try {
             const name = columns[TEMPLATE_COLUMNS.NAME] || '';
-            
+
             // Generate unique slug considering already parsed slugs
             let slug;
             try {
@@ -293,7 +280,7 @@ export async function parseParticipantCSV(file) {
               });
               return;
             }
-            
+
             const participantData = {
               name,
               slug,
@@ -302,15 +289,15 @@ export async function parseParticipantCSV(file) {
               pronouns: columns[TEMPLATE_COLUMNS.PRONOUNS] || '',
               instagram: columns[TEMPLATE_COLUMNS.INSTAGRAM] || ''
             };
-            
+
             // Validate with Zod schema
             const validationResult = participantSchema.safeParse(participantData);
-            
+
             if (validationResult.success) {
               // Additional validation for role and region
               const roleValid = allowedRoles.includes(participantData.role);
               const regionValid = !participantData.region || allowedRegions.includes(participantData.region);
-              
+
               if (!roleValid) {
                 errors.push({
                   row: rowNumber,
@@ -320,7 +307,7 @@ export async function parseParticipantCSV(file) {
                 });
                 return;
               }
-              
+
               if (!regionValid) {
                 errors.push({
                   row: rowNumber,
@@ -330,7 +317,7 @@ export async function parseParticipantCSV(file) {
                 });
                 return;
               }
-              
+
               validRows.push(participantData);
             } else {
               // Handle Zod validation errors
@@ -352,22 +339,22 @@ export async function parseParticipantCSV(file) {
             });
           }
         });
-        
+
         resolve({
           validRows,
           errors,
           totalRows: dataLines.length
         });
-        
+
       } catch (error) {
         reject(new Error(`Fehler beim Lesen der CSV-Datei: ${error.message}`));
       }
     };
-    
+
     reader.onerror = () => {
       reject(new Error('Fehler beim Lesen der Datei'));
     };
-    
+
     reader.readAsText(file);
   });
 }
@@ -382,33 +369,44 @@ export async function parseParticipantExcel(file) {
   if (file.size > MAX_FILE_SIZE) {
     throw new Error(`Datei ist zu groß. Maximum: ${MAX_FILE_SIZE / (1024 * 1024)}MB`);
   }
-  
+
   // Check file type
   const allowedTypes = [
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
     'application/vnd.ms-excel', // .xls
     'application/vnd.ms-excel.sheet.macroEnabled.12' // .xlsm
   ];
-  
+
   if (!allowedTypes.includes(file.type) && !file.name.match(/\.(xlsx|xls)$/i)) {
     throw new Error('Nur Excel-Dateien (.xlsx, .xls) sind erlaubt');
   }
-  
+
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    
-    reader.onload = (e) => {
+
+    reader.onload = async (e) => {
       try {
-        const data = new Uint8Array(e.target.result);
-        const workbook = XLSX.read(data, { type: 'array' });
-        
+        const arrayBuffer = e.target.result;
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.load(arrayBuffer);
+
         // Get first worksheet
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        
-        // Convert to JSON
-        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-        
+        const worksheet = workbook.worksheets[0];
+
+        if (!worksheet) {
+          throw new Error('Excel-Datei enthält keine Arbeitsblätter');
+        }
+
+        // Convert worksheet to array of arrays
+        const jsonData = [];
+        worksheet.eachRow((row, rowNumber) => {
+          const rowValues = [];
+          row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+            rowValues.push(cell.value);
+          });
+          jsonData.push(rowValues);
+        });
+
         // Skip empty rows and find data rows (skip header and instruction rows)
         const dataRows = jsonData.filter((row, index) => {
           // Skip first row (headers) and instruction rows
@@ -420,23 +418,23 @@ export async function parseParticipantExcel(file) {
           // Include rows that have at least a name
           return Array.isArray(row) && row.length > 0 && row[0] && typeof row[0] === 'string' && row[0].trim() !== '';
         });
-        
+
         // Check row limit
         if (dataRows.length > MAX_ROWS) {
           throw new Error(`Zu viele Zeilen. Maximum: ${MAX_ROWS} Zeilen`);
         }
-        
+
         // Parse and validate each row
         const validRows = [];
         const errors = [];
         const batchSlugs = []; // Track slugs within this batch
-        
+
         dataRows.forEach((row, index) => {
           const rowNumber = index + 2; // +2 because we skip header row and arrays are 0-indexed
-          
+
           try {
             const name = row[TEMPLATE_COLUMNS.NAME]?.toString().trim() || '';
-            
+
             // Generate unique slug considering already parsed slugs
             let slug;
             try {
@@ -451,7 +449,7 @@ export async function parseParticipantExcel(file) {
               });
               return;
             }
-            
+
             const participantData = {
               name,
               slug,
@@ -460,15 +458,15 @@ export async function parseParticipantExcel(file) {
               pronouns: row[TEMPLATE_COLUMNS.PRONOUNS]?.toString().trim() || '',
               instagram: row[TEMPLATE_COLUMNS.INSTAGRAM]?.toString().trim() || ''
             };
-            
+
             // Validate with Zod schema
             const validationResult = participantSchema.safeParse(participantData);
-            
+
             if (validationResult.success) {
               // Additional validation for role and region
               const roleValid = allowedRoles.includes(participantData.role);
               const regionValid = !participantData.region || allowedRegions.includes(participantData.region);
-              
+
               if (!roleValid) {
                 errors.push({
                   row: rowNumber,
@@ -478,7 +476,7 @@ export async function parseParticipantExcel(file) {
                 });
                 return;
               }
-              
+
               if (!regionValid) {
                 errors.push({
                   row: rowNumber,
@@ -488,7 +486,7 @@ export async function parseParticipantExcel(file) {
                 });
                 return;
               }
-              
+
               validRows.push(participantData);
             } else {
               // Handle Zod validation errors
@@ -510,22 +508,22 @@ export async function parseParticipantExcel(file) {
             });
           }
         });
-        
+
         resolve({
           validRows,
           errors,
           totalRows: dataRows.length
         });
-        
+
       } catch (error) {
         reject(new Error(`Fehler beim Lesen der Excel-Datei: ${error.message}`));
       }
     };
-    
+
     reader.onerror = () => {
       reject(new Error('Fehler beim Lesen der Datei'));
     };
-    
+
     reader.readAsArrayBuffer(file);
   });
 }
@@ -538,14 +536,14 @@ export async function parseParticipantExcel(file) {
  */
 export function validateParticipantRow(row, index) {
   const validationResult = participantSchema.safeParse(row);
-  
+
   if (validationResult.success) {
     // Additional validation for role and region
     const roleValid = allowedRoles.includes(row.role);
     const regionValid = !row.region || allowedRegions.includes(row.region);
-    
+
     const errors = [];
-    
+
     if (!roleValid) {
       errors.push({
         row: index + 1,
@@ -554,7 +552,7 @@ export function validateParticipantRow(row, index) {
         message: `Ungültige Rolle. Erlaubte Werte: ${allowedRoles.join(', ')}`
       });
     }
-    
+
     if (!regionValid && row.region) {
       errors.push({
         row: index + 1,
@@ -563,7 +561,7 @@ export function validateParticipantRow(row, index) {
         message: `Ungültige Region. Erlaubte Werte: ${allowedRegions.join(', ')}`
       });
     }
-    
+
     return {
       isValid: errors.length === 0,
       errors
@@ -588,7 +586,7 @@ export function validateParticipantRow(row, index) {
  */
 export async function parseParticipantFile(file) {
   const fileName = file.name.toLowerCase();
-  
+
   if (fileName.endsWith('.csv')) {
     return await parseParticipantCSV(file);
   } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
@@ -607,13 +605,13 @@ export async function parseParticipantFile(file) {
 export function checkForDuplicates(newParticipants, existingParticipants) {
   const duplicates = [];
   const uniqueParticipants = [];
-  
+
   newParticipants.forEach(participant => {
-    const isDuplicate = existingParticipants.some(existing => 
-      existing.name.toLowerCase().trim() === participant.name.toLowerCase().trim() &&
-      existing.region.toLowerCase().trim() === participant.region.toLowerCase().trim()
+    const isDuplicate = existingParticipants.some(existing =>
+      (existing.name || '').toLowerCase().trim() === (participant.name || '').toLowerCase().trim() &&
+      (existing.region || '').toLowerCase().trim() === (participant.region || '').toLowerCase().trim()
     );
-    
+
     if (isDuplicate) {
       duplicates.push({
         name: participant.name,
@@ -624,7 +622,7 @@ export function checkForDuplicates(newParticipants, existingParticipants) {
       uniqueParticipants.push(participant);
     }
   });
-  
+
   return {
     duplicates,
     uniqueParticipants,

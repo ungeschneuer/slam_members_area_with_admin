@@ -70,6 +70,9 @@ const ROLE_OPTIONS = [
   { value: 'jury', label: 'Jury' },
   { value: 'moderator', label: 'Moderator*in' },
   { value: 'feature_artist', label: 'Feature-Künstler*in' },
+  { value: 'feature', label: 'Feature' },
+  { value: 'dj', label: 'DJ' },
+  { value: 'fotograf', label: 'Fotograf*in' },
   // Crew roles
   ...Object.entries(CREW_ROLES).map(([value, label]) => ({ 
     value, 

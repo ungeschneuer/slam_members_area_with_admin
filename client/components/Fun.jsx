@@ -74,9 +74,9 @@ export default function Fun() {
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Header */}
       <div className="page-header-card text-center">
-        <h1 className="heading-primary mb-4">Fun & Games 🎮</h1>
+        <h1 className="heading-primary mb-4">Fun & Weiteres ✨</h1>
         <p className="text-body max-w-2xl mx-auto">
-          Entdecke spannende Features und interaktive Elemente der SLAM25 Community!
+          Alles Weitere, was nicht auf die anderen Seite passt!
         </p>
       </div>
       

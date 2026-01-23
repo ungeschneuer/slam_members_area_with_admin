@@ -12,13 +12,17 @@ import LoadingSpinner from '../LoadingSpinner.jsx';
 
 export default function AdminDashboard() {
   // Use TanStack Query hooks for data fetching with admin flag for immediate updates
-  const { data: participantsData = { data: [] }, isLoading: participantsLoading, error: participantsError } = useParticipants(undefined, true);
+  // Use default limit since we only need the totalCount from metadata for stats
+  const { data: participantsData = { data: [], totalCount: 0 }, isLoading: participantsLoading, error: participantsError } = useParticipants({}, true);
   const { data: rounds = [], isLoading: roundsLoading, error: roundsError } = useRounds(undefined, true);
   const { data: news = [], isLoading: newsLoading, error: newsError } = useNews(undefined, true);
   const { data: timetable = [], isLoading: timetableLoading, error: timetableError } = useTimetable(undefined, true);
   
   // Extract the actual participants array from the data structure
   const participants = participantsData?.data || [];
+  const participantsTotalCount = typeof participantsData?.totalCount === 'number' 
+    ? participantsData.totalCount 
+    : participants.length;
   const { data: cityTips = [], isLoading: cityTipsLoading, error: cityTipsError } = useCityTips(undefined, true);
   const { data: infoPages = [], isLoading: infoPagesLoading, error: infoPagesError } = useInfoPages(undefined, true);
 
@@ -46,13 +50,13 @@ export default function AdminDashboard() {
 
   // Calculate stats from TanStack Query data
   const stats = React.useMemo(() => ({
-    participants: participants.length,
+    participants: participantsTotalCount, // Use totalCount from metadata for accurate count
     rounds: rounds.length,
     news: news.length,
     events: timetable.length,
     cityTips: cityTips.length,
     infoPages: infoPages.length
-  }), [participants, rounds, news, timetable, cityTips, infoPages]);
+  }), [participantsTotalCount, rounds, news, timetable, cityTips, infoPages]);
 
   const loadDashboardData = async () => {
     setDashboardLoading(true);
@@ -71,7 +75,7 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     // Data counts updated
-  }, [participants, rounds, news, timetable, cityTips, infoPages]);
+  }, [participantsTotalCount, rounds, news, timetable, cityTips, infoPages]);
 
 
 

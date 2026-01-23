@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useParticipants, useDeleteParticipant, useBulkImportParticipants } from '../../hooks/index.js';
+import { ALLOWED_PARTICIPANT_ROLES } from '@shared/constants/roles.js';
 import LoadingSpinner from '../LoadingSpinner';
 import { ErrorMessage, SuccessMessage } from '../StatusMessages.jsx';
 import PaginationControls from '../PaginationControls.jsx';
@@ -72,7 +73,7 @@ export default function AdminParticipants() {
     'Chemnitz'
   ];
 
-  const roles = ['Wettbewerb-Teilnehmer*in', 'Supporter*in', 'SLAM25-Team', 'SLAM-MC'];
+  const roles = ALLOWED_PARTICIPANT_ROLES;
 
   // Pronouns is now a free-form text field
 

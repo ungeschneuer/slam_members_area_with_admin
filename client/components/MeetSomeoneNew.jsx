@@ -246,7 +246,7 @@ export default function MeetSomeoneNew() {
       {allShown && (
         <div className="animate-bounce-in">
           <div className="card-elevated p-4 text-center">
-            <div className="text-4xl mb-2">🎉</div>
+            <div className="text-3xl sm:text-4xl mb-2">🎉</div>
             <h2 className="heading-secondary text-lg text-gray-900 dark:text-white mb-2">Alle gesehen!</h2>
             <p className="text-body text-sm text-gray-600 dark:text-gray-400 mb-3">
               Du hast alle {participantsWithInstagram.length} Teilnehmer*innen kennengelernt!

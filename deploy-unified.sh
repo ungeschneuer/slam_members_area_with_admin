@@ -281,7 +281,6 @@ upload_files() {
         --exclude '*.log' \
         --exclude '.env' \
         --exclude 'public/uploads' \
-        --exclude 'dist' \
         --exclude 'slam25_backup.sql' \
         --exclude 'uploads_backup.tar.gz' \
         ./ ${UBERSPACE_USER}@${UBERSPACE_HOST}:~/${PROJECT_NAME}/

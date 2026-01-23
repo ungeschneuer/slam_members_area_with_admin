@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useParticipants, useCreateParticipant, useUpdateParticipant } from '../../hooks/index.js';
+import { ALLOWED_PARTICIPANT_ROLES } from '@shared/constants/roles.js';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -47,7 +48,7 @@ const bundeslaender = [
   'Chemnitz'
 ];
 
-const roles = ['Wettbewerb-Teilnehmer*in', 'Supporter*in', 'SLAM25-Team', 'SLAM-MC'];
+const roles = ALLOWED_PARTICIPANT_ROLES;
 
 export default function AdminParticipantsForm() {
   const navigate = useNavigate();

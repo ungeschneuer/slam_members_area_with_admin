@@ -5,6 +5,9 @@ import LoadingSpinner from './LoadingSpinner';
 import { ErrorMessage, SuccessMessage } from './StatusMessages.jsx';
 import { getTodayBerlinDateString, isFutureDateBerlin } from '../utils/dateUtils';
 import { getAvailableContentFilterOptions, validateFilterValue } from '../utils/filterUtils.js';
+import { handleLinkClick } from '../utils/linkUtils.js';
+import DayTabs from './shared/DayTabs.jsx';
+import FilterButtons from './shared/FilterButtons.jsx';
 
 // Event type translations
 const translateEventType = (type) => {
@@ -19,17 +22,94 @@ const translateEventType = (type) => {
   return translations[type] || type;
 };
 
+// Helper function to get event type info for badges
+const getEventTypeInfo = (type) => {
+  switch (type) {
+    case 'team-round':
+      return { icon: '👥', color: 'bg-red-500 text-white dark:bg-red-600 dark:text-white', label: 'Team-Runde' };
+    case 'individual-round':
+      return { icon: '👤', color: 'bg-blue-500 text-white dark:bg-blue-600 dark:text-white', label: 'Einzel-Runde' };
+    case 'workshop':
+      return { icon: '🎓', color: 'bg-green-500 text-white dark:bg-green-600 dark:text-white', label: 'Workshop' };
+    case 'fun':
+      return { icon: '🎉', color: 'bg-yellow-500 text-black dark:bg-yellow-600 dark:text-black', label: 'Fun' };
+    case 'aftershow':
+      return { icon: '🎭', color: 'bg-purple-500 text-white dark:bg-purple-600 dark:text-white', label: 'Aftershow' };
+    case 'panel':
+      return { icon: '🎤', color: 'bg-orange-500 text-white dark:bg-orange-600 dark:text-white', label: 'Panel' };
+    case 'networking':
+      return { icon: '🤝', color: 'bg-teal-500 text-white dark:bg-teal-600 dark:text-white', label: 'Netzwerktreffen' };
+      case 'akkreditierung':
+        return { icon: '🪪', color: 'bg-pink-500 text-white dark:bg-pink-600 dark:text-white', label: 'Akkreditierung' };
+      case 'festivalzentrum':
+        return { icon: '🏟️', color: 'bg-amber-500 text-black dark:bg-amber-600 dark:text-black', label: 'Festivalzentrum' };
+    default:
+      return { icon: '📅', color: 'bg-gray-500 text-white dark:bg-gray-600 dark:text-white', label: 'Event' };
+  }
+};
+
 export default function Timetable() {
   usePageTitle('Zeitplan');
   const { data: events = [], isLoading: loading, error } = useTimetable();
   const [success, setSuccess] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [dayFilter, setDayFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
   const [locationFilter, setLocationFilter] = useState('all');
   
-  // Ref to track if initial day selection was made
-  const hasSetInitialDay = useRef(false);
+  // Day tab logic
+  const uniqueDates = useMemo(() => 
+    [...new Set(events.map(e => e.date))].sort(),
+    [events]
+  );
+
+  const dayTabs = useMemo(() => 
+    uniqueDates.map((date, index) => ({
+      id: date,
+      label: `Tag ${index + 1}`,
+      subtitle: new Date(date).toLocaleDateString('de-DE', { 
+        weekday: 'short', 
+        day: 'numeric', 
+        month: 'short',
+        timeZone: 'Europe/Berlin'
+      })
+    })),
+    [uniqueDates]
+  );
+
+  // Smart default day selection based on current date
+  const [activeDay, setActiveDay] = useState(null);
+
+  // Set active day once data is loaded
+  useEffect(() => {
+    if (uniqueDates.length > 0 && !activeDay) {
+      const today = new Date();
+      const todayStr = today.toISOString().split('T')[0];
+      
+      // Check if today is within the event dates
+      const todayIndex = uniqueDates.findIndex(date => date === todayStr);
+      if (todayIndex !== -1) {
+        setActiveDay(uniqueDates[todayIndex]); // Current day
+        return;
+      }
+      
+      // Check if we're before the first day
+      const firstDate = new Date(uniqueDates[0]);
+      if (today < firstDate) {
+        setActiveDay(uniqueDates[0]); // First day
+        return;
+      }
+      
+      // Check if we're after the last day
+      const lastDate = new Date(uniqueDates[uniqueDates.length - 1]);
+      if (today > lastDate) {
+        setActiveDay(uniqueDates[uniqueDates.length - 1]); // Last day
+        return;
+      }
+      
+      // Fallback to first day
+      setActiveDay(uniqueDates[0]);
+    }
+  }, [uniqueDates, activeDay]);
 
   // Extract matching logic to reusable functions
   const matchesSearchFilter = (event, search) => {
@@ -37,15 +117,15 @@ export default function Timetable() {
     const searchLower = search.toLowerCase();
     
     // Early returns for performance
-    if (event.title?.toLowerCase().includes(searchLower)) return true;
-    if (event.location?.toLowerCase().includes(searchLower)) return true;
-    if (event.description?.toLowerCase().includes(searchLower)) return true;
+    if ((event.title || '').toLowerCase().includes(searchLower)) return true;
+    if ((event.location || '').toLowerCase().includes(searchLower)) return true;
+    if ((event.description || '').toLowerCase().includes(searchLower)) return true;
     
     return false;
   };
 
-  const matchesDayFilter = (event, dayFilter) => {
-    return dayFilter === 'all' || event.date === dayFilter;
+  const matchesDayFilter = (event, activeDay) => {
+    return activeDay && event.date === activeDay;
   };
 
   const matchesTypeFilter = (event, typeFilter) => {
@@ -64,54 +144,55 @@ export default function Timetable() {
     { id: 'workshop', name: 'Workshop' },
     { id: 'fun', name: 'Fun' },
     { id: 'aftershow', name: 'Aftershow' },
-    { id: 'panel', name: 'Panel' }
+    { id: 'panel', name: 'Panel' },
+    { id: 'networking', name: 'Netzwerktreffen' },
+    { id: 'akkreditierung', name: 'Akkreditierung' },
+    { id: 'festivalzentrum', name: 'Festivalzentrum' }
   ];
 
+  // Day filtering first, then other filters
+  const dayFilteredEvents = useMemo(() => 
+    activeDay ? events.filter(e => e.date === activeDay) : [],
+    [events, activeDay]
+  );
+
   // Single-pass cascading filter options and results
-  const { typeOptions, locationOptions, dayOptions, filteredEvents } = useMemo(() => {
+  const { typeOptions, locationOptions, filteredEvents } = useMemo(() => {
     try {
       // Handle empty or invalid datasets
-      if (!Array.isArray(events) || events.length === 0) {
+      if (!Array.isArray(dayFilteredEvents) || dayFilteredEvents.length === 0) {
         return {
           typeOptions: predefinedTypeOptions,
           locationOptions: [{ id: 'all', name: 'Alle Orte' }],
-          dayOptions: [{ id: 'all', name: 'Alle Tage' }],
           filteredEvents: []
         };
       }
     
-    const afterSearch = events.filter(event => {
+    const afterSearch = dayFilteredEvents.filter(event => {
       if (!event || typeof event !== 'object') return false;
       return matchesSearchFilter(event, searchTerm);
     });
     
     const types = new Set();
     const locations = new Set();
-    const days = new Set();
     const filtered = [];
     
     afterSearch.forEach(event => {
-      const passesDay = matchesDayFilter(event, dayFilter);
       const passesType = matchesTypeFilter(event, typeFilter);
       const passesLocation = matchesLocationFilter(event, locationFilter);
       
-      if (passesDay && passesType && passesLocation) {
+      if (passesType && passesLocation) {
         filtered.push(event);
       }
       
-      // For type options: match day + location (but NOT type filter)
-      if (passesDay && passesLocation && event.type) {
+      // For type options: match location (but NOT type filter)
+      if (passesLocation && event.type) {
         types.add(event.type);
       }
       
-      // For location options: match day + type (but NOT location filter)
-      if (passesDay && passesType && event.location) {
+      // For location options: match type (but NOT location filter)
+      if (passesType && event.location) {
         locations.add(event.location);
-      }
-      
-      // For day options: match type + location (but NOT day filter)
-      if (passesType && passesLocation && event.date) {
-        days.add(event.date);
       }
     });
     
@@ -127,23 +208,9 @@ export default function Timetable() {
       ...Array.from(locations).sort().map(loc => ({ id: loc, name: loc }))
     ];
     
-    const dayOpts = [
-      { id: 'all', name: 'Alle Tage' },
-      ...Array.from(days).sort().map(date => ({
-        id: date,
-        name: new Date(date).toLocaleDateString('de-DE', { 
-          weekday: 'long', 
-          day: 'numeric', 
-          month: 'long',
-          timeZone: 'Europe/Berlin'
-        })
-      }))
-    ];
-    
       return {
         typeOptions: typeOpts,
         locationOptions: locationOpts,
-        dayOptions: dayOpts,
         filteredEvents: filtered
       };
     } catch (error) {
@@ -152,13 +219,12 @@ export default function Timetable() {
       return {
         typeOptions: predefinedTypeOptions,
         locationOptions: [{ id: 'all', name: 'Alle Orte' }],
-        dayOptions: [{ id: 'all', name: 'Alle Tage' }],
         filteredEvents: []
       };
     }
-  }, [events, searchTerm, dayFilter, typeFilter, locationFilter]);
+  }, [dayFilteredEvents, searchTerm, typeFilter, locationFilter]);
 
-  // Auto-reset logic (with loop prevention)
+  // Aureset logic (with loop prevention)
   const resetInProgress = useRef(false);
   
   useEffect(() => {
@@ -179,42 +245,6 @@ export default function Timetable() {
     }
   }, [locationOptions, locationFilter]);
 
-  // Smart default day selection - runs once when data loads
-  useEffect(() => {
-    // Only run once and when loading completes
-    if (hasSetInitialDay.current || loading || !events || events.length === 0) {
-      return;
-    }
-    
-    // Mark as completed to prevent future runs
-    hasSetInitialDay.current = true;
-    
-    // Get today's date in Berlin timezone
-    const todayStr = getTodayBerlinDateString();
-    
-    // Get unique dates from events and sort them
-    const eventsArray = Array.isArray(events) ? events : [];
-    const eventDates = [...new Set(eventsArray.map(e => e.date))].sort();
-    
-    // Check if today has events
-    if (eventDates.includes(todayStr)) {
-      setDayFilter(todayStr);
-      return;
-    }
-    
-    // Find future and past dates
-    const futureDates = eventDates.filter(date => isFutureDateBerlin(date));
-    const pastDates = eventDates.filter(date => !isFutureDateBerlin(date));
-    
-    // If we have both past and future events, select the next future date
-    if (futureDates.length > 0 && pastDates.length > 0) {
-      setDayFilter(futureDates[0]);
-      return;
-    }
-    
-    // If all events are in the future OR all events are in the past OR no events, show "all"
-    setDayFilter('all');
-  }, [events, loading]);
 
 
   // Group events by date
@@ -272,23 +302,6 @@ export default function Timetable() {
     return timeString;
   };
 
-  // Helper function to format date for display
-  const formatDateForDisplay = (date) => {
-    if (!date) return 'Datum unbekannt';
-    try {
-      const dateObj = new Date(date);
-      if (isNaN(dateObj.getTime())) return 'Ungültiges Datum';
-      return dateObj.toLocaleDateString('de-DE', { 
-        weekday: 'short',
-        day: '2-digit', 
-        month: '2-digit',
-        timeZone: 'Europe/Berlin'
-      });
-    } catch (error) {
-      return 'Ungültiges Datum';
-    }
-  };
-
   // Helper function to get link icon
   const getLinkIcon = (type) => {
     if (!type || typeof type !== 'string') return '🔗';
@@ -312,42 +325,70 @@ export default function Timetable() {
         return {
           cardBg: 'bg-red-100 dark:bg-red-900/40',
           cardBorder: 'border-red-300 dark:border-red-700',
+          timeCircle: 'bg-red-500',
           accent: 'text-red-800 dark:text-red-200'
         };
       case 'individual-round':
         return {
-          cardBg: 'bg-blue-100 dark:bg-blue-900/40',
-          cardBorder: 'border-blue-300 dark:border-blue-700',
-          accent: 'text-blue-800 dark:text-blue-200'
+          cardBg: 'bg-[#A2D2B9]/20 dark:bg-[#185757]/40',
+          cardBorder: 'border-[#185757]/30 dark:border-[#185757]/70',
+          timeCircle: 'bg-[#185757]',
+          accent: 'text-[#185757] dark:text-[#A2D2B9]'
         };
       case 'workshop':
         return {
           cardBg: 'bg-green-100 dark:bg-green-900/40',
           cardBorder: 'border-green-300 dark:border-green-700',
+          timeCircle: 'bg-green-500',
           accent: 'text-green-800 dark:text-green-200'
         };
       case 'fun':
         return {
           cardBg: 'bg-yellow-100 dark:bg-yellow-900/40',
           cardBorder: 'border-yellow-300 dark:border-yellow-700',
+          timeCircle: 'bg-yellow-500',
           accent: 'text-yellow-800 dark:text-yellow-200'
         };
       case 'aftershow':
         return {
           cardBg: 'bg-purple-100 dark:bg-purple-900/40',
           cardBorder: 'border-purple-300 dark:border-purple-700',
+          timeCircle: 'bg-purple-500',
           accent: 'text-purple-800 dark:text-purple-200'
         };
       case 'panel':
         return {
           cardBg: 'bg-orange-100 dark:bg-orange-900/40',
           cardBorder: 'border-orange-300 dark:border-orange-700',
+          timeCircle: 'bg-orange-500',
           accent: 'text-orange-800 dark:text-orange-200'
+        };
+      case 'networking':
+        return {
+          cardBg: 'bg-teal-100 dark:bg-teal-900/40',
+          cardBorder: 'border-teal-300 dark:border-teal-700',
+          timeCircle: 'bg-teal-500',
+          accent: 'text-teal-800 dark:text-teal-200'
+        };
+      case 'akkreditierung':
+        return {
+          cardBg: 'bg-pink-100 dark:bg-pink-900/40',
+          cardBorder: 'border-pink-300 dark:border-pink-700',
+          timeCircle: 'bg-pink-500',
+          accent: 'text-pink-800 dark:text-pink-200'
+        };
+      case 'festivalzentrum':
+        return {
+          cardBg: 'bg-amber-100 dark:bg-amber-900/40',
+          cardBorder: 'border-amber-300 dark:border-amber-700',
+          timeCircle: 'bg-amber-500',
+          accent: 'text-amber-800 dark:text-amber-200'
         };
       default:
         return {
           cardBg: 'bg-gray-100 dark:bg-gray-800',
           cardBorder: 'border-gray-300 dark:border-gray-600',
+          timeCircle: 'bg-gray-500',
           accent: 'text-gray-800 dark:text-gray-200'
         };
     }
@@ -362,29 +403,10 @@ export default function Timetable() {
       case 'fun': return 'border-l-yellow-500';
       case 'aftershow': return 'border-l-purple-500';
       case 'panel': return 'border-l-orange-500';
+      case 'networking': return 'border-l-teal-500';
+      case 'akkreditierung': return 'border-l-pink-500';
+      case 'festivalzentrum': return 'border-l-amber-500';
       default: return 'border-l-gray-500';
-    }
-  };
-
-  // Helper function to get competition type indicator color
-  const getCompetitionTypeIndicator = (eventType) => {
-    switch (eventType) {
-      case 'team-round':
-        return 'bg-red-500';
-      case 'individual-round':
-        return 'bg-[#185757]';
-      case 'workshop':
-        return 'bg-green-500';
-      case 'fun':
-        return 'bg-yellow-500';
-      case 'aftershow':
-        return 'bg-purple-500';
-      case 'panel':
-        return 'bg-orange-500';
-      case 'networking':
-        return 'bg-teal-500';
-      default:
-        return 'bg-gray-500';
     }
   };
 
@@ -412,80 +434,72 @@ export default function Timetable() {
       )}
 
       {/* Header */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+      <div className="page-header-card">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Zeitplan</h1>
           <p className="text-gray-600 dark:text-gray-400">Übersicht aller Veranstaltungen und Events während SLAM25</p>
         </div>
 
         {/* Search and Filter Controls */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="space-y-4 mb-6">
           <input
             type="text"
             placeholder="Events durchsuchen..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+            className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white text-base"
           />
-          <select
-            value={dayFilter}
-            onChange={(e) => setDayFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-          >
-            <option value="all">Alle Tage</option>
-            {[...new Set(events.map(e => e.date))].sort().map(date => (
-              <option key={date} value={date}>
-                {new Date(date).toLocaleDateString('de-DE', { 
-                  weekday: 'short', 
-                  year: '2-digit', 
-                  month: '2-digit', 
-                  day: '2-digit',
-                  timeZone: 'Europe/Berlin'
-                })}
-              </option>
-            ))}
-          </select>
-          <select
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-          >
-            {typeOptions.map(option => (
-              <option key={option.id} value={option.id}>
-                {option.id === 'all' ? option.name : translateEventType(option.id)}
-              </option>
-            ))}
-          </select>
-          <select
-            value={locationFilter}
-            onChange={(e) => setLocationFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-            aria-label="Ort filtern"
-          >
-            {locationOptions.map(option => (
-              <option key={option.id} value={option.id}>
-                {option.name}
-              </option>
-            ))}
-          </select>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <FilterButtons
+                options={typeOptions}
+                activeFilter={typeFilter}
+                onFilterChange={setTypeFilter}
+                label="Event-Typ filtern"
+                ariaLabel="Event-Typ auswählen"
+              />
+            </div>
+            
+            <div>
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
+                Ort filtern
+              </label>
+              <select
+                value={locationFilter}
+                onChange={(e) => setLocationFilter(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white text-base"
+                aria-label="Ort filtern"
+              >
+                {locationOptions.map(option => (
+                  <option key={option.id} value={option.id}>
+                    {option.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
+      </div>
 
-        {/* Timetable */}
-        <div className="space-y-6">
-          {Array.isArray(groupedEventsArray) && groupedEventsArray.map((dayGroup, dayIndex) => (
-            <div key={`day-${dayGroup.date}-${dayIndex}`} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-              {/* Date Header */}
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                  {dayGroup.dayName}
-                </h2>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  {dayGroup.events.length} Event{dayGroup.events.length !== 1 ? 's' : ''}
-                </p>
-              </div>
-              
-              <div className="divide-y divide-gray-200 dark:divide-gray-700">
-                {Array.isArray(dayGroup.events) && dayGroup.events.map((event, eventIndex) => {
+      {/* Day Tabs Section */}
+      {dayTabs.length > 0 && (
+        <div className="bg-gray-50 dark:bg-gray-900/50 rounded-xl p-4 mb-6">
+          <div className="flex justify-center">
+            <DayTabs 
+              days={dayTabs}
+              activeDay={activeDay}
+              onDayChange={setActiveDay}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Timetable */}
+        <div className="space-y-4 sm:space-y-6">
+        {filteredEvents.length > 0 ? (
+          <div className="flex flex-col gap-5">
+                {Array.isArray(filteredEvents) && filteredEvents.map((event, eventIndex) => {
                   // Sicherheitsprüfung für Event-Daten
                   if (!event || typeof event !== 'object') {
                     return null;
@@ -496,129 +510,202 @@ export default function Timetable() {
                   return (
                     <Link 
                       key={`event-${event.id || eventIndex}-${eventIndex}`} 
-                      to={event.internal_link ? `/rounds/${event.internal_link}` : `/timetable/event/${event.slug}`}
-                      className={`${colors.cardBg} ${getBorderColorClass(event.type)} border-l-4 rounded-lg p-3 sm:p-6 shadow-sm border ${colors.cardBorder} hover:shadow-md transition-all duration-200 block group`}
+                      to={`/timetable/event/${event.slug}`}
+                      className={`${colors.cardBg} ${getBorderColorClass(event.type)} border-l-4 rounded-xl p-3 sm:p-6 shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition-all duration-200 block group`}
                     >
-                      <div className="flex items-start space-x-3 sm:space-x-4">
-                        <div className="text-center flex-shrink-0">
-                          <div className="text-lg font-bold text-gray-900 dark:text-white">
-                            {formatTime(event.time)} - {formatTime(event.end_time)}
+                      {/* Mobile Layout - Compact List View */}
+                      <div className="sm:hidden">
+                        <div className="flex items-start space-x-3">
+                          {/* Time Circle - Smaller on mobile */}
+                          <div className="flex-shrink-0">
+                            <div className={`w-10 h-10 ${colors.timeCircle} rounded-full flex items-center justify-center text-white font-bold text-sm`}>
+                              {event.time && typeof event.time === 'string' ? event.time.split(':')[0] : '?'}
+                            </div>
                           </div>
-                          <div className="text-xs text-gray-500 dark:text-gray-300 mt-1">
-                            {formatDateForDisplay(event.date)}
-                          </div>
-                        </div>
-
-                        {/* Colored Indicator Line - Desktop only */}
-                        <div className={`hidden sm:block w-1 h-12 rounded-full ${getCompetitionTypeIndicator(event.type)}`}></div>
-                        
-                        <div className="flex-1 min-w-0">
-                          {/* Title Row with Navigation Arrow */}
-                          <div className="flex items-start justify-between mb-1 sm:mb-2">
-                            <div className="flex-1 min-w-0">
-                              <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white leading-tight group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                          
+                          {/* Content - Compact */}
+                          <div className="flex-1 min-w-0">
+                            {/* Title */}
+                            <div className="mb-2">
+                              <h3 className="text-sm font-semibold text-gray-900 dark:text-white leading-tight group-hover:text-[#185757] dark:group-hover:text-[#A2D2B9] transition-colors">
                                 {event.title || 'Unbekanntes Event'}
                               </h3>
+                              {/* Event Type Badge */}
+                              {event.type && (
+                                <div className="mt-1">
+                                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getEventTypeInfo(event.type).color}`}>
+                                    {getEventTypeInfo(event.type).label}
+                                  </span>
+                                </div>
+                              )}
                             </div>
-                            {/* Navigation Arrow - Rounds-style */}
-                            <div className="flex items-center text-blue-600 dark:text-blue-400 group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors ml-2">
-                              <svg className="w-5 h-5 sm:w-6 sm:h-6 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                              </svg>
+                            
+                            {/* Time and Location - Compact */}
+                            <div className="space-y-1 text-xs text-gray-600 dark:text-gray-400 mb-2">
+                              <div className="flex items-center space-x-1">
+                                <span>🕐</span>
+                                <span>{formatTime(event.time) || '--:--'}{event.end_time ? ` - ${formatTime(event.end_time)}` : ''}</span>
+                              </div>
+                              <div className="flex items-center space-x-1">
+                                <span>📍</span>
+                                <span className="truncate">{event.location || 'Unbekannter Ort'}</span>
+                              </div>
+                              <div className="flex items-center space-x-1">
+                                <span>📅</span>
+                                <span>{new Date(event.date).toLocaleDateString('de-DE', { 
+                                  weekday: 'short', 
+                                  day: 'numeric', 
+                                  month: 'short',
+                                  timeZone: 'Europe/Berlin'
+                                })}</span>
+                              </div>
+                            </div>
+                            
+                            {/* Description - Truncated */}
+                            <p className="text-xs text-gray-700 dark:text-gray-300 line-clamp-2">{event.description || 'Keine Beschreibung verfügbar'}</p>
+                            
+                            {/* Navigation Arrow - Bottom right */}
+                            <div className="flex justify-end mt-2">
+                              <div className="flex items-center text-[#185757] dark:text-[#A2D2B9] group-hover:text-[#0f3a3b] dark:group-hover:text-[#8BC4A3] transition-colors">
+                                <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                </svg>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Desktop Layout - Original Card View */}
+                      <div className="hidden sm:block">
+                        <div className="flex items-start space-x-4">
+                          <div className="flex-shrink-0">
+                            <div className={`w-12 h-12 ${colors.timeCircle} rounded-full flex items-center justify-center text-white font-bold text-base`}>
+                              {event.time && typeof event.time === 'string' ? event.time.split(':')[0] : '?'}
                             </div>
                           </div>
                           
-                          {/* Event Type Badge */}
-                          <div className="mb-3">
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                              event.type === 'team-round' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
-                              event.type === 'individual-round' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
-                              event.type === 'workshop' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
-                              event.type === 'fun' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
-                              event.type === 'aftershow' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' :
-                              event.type === 'panel' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200' :
-                              'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
-                            }`}>
-                              {event.type === 'team-round' ? '👥' :
-                               event.type === 'individual-round' ? '👤' :
-                               event.type === 'workshop' ? '🎓' :
-                               event.type === 'fun' ? '🎉' :
-                               event.type === 'aftershow' ? '🎭' :
-                               event.type === 'panel' ? '🎤' : '📅'}
-                            </span>
-                          </div>
-                          
-                          <div className="space-y-1 sm:space-y-2 text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2 sm:mb-3">
-                            <div className="flex items-center space-x-1 sm:space-x-2">
-                              <span className="text-xs">🕐</span>
-                              <span>{formatTime(event.time) || '--:--'}{event.end_time ? ` - ${formatTime(event.end_time)}` : ''}</span>
+                          <div className="flex-1 min-w-0">
+                            {/* Title Row with Navigation Arrow */}
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex-1 min-w-0">
+                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white leading-tight group-hover:text-[#185757] dark:group-hover:text-[#A2D2B9] transition-colors">
+                                  {event.title || 'Unbekanntes Event'}
+                                </h3>
+                                {/* Event Type Badge */}
+                                {event.type && (
+                                  <div className="mt-2">
+                                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getEventTypeInfo(event.type).color}`}>
+                                      {getEventTypeInfo(event.type).label}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                              {/* Navigation Arrow - Rounds-style */}
+                              <div className="flex items-center text-[#185757] dark:text-[#A2D2B9] group-hover:text-[#0f3a3b] dark:group-hover:text-[#8BC4A3] transition-colors ml-2">
+                                <svg className="w-6 h-6 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                </svg>
+                              </div>
                             </div>
-                            <div className="flex items-center space-x-1 sm:space-x-2">
-                              <span className="text-xs">📍</span>
-                              <span className="truncate">{event.location || 'Unbekannter Ort'}</span>
+                            
+                            
+                            <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400 mb-3">
+                              <div className="flex items-center space-x-2">
+                                <span className="text-xs">🕐</span>
+                                <span>{formatTime(event.time) || '--:--'}{event.end_time ? ` - ${formatTime(event.end_time)}` : ''}</span>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <span className="text-xs">📍</span>
+                                <span className="truncate">{event.location || 'Unbekannter Ort'}</span>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <span className="text-xs">📅</span>
+                                <span>{new Date(event.date).toLocaleDateString('de-DE', { 
+                                  weekday: 'short', 
+                                  day: 'numeric', 
+                                  month: 'short',
+                                  timeZone: 'Europe/Berlin'
+                                })}</span>
+                              </div>
+                              {event.address && (
+                                <div className="flex items-center space-x-2">
+                                  <span className="text-xs">🗺️</span>
+                                  <span className="text-xs truncate">{event.address}</span>
+                                </div>
+                              )}
+                              {event.assignments && Array.isArray(event.assignments) && event.assignments.length > 0 && (
+                                <div className="flex items-center space-x-2">
+                                  <span className="text-xs">👥</span>
+                                  <span>{event.assignments.length} Teilnehmer*innen</span>
+                                </div>
+                              )}
                             </div>
-                            {event.assignments && Array.isArray(event.assignments) && event.assignments.length > 0 && (
-                              <div className="flex items-center space-x-1 sm:space-x-2">
-                                <span className="text-xs">👥</span>
-                                <span>{event.assignments.length} Teilnehmer*innen</span>
+                            
+                            <p className="text-sm text-gray-700 dark:text-gray-300 mb-4 line-clamp-2">{event.description || 'Keine Beschreibung verfügbar'}</p>
+                            
+                            {/* Additional Links */}
+                            {event.additional_links && Array.isArray(event.additional_links) && event.additional_links.length > 0 && (
+                              <div className="flex flex-wrap gap-2 mb-4">
+                                {event.additional_links.map((link, linkIndex) => {
+                                  if (!link || typeof link !== 'object') return null;
+                                  
+                                  return (
+                                    <button
+                                      key={`link-${event.id || eventIndex}-${linkIndex}`}
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        const timetableLink = {
+                                          url: link.url || '#',
+                                          title: link.title || 'Link',
+                                          is_external: true // Timetable links are always external
+                                        };
+                                        handleLinkClick(timetableLink, e);
+                                      }}
+                                      className="inline-flex items-center space-x-1 px-3 py-1 bg-[#A2D2B9]/20 dark:bg-[#185757]/30 text-[#185757] dark:text-[#A2D2B9] rounded-lg hover:bg-[#A2D2B9]/30 dark:hover:bg-[#185757]/40 transition-colors cursor-pointer"
+                                    >
+                                      <span>{getLinkIcon(link.type)}</span>
+                                      <span className="text-sm">{link.title || 'Link'}</span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            )}
+                            
+                            {/* Detailed Description */}
+                            {event.detailed_description && (
+                              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                                <h4 className="font-medium text-gray-900 dark:text-white mb-2">Details</h4>
+                                <p className="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-wrap">{event.detailed_description}</p>
                               </div>
                             )}
                           </div>
-                          
-                          <p className="text-sm text-gray-700 dark:text-gray-300 mb-2 sm:mb-4 line-clamp-2">{event.description || 'Keine Beschreibung verfügbar'}</p>
-                          
-                          {/* Additional Links - Hidden on mobile for compactness */}
-                          {event.additional_links && Array.isArray(event.additional_links) && event.additional_links.length > 0 && (
-                            <div className="hidden sm:flex flex-wrap gap-2 mb-4">
-                              {event.additional_links.map((link, linkIndex) => {
-                                if (!link || typeof link !== 'object') return null;
-                                
-                                return (
-                                  <button
-                                    key={`link-${event.id || eventIndex}-${linkIndex}`}
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                      window.open(link.url || '#', '_blank', 'noopener,noreferrer');
-                                    }}
-                                    className="inline-flex items-center space-x-1 px-3 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors cursor-pointer"
-                                  >
-                                    <span>{getLinkIcon(link.type)}</span>
-                                    <span className="text-sm">{link.title || 'Link'}</span>
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          )}
-                          
-                          {/* Detailed Description - Hidden on mobile */}
-                          {event.detailed_description && (
-                            <div className="hidden sm:block bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                              <h4 className="font-medium text-gray-900 dark:text-white mb-2">Details</h4>
-                              <p className="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-wrap">{event.detailed_description}</p>
-                            </div>
-                          )}
                         </div>
                       </div>
                     </Link>
                   );
                 })}
               </div>
-            </div>
-          ))}
-        </div>
-
-        {(!filteredEvents || filteredEvents.length === 0) && (
-          <div className="text-center py-12">
+          ) : (
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-12 shadow-sm border border-gray-200 dark:border-gray-700">
+              <div className="text-center">
             <div className="text-4xl mb-4">📅</div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-              Keine Events gefunden
+              {filteredEvents.length === 0 && dayFilteredEvents.length > 0 
+                ? 'Keine Events gefunden' 
+                : 'Zeitplan kommt bald :)'
+              }
             </h3>
             <p className="text-gray-600 dark:text-gray-400">
-              Versuchen Sie andere Suchbegriffe oder Filter.
+              {filteredEvents.length === 0 && dayFilteredEvents.length > 0 
+                ? 'Versuche andere Filter oder suche nach anderen Begriffen.' 
+                : 'Bald wird hier der komplette SLAM25 Zeitplan zu sehen sein!'
+              }
             </p>
-          </div>
-        )}
+              </div>
+            </div>
+          )}
       </div>
     </div>
   );

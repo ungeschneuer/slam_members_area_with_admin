@@ -28,9 +28,9 @@ export default function CityTips() {
     const searchLower = search.toLowerCase();
     
     // Early returns for performance
-    if (location.name.toLowerCase().includes(searchLower)) return true;
-    if (location.address.toLowerCase().includes(searchLower)) return true;
-    if (location.description.toLowerCase().includes(searchLower)) return true;
+    if ((location.name || '').toLowerCase().includes(searchLower)) return true;
+    if ((location.address || '').toLowerCase().includes(searchLower)) return true;
+    if ((location.description || '').toLowerCase().includes(searchLower)) return true;
     
     return false;
   };
@@ -46,9 +46,7 @@ export default function CityTips() {
   const predefinedCategories = useMemo(() => {
     return getCategoryOptionsWithAll().map(cat => ({
       id: cat.value,
-      name: cat.label,
-      icon: cat.icon,
-      color: cat.color
+      name: cat.label
     }));
   }, []);
 

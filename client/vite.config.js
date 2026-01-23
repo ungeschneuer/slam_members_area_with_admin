@@ -5,6 +5,11 @@ import { resolve } from 'path'
 export default defineConfig({
   plugins: [react()],
   root: '.',
+  resolve: {
+    alias: {
+      '@shared': resolve(__dirname, '../shared')
+    }
+  },
   
   // Safe defines (avoid forcing DEV true which can affect builds)
   define: {

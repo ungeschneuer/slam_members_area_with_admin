@@ -39,8 +39,8 @@ function ParticipantDropdown({
     if (!searchTerm) return preFilteredItems;
     const lowerSearch = searchTerm.toLowerCase();
     return preFilteredItems.filter(item =>
-      item.name.toLowerCase().includes(lowerSearch) ||
-      (item.region && item.region.toLowerCase().includes(lowerSearch))
+      (item.name || '').toLowerCase().includes(lowerSearch) ||
+      (item.region || '').toLowerCase().includes(lowerSearch)
     );
   }, [preFilteredItems, searchTerm]);
   

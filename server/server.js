@@ -6,7 +6,7 @@ import morgan from 'morgan';
 import compression from 'compression';
 import path from 'path';
 // Rate limiting configuration
-import { rateLimitConfig, cspConfig } from './config/security.js';
+import { rateLimitConfig } from './config/security.js';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import { createServer } from 'http';
@@ -27,7 +27,7 @@ const envFile = process.env.NODE_ENV === 'production' ? '.env.production' : '.en
 dotenv.config({ path: envFile });
 
 // Log which env file was loaded (for debugging)
-console.log(`Loaded environment from: ${envFile} (NODE_ENV=${process.env.NODE_ENV})`);
+logger.info(`Loaded environment from: ${envFile} (NODE_ENV=${process.env.NODE_ENV})`);
 
 // Warn if using development secrets in production
 if (process.env.NODE_ENV === 'production') {
@@ -127,9 +127,9 @@ const getCorsConfig = () => {
 
 const PORT = process.env.PORT || 3005;
 
-// Security middleware
+// Security middleware - Disable CSP to avoid limitations
 app.use(helmet({
-  contentSecurityPolicy: cspConfig,
+  contentSecurityPolicy: false, // Disable CSP entirely
   frameguard: { action: 'deny' },
   crossOriginEmbedderPolicy: false,
   hsts: {
@@ -208,6 +208,18 @@ if (process.env.NODE_ENV !== 'test') {
     skip: (req, res) => req.aborted === true
   }));
 }
+
+// Favicon endpoint to prevent CSP issues
+app.get('/favicon.ico', (req, res) => {
+  res.setHeader('Cache-Control', 'public, max-age=31536000'); // 1 year cache
+  res.setHeader('Content-Type', 'image/x-icon');
+  res.sendFile(path.join(process.cwd(), 'public', 'favicon.ico'), (err) => {
+    if (err) {
+      console.error('Favicon error:', err);
+      res.status(404).end();
+    }
+  });
+});
 
 // Health check endpoint
 app.get('/health', async (req, res) => {

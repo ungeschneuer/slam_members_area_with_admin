@@ -1,9 +1,12 @@
 import { z } from 'zod';
+import { ALLOWED_PARTICIPANT_ROLES } from '../constants/roles.js';
 
 // Shared validation schema for participants - used by both frontend and backend
 export const participantSchema = z.object({
   name: z.string().min(1, 'Name ist erforderlich').max(255, 'Name zu lang'),
-  role: z.string().min(1, 'Rolle ist erforderlich').max(100, 'Rolle zu lang'),
+  role: z.enum(ALLOWED_PARTICIPANT_ROLES, {
+    errorMap: () => ({ message: `Rolle muss einer der erlaubten Werte sein: ${ALLOWED_PARTICIPANT_ROLES.join(', ')}` })
+  }),
   region: z.string().max(100, 'Region zu lang').optional().or(z.literal('')),
   pronouns: z.string().max(50, 'Pronomen zu lang').optional(),
   instagram: z.string().max(100, 'Instagram-Handle zu lang').optional(),
