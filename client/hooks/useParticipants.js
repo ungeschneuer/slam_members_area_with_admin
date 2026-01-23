@@ -105,7 +105,9 @@ export function useCreateParticipant() {
 
   return useMutation({
     mutationFn: async (participantData) => {
+      console.log('[DEBUG] mutationFn started with data:', participantData);
       try {
+        console.log('[DEBUG] About to call authService.authenticatedRequest');
         const response = await authService.authenticatedRequest(
           `${API_URL}/participants`,
           {
@@ -114,6 +116,7 @@ export function useCreateParticipant() {
             body: JSON.stringify(participantData)
           }
         );
+        console.log('[DEBUG] authService.authenticatedRequest returned:', response);
 
         const result = await response.json().catch(() => {
           throw new Error('Ungültige Serverantwort');
@@ -125,6 +128,7 @@ export function useCreateParticipant() {
 
         return result?.data || result;
       } catch (error) {
+        console.log('[DEBUG] mutationFn caught error:', error);
         logger.error('Create participant error', { error: error.message });
         throw error;
       }
