@@ -103,6 +103,7 @@ export function useCreateInfoPage() {
   const { showErrorToast } = useToast();
 
   return useMutation({
+    networkMode: 'always', // Execute even when offline to show proper error messages
     mutationFn: async (infoPageData) => {
       try {
         const response = await authService.authenticatedRequest(
@@ -158,6 +159,7 @@ export function useUpdateInfoPage() {
   const { showErrorToast } = useToast();
 
   return useMutation({
+    networkMode: 'always', // Execute even when offline to show proper error messages
     mutationFn: async ({ id, ...infoPageData }) => {
       try {
         const response = await authService.authenticatedRequest(
@@ -211,6 +213,7 @@ export function useDeleteInfoPage() {
   const { showErrorToast } = useToast();
 
   return useMutation({
+    networkMode: 'always', // Execute even when offline to show proper error messages
     mutationFn: async (id) => {
       try {
         const response = await authService.authenticatedRequest(

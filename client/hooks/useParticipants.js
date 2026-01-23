@@ -104,6 +104,7 @@ export function useCreateParticipant() {
   const { showErrorToast } = useToast();
 
   return useMutation({
+    networkMode: 'always', // Execute even when offline to show proper error messages
     mutationFn: async (participantData) => {
       console.log('[DEBUG] mutationFn started with data:', participantData);
       try {
@@ -175,6 +176,7 @@ export function useUpdateParticipant() {
   const { showErrorToast } = useToast();
 
   return useMutation({
+    networkMode: 'always', // Execute even when offline to show proper error messages
     mutationFn: async ({ id, ...participantData }) => {
       try {
         const response = await authService.authenticatedRequest(
@@ -257,6 +259,7 @@ export function useDeleteParticipant() {
   const { showErrorToast } = useToast();
 
   return useMutation({
+    networkMode: 'always', // Execute even when offline to show proper error messages
     mutationFn: async (id) => {
       try {
         const response = await authService.authenticatedRequest(
@@ -325,6 +328,7 @@ export function useBulkImportParticipants() {
   const { showErrorToast } = useToast();
 
   return useMutation({
+    networkMode: 'always', // Execute even when offline to show proper error messages
     mutationFn: async (participants) => {
       try {
         const response = await authService.authenticatedRequest(

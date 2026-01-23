@@ -55,6 +55,7 @@ export function useSchnellzugriffLink(id) {
 export function useCreateSchnellzugriff() {
   const queryClient = useQueryClient();
   return useMutation({
+    networkMode: 'always', // Execute even when offline to show proper error messages
     mutationFn: async (newLink) => {
       const response = await authService.authenticatedRequest(
         `${API_URL}/schnellzugriff`,
@@ -79,6 +80,7 @@ export function useCreateSchnellzugriff() {
 export function useUpdateSchnellzugriff() {
   const queryClient = useQueryClient();
   return useMutation({
+    networkMode: 'always', // Execute even when offline to show proper error messages
     mutationFn: async ({ id, ...updatedLink }) => {
       const response = await authService.authenticatedRequest(
         `${API_URL}/schnellzugriff/${id}`,
@@ -103,6 +105,7 @@ export function useUpdateSchnellzugriff() {
 export function useDeleteSchnellzugriff() {
   const queryClient = useQueryClient();
   return useMutation({
+    networkMode: 'always', // Execute even when offline to show proper error messages
     mutationFn: async (id) => {
       const response = await authService.authenticatedRequest(
         `${API_URL}/schnellzugriff/${id}`,

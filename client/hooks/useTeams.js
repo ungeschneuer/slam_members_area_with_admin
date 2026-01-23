@@ -104,6 +104,7 @@ export const useCreateTeam = () => {
   const { showErrorToast } = useToast();
 
   return useMutation({
+    networkMode: 'always', // Execute even when offline to show proper error messages
     mutationFn: async (teamData) => {
       try {
         const response = await fetch(`${API_URL}/teams`, {
@@ -149,6 +150,7 @@ export const useUpdateTeam = () => {
   const { showErrorToast } = useToast();
 
   return useMutation({
+    networkMode: 'always', // Execute even when offline to show proper error messages
     mutationFn: async ({ teamId, teamData }) => {
       try {
         const response = await fetch(`${API_URL}/teams/${teamId}`, {
@@ -195,6 +197,7 @@ export const useDeleteTeam = () => {
   const { showErrorToast } = useToast();
 
   return useMutation({
+    networkMode: 'always', // Execute even when offline to show proper error messages
     mutationFn: async (teamId) => {
       try {
         const response = await fetch(`${API_URL}/teams/${teamId}`, {
@@ -247,6 +250,7 @@ export const useAddTeamMember = () => {
   const { showErrorToast } = useToast();
 
   return useMutation({
+    networkMode: 'always', // Execute even when offline to show proper error messages
     mutationFn: async ({ teamId, participantId }) => {
       try {
         const response = await fetch(`${API_URL}/teams/${teamId}/members`, {
@@ -295,6 +299,7 @@ export const useRemoveTeamMember = () => {
   const { showErrorToast } = useToast();
 
   return useMutation({
+    networkMode: 'always', // Execute even when offline to show proper error messages
     mutationFn: async ({ teamId, participantId }) => {
       try {
         const response = await fetch(`${API_URL}/teams/${teamId}/members/${participantId}`, {

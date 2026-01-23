@@ -65,6 +65,7 @@ export function useCreateTimetableEvent() {
   const { showErrorToast } = useToast();
 
   return useMutation({
+    networkMode: 'always', // Execute even when offline to show proper error messages
     mutationFn: async (eventData) => {
       try {
         const response = await authService.authenticatedRequest(
@@ -113,6 +114,7 @@ export function useUpdateTimetableEvent() {
   const { showErrorToast } = useToast();
 
   return useMutation({
+    networkMode: 'always', // Execute even when offline to show proper error messages
     mutationFn: async ({ id, ...eventData }) => {
       try {
         const response = await authService.authenticatedRequest(
@@ -161,6 +163,7 @@ export function useDeleteTimetableEvent() {
   const { showErrorToast } = useToast();
 
   return useMutation({
+    networkMode: 'always', // Execute even when offline to show proper error messages
     mutationFn: async (id) => {
       try {
         const response = await authService.authenticatedRequest(
@@ -205,6 +208,7 @@ export function useUpdateTimetableParticipantRole() {
   const { showErrorToast } = useToast();
 
   return useMutation({
+    networkMode: 'always', // Execute even when offline to show proper error messages
     mutationFn: async ({ entryId, participantId, role }) => {
       try {
         const response = await authService.authenticatedRequest(
@@ -248,6 +252,7 @@ export function useAddTimetableParticipant() {
   const { showErrorToast } = useToast();
 
   return useMutation({
+    networkMode: 'always', // Execute even when offline to show proper error messages
     mutationFn: async ({ entryId, participantId, role }) => {
       try {
         const response = await authService.authenticatedRequest(
@@ -290,6 +295,7 @@ export function useRemoveTimetableParticipant() {
   const { showErrorToast } = useToast();
 
   return useMutation({
+    networkMode: 'always', // Execute even when offline to show proper error messages
     mutationFn: async ({ entryId, participantId }) => {
       try {
         const response = await authService.authenticatedRequest(

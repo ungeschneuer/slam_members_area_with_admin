@@ -47,6 +47,7 @@ export function useCountdown() {
 export function useUpdateCountdown() {
   const queryClient = useQueryClient();
   return useMutation({
+    networkMode: 'always', // Execute even when offline to show proper error messages
     mutationFn: async (countdownData) => {
       const response = await authService.authenticatedRequest(
         `${API_URL}/countdown-config`,

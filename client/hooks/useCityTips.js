@@ -87,6 +87,7 @@ export function useCreateCityTip() {
   const { showErrorToast } = useToast();
 
   return useMutation({
+    networkMode: 'always', // Execute even when offline to show proper error messages
     mutationFn: async (cityTipData) => {
       try {
         const response = await authService.authenticatedRequest(
@@ -138,6 +139,7 @@ export function useUpdateCityTip() {
   const { showErrorToast } = useToast();
 
   return useMutation({
+    networkMode: 'always', // Execute even when offline to show proper error messages
     mutationFn: async ({ id, ...cityTipData }) => {
       try {
         const response = await authService.authenticatedRequest(
@@ -189,6 +191,7 @@ export function useDeleteCityTip() {
   const { showErrorToast } = useToast();
 
   return useMutation({
+    networkMode: 'always', // Execute even when offline to show proper error messages
     mutationFn: async (id) => {
       try {
         const response = await authService.authenticatedRequest(

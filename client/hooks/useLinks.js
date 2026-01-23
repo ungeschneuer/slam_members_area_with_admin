@@ -60,6 +60,7 @@ export function useCreateLink() {
   const { showErrorToast } = useToast();
 
   return useMutation({
+    networkMode: 'always', // Execute even when offline to show proper error messages
     mutationFn: async (linkData) => {
       try {
         const response = await authService.authenticatedRequest(
@@ -108,6 +109,7 @@ export function useUpdateLink() {
   const { showErrorToast } = useToast();
 
   return useMutation({
+    networkMode: 'always', // Execute even when offline to show proper error messages
     mutationFn: async ({ id, ...linkData }) => {
       try {
         const response = await authService.authenticatedRequest(
@@ -156,6 +158,7 @@ export function useDeleteLink() {
   const { showErrorToast } = useToast();
 
   return useMutation({
+    networkMode: 'always', // Execute even when offline to show proper error messages
     mutationFn: async (id) => {
       try {
         const response = await authService.authenticatedRequest(

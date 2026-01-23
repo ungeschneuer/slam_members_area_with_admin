@@ -82,6 +82,7 @@ export function useCreateNews() {
   const { showErrorToast } = useToast();
 
   return useMutation({
+    networkMode: 'always', // Execute even when offline to show proper error messages
     mutationFn: async (newsData) => {
       try {
         const response = await authService.authenticatedRequest(
@@ -130,6 +131,7 @@ export function useUpdateNews() {
   const { showErrorToast } = useToast();
 
   return useMutation({
+    networkMode: 'always', // Execute even when offline to show proper error messages
     mutationFn: async ({ id, ...newsData }) => {
       try {
         const response = await authService.authenticatedRequest(
@@ -178,6 +180,7 @@ export function useDeleteNews() {
   const { showErrorToast } = useToast();
 
   return useMutation({
+    networkMode: 'always', // Execute even when offline to show proper error messages
     mutationFn: async (id) => {
       try {
         const response = await authService.authenticatedRequest(
@@ -222,6 +225,7 @@ export function useCreateBreakingNews() {
   const { showErrorToast } = useToast();
 
   return useMutation({
+    networkMode: 'always', // Execute even when offline to show proper error messages
     mutationFn: async (breakingNewsData) => {
       try {
         const response = await authService.authenticatedRequest(
@@ -264,6 +268,7 @@ export function useUpdateBreakingNews() {
   const { showErrorToast } = useToast();
 
   return useMutation({
+    networkMode: 'always', // Execute even when offline to show proper error messages
     mutationFn: async ({ id, ...breakingNewsData }) => {
       try {
         const response = await authService.authenticatedRequest(
@@ -306,6 +311,7 @@ export function useDeleteBreakingNews() {
   const { showErrorToast } = useToast();
 
   return useMutation({
+    networkMode: 'always', // Execute even when offline to show proper error messages
     mutationFn: async (id) => {
       try {
         const response = await authService.authenticatedRequest(

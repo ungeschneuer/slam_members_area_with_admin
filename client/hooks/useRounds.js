@@ -85,6 +85,7 @@ export function useCreateRound() {
   const { showErrorToast } = useToast();
 
   return useMutation({
+    networkMode: 'always', // Execute even when offline to show proper error messages
     mutationFn: async (roundData) => {
       try {
         const response = await authService.authenticatedRequest(
@@ -136,6 +137,7 @@ export function useUpdateRound() {
   const { showErrorToast } = useToast();
 
   return useMutation({
+    networkMode: 'always', // Execute even when offline to show proper error messages
     mutationFn: async ({ id, version, ...roundData }) => {
       try {
         const response = await authService.authenticatedRequest(
@@ -187,6 +189,7 @@ export function useDeleteRound() {
   const { showErrorToast } = useToast();
 
   return useMutation({
+    networkMode: 'always', // Execute even when offline to show proper error messages
     mutationFn: async (id) => {
       try {
         // Check if user is authenticated before making the request
