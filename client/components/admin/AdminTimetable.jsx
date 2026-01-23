@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useTimetable, useParticipants, useCreateTimetableEvent, useUpdateTimetableEvent, useDeleteTimetableEvent, useAddTimetableParticipant, useRemoveTimetableParticipant } from '../../hooks/index.js';
+import { useTimetable, useParticipants, useCreateTimetableEvent, useUpdateTimetableEvent, useDeleteTimetableEvent } from '../../hooks/index.js';
 import LoadingSpinner from '../LoadingSpinner.jsx';
 import ErrorBoundary from '../ErrorBoundary.jsx';
 import { useFieldArray, Controller } from 'react-hook-form';
@@ -21,8 +21,7 @@ export default function AdminTimetable() {
   const createEvent = useCreateTimetableEvent();
   const updateEvent = useUpdateTimetableEvent();
   const deleteEvent = useDeleteTimetableEvent();
-  const addParticipantMutation = useAddTimetableParticipant();
-  const removeParticipantMutation = useRemoveTimetableParticipant();
+  
   const queryClient = useQueryClient();
   
   const loading = loadingEvents || loadingParticipants;
@@ -73,6 +72,7 @@ export default function AdminTimetable() {
   const [selectedDate, setSelectedDate] = useState('all');
   const [selectedParticipant, setSelectedParticipant] = useState('');
   const [participantAssignments, setParticipantAssignments] = useState([]);
+  const [serverError, setServerError] = useState(null);
   
   const handleAddParticipant = () => {
     if (!selectedParticipant) return;
@@ -265,6 +265,8 @@ export default function AdminTimetable() {
           form.reset(getDefaultValues('timetable'));
           setParticipantAssignments([]);
         }
+        // Clear any server error when closing
+        setServerError(null);
         
         // Return new closed state
         return { isOpen: false, mode: null, eventId: null };
@@ -367,7 +369,9 @@ export default function AdminTimetable() {
     { value: 'fun', label: 'Fun', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200', icon: '🎉' },
     { value: 'aftershow', label: 'Aftershow', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200', icon: '🎭' },
     { value: 'panel', label: 'Panel', color: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200', icon: '🎤' },
-    { value: 'networking', label: 'Netzwerktreffen', color: 'bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200', icon: '🤝' }
+    { value: 'networking', label: 'Netzwerktreffen', color: 'bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200', icon: '🤝' },
+    { value: 'akkreditierung', label: 'Akkreditierung', color: 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200', icon: '🪪' },
+    { value: 'festivalzentrum', label: 'Festivalzentrum', color: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200', icon: '🏟️' }
   ];
 
   const statuses = getStatusOptions('timetable').map(status => ({
@@ -390,7 +394,6 @@ export default function AdminTimetable() {
     // Transform participants to API format
     const transformedParticipants = (participantAssignments || []).map(participant => ({
       participant_id: participant.participantId,
-      participant_name: participant.name,
       role: participant.role || 'Teilnehmer*in'
     }));
 
@@ -399,7 +402,8 @@ export default function AdminTimetable() {
       description: formData.description,
       detailed_description: formData.detailedDescription,
       location: formData.location,
-      date: formData.date ? new Date(formData.date + 'T00:00:00.000Z').toISOString() : null,
+      // Send date as YYYY-MM-DD string; server normalizes to DATE
+      date: formData.date || null,
       time: formData.time,
       end_time: formData.endTime || null, // Convert empty string to null for database
       type: formData.type,
@@ -625,32 +629,8 @@ export default function AdminTimetable() {
   const handleAdd = async (data) => {
     try {
       const apiData = mapFormToAPI(data);
+      setServerError(null);
       const createdEvent = await createEvent.mutateAsync(apiData);
-      
-      // Save participants sequentially with error tracking
-      if (data.participants && data.participants.length > 0 && createdEvent?.data?.id) {
-        const participantErrors = [];
-        
-        for (const participant of data.participants) {
-          if (participant.participantId) {
-            try {
-              await addParticipantMutation.mutateAsync({
-                entryId: createdEvent.data.id,
-                participantId: participant.participantId,
-                role: participant.role || 'Teilnehmer*in'
-              });
-            } catch (participantError) {
-              console.error('Error adding participant:', participantError);
-              participantErrors.push(participant.name || `ID ${participant.participantId}`);
-            }
-          }
-        }
-        
-        // Show error message if any participants failed
-        if (participantErrors.length > 0) {
-          alert(`Event erstellt, aber folgende Teilnehmer*innen konnten nicht hinzugefügt werden: ${participantErrors.join(', ')}`);
-        }
-      }
       
       // Invalidate queries to refresh data
       queryClient.invalidateQueries(['timetable']);
@@ -659,6 +639,9 @@ export default function AdminTimetable() {
       setModalStateSafe({ isOpen: false, mode: null, eventId: null });
     } catch (error) {
       console.error('Error creating event:', error);
+      // Surface server validation error message
+      const message = error?.error || error?.message || 'Unbekannter Fehler';
+      setServerError(message);
       // Error is handled by React Query error state
     }
   };
@@ -666,54 +649,8 @@ export default function AdminTimetable() {
   const handleUpdate = async (data) => {
     try {
       const apiData = mapFormToAPI(data);
+      setServerError(null);
       await updateEvent.mutateAsync({ id: editingEvent.id, ...apiData });
-      
-      // Sync participants sequentially for better error handling
-      if (editingEvent?.id) {
-        const currentParticipants = editingEvent.assignments || [];
-        const newParticipants = data.participants || [];
-        const errors = [];
-        
-        // Remove participants no longer selected
-        for (const current of currentParticipants) {
-          const stillSelected = newParticipants.some(p => p.participantId === current.participant_id);
-          if (!stillSelected && current.participant_id) {
-            try {
-              await removeParticipantMutation.mutateAsync({
-                entryId: editingEvent.id,
-                participantId: current.participant_id
-              });
-            } catch (error) {
-              console.error('Error removing participant:', error);
-              errors.push(`Entfernen: ${current.participant_name}`);
-            }
-          }
-        }
-        
-        // Add new participants
-        for (const participant of newParticipants) {
-          if (participant.participantId) {
-            const alreadyExists = currentParticipants.some(p => p.participant_id === participant.participantId);
-            if (!alreadyExists) {
-              try {
-                await addParticipantMutation.mutateAsync({
-                  entryId: editingEvent.id,
-                  participantId: participant.participantId,
-                  role: participant.role || 'Teilnehmer*in'
-                });
-              } catch (error) {
-                console.error('Error adding participant:', error);
-                errors.push(`Hinzufügen: ${participant.name}`);
-              }
-            }
-          }
-        }
-        
-        // Show errors if any
-        if (errors.length > 0) {
-          alert(`Event aktualisiert, aber Fehler bei Teilnehmer*innen: ${errors.join(', ')}`);
-        }
-      }
       
       // Invalidate queries to refresh data
       queryClient.invalidateQueries(['timetable']);
@@ -722,6 +659,8 @@ export default function AdminTimetable() {
       setModalStateSafe({ isOpen: false, mode: null, eventId: null });
     } catch (error) {
       console.error('Error updating event:', error);
+      const message = error?.error || error?.message || 'Unbekannter Fehler';
+      setServerError(message);
       // Error is handled by React Query error state
     }
   };
@@ -762,11 +701,7 @@ export default function AdminTimetable() {
   const [participantSearchTerm, setParticipantSearchTerm] = useState('');
   const [showParticipantSearch, setShowParticipantSearch] = useState(false);
   
-  const getAvailableParticipants = (currentParticipants = []) => {
-    if (!participants) return [];
-    const currentIds = currentParticipants.map(p => p.participantId || p.id);
-    return participants.filter(p => !currentIds.includes(p.id));
-  };
+  // Removed unused getAvailableParticipants helper for simplicity
 
   const removeParticipant = (index) => {
     setParticipantAssignments(prev => prev.filter((_, i) => i !== index));
@@ -885,6 +820,15 @@ export default function AdminTimetable() {
           <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg p-4" role="alert" aria-live="polite">
             <p className="text-sm text-red-700 dark:text-red-300">
               {componentError.message || componentError}
+            </p>
+          </div>
+        )}
+
+        {/* Server Error Display */}
+        {serverError && (
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg p-4" role="alert" aria-live="assertive">
+            <p className="text-sm text-red-700 dark:text-red-300">
+              {serverError}
             </p>
           </div>
         )}

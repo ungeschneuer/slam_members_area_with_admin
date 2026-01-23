@@ -30,8 +30,8 @@ function ParticipantMultiSelect({
     if (!searchTerm) return items;
     const lowerSearch = searchTerm.toLowerCase();
     return items.filter(item =>
-      item.name.toLowerCase().includes(lowerSearch) ||
-      (showRegion && item.region?.toLowerCase().includes(lowerSearch))
+      (item.name || '').toLowerCase().includes(lowerSearch) ||
+      (showRegion && (item.region || '').toLowerCase().includes(lowerSearch))
     );
   }, [items, searchTerm, showRegion]);
   

@@ -99,7 +99,7 @@ export default function Rounds() {
     
     const participantSearch = round.assignments.some(assignment => {
       const participant = participantLookup[assignment.participant_id];
-      return participant && participant.name.toLowerCase().includes(searchLower);
+      return participant && (participant.name || '').toLowerCase().includes(searchLower);
     });
     
     return participantSearch;

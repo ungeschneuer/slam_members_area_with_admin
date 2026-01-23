@@ -62,6 +62,9 @@ export default function AdminCityTips() {
         status: editingTip.status || 'ACTIVE',
         opening_hours: editingTip.opening_hours || ''
       });
+    } else {
+      // CRITICAL FIX: Reset form to default values when not editing
+      resetForm();
     }
   }, [editingTip, setFormValues]);
 
@@ -172,9 +175,9 @@ export default function AdminCityTips() {
   };
 
   const filteredTips = cityTips.filter(tip =>
-    tip.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    tip.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    tip.address.toLowerCase().includes(searchTerm.toLowerCase())
+    (tip.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (tip.category || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (tip.address || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   if (loading) return <LoadingSpinner size="xl" text="Stadt-Tipps werden geladen..." />;
@@ -207,8 +210,8 @@ export default function AdminCityTips() {
         </div>
         <button
           onClick={() => {
+            setEditingTip(null);  // Clear editing state - useEffect will handle reset
             setShowAddForm(!showAddForm);
-            resetForm();
           }}
           className="w-full sm:w-auto min-h-[44px] px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 touch-manipulation active:scale-95"
         >
@@ -238,9 +241,8 @@ export default function AdminCityTips() {
               </h2>
               <button
                 onClick={() => {
+                  setEditingTip(null);      // Clear editing state - useEffect will handle reset
                   setShowAddForm(false);
-                  setEditingTip(null);
-                  resetForm();
                 }}
                 className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
               >
@@ -276,7 +278,7 @@ export default function AdminCityTips() {
                 control={form.control}
                 name="category" 
                 label="Kategorie *"
-                options={categories.map(c => ({ value: c.value, label: `${c.icon} ${c.label}` }))}
+                options={categories.map(c => ({ value: c.value, label: `${getCategoryIcon(c.value, 'cityTip')} ${c.label}` }))}
                 error={form.formState.errors.category?.message}
               />
                   <TextareaInput
@@ -404,7 +406,7 @@ So: Geschlossen"
             <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t">
                 <button
                   type="button"
-                onClick={() => { setShowAddForm(false); setEditingTip(null); resetForm(); }} 
+                onClick={() => { setEditingTip(null); setShowAddForm(false); }} 
                 className="w-full sm:w-auto min-h-[44px] btn-secondary touch-manipulation active:scale-95"
                 >
                   Abbrechen

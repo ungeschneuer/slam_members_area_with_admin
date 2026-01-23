@@ -350,3 +350,4 @@ public/uploads/**/*
 # Database migration backups (server-side backups)
 # These contain sensitive production data and should never be committed
 .backups/
+.trash/

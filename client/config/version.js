@@ -1,11 +1,11 @@
 // Auto-generated version file
-// Generated at: 2025-10-27T11:09:08.071Z
+// Generated at: 2025-10-29T11:15:25.852Z
 
 export const VERSION_INFO = {
   "appVersion": "1.0.0",
-  "buildTime": "2025-10-27T11:09:08.070Z",
-  "gitHash": "756b2a9b288bba7ebbf5ddbacd523335a8a54ec0",
-  "cacheVersion": "1.0.0-1761563348071-756b2a9b"
+  "buildTime": "2025-10-29T11:15:25.851Z",
+  "gitHash": "36ae63bef2112024e9692a12bebdd6f6df4b9711",
+  "cacheVersion": "1.0.0-1761736525852-36ae63be"
 };
 
 // Generate cache version string

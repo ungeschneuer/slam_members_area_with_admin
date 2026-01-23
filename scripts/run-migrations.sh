@@ -298,11 +298,11 @@ for migration in $PENDING_MIGRATIONS; do
         
         # Test the migration first by checking if it would fail
         if psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" \
-            -c "BEGIN; \i $MIGRATION_FILE; ROLLBACK;" >/dev/null 2>&1; then
+            -f "$MIGRATION_FILE" >/dev/null 2>&1; then
             # Migration syntax is valid, now execute it for real
+            END_TIME=$(date +%s%3N)
             if psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" \
-                -c "BEGIN; \i $MIGRATION_FILE; INSERT INTO schema_migrations (migration_name, execution_time_ms) VALUES ('$migration', $(($(date +%s%3N) - START_TIME))); COMMIT;" >/dev/null 2>&1; then
-                END_TIME=$(date +%s%3N)
+                -c "BEGIN; $(cat "$MIGRATION_FILE"); INSERT INTO schema_migrations (migration_name, execution_time_ms) VALUES ('$migration', $((END_TIME - START_TIME))); COMMIT;" >/dev/null 2>&1; then
                 EXECUTION_TIME=$((END_TIME - START_TIME))
                 log_success "✅ Completed: $migration (${EXECUTION_TIME}ms)"
                 SUCCESSFUL_MIGRATIONS="$SUCCESSFUL_MIGRATIONS $migration"

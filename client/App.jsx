@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
 // Token refresh now handled by Axios interceptors in services/api.js
 import Admin from './Admin';
-import Themes from './components/Themes';
 import MemberDashboard from './components/MemberDashboard';
 import Participants from './components/Participants';
 import ParticipantDetail from './components/ParticipantDetail';
@@ -172,12 +171,13 @@ const Navigation = React.memo(function Navigation() {
               </Link>
             )}
             <button
+              type="button"
               onClick={toggleTheme}
               className="p-2 rounded-lg text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#A2D2B9] focus:ring-offset-2"
               title={`Wechsel zu ${theme === 'light' ? 'dunklem' : 'hellem'} Modus`}
-              aria-label={`Wechsel zu ${theme === 'light' ? 'dunklem' : 'hellem'} Modus`}
+              aria-label={`Zu ${theme === 'light' ? 'dunklem' : 'hellem'} Modus wechseln`}
             >
-              {theme === 'light' ? '🌙' : '☀️'}
+              <span aria-hidden="true">{theme === 'light' ? '🌙' : '☀️'}</span>
             </button>
           </div>
 
@@ -189,18 +189,20 @@ const Navigation = React.memo(function Navigation() {
               </Link>
             )}
             <button
+              type="button"
               onClick={toggleTheme}
               className="p-2 rounded-lg text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#A2D2B9] focus:ring-offset-2"
               title={`Wechsel zu ${theme === 'light' ? 'dunklem' : 'hellem'} Modus`}
-              aria-label={`Wechsel zu ${theme === 'light' ? 'dunklem' : 'hellem'} Modus`}
+              aria-label={`Zu ${theme === 'light' ? 'dunklem' : 'hellem'} Modus wechseln`}
             >
-              {theme === 'light' ? '🌙' : '☀️'}
+              <span aria-hidden="true">{theme === 'light' ? '🌙' : '☀️'}</span>
             </button>
             <button
+              type="button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               onKeyDown={handleKeyDown}
               className="p-2 rounded-lg text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200 touch-target touch-feedback focus:outline-none focus:ring-2 focus:ring-[#A2D2B9] focus:ring-offset-2"
-              aria-label="Menü öffnen"
+              aria-label={mobileMenuOpen ? "Menü schließen" : "Menü öffnen"}
               aria-expanded={mobileMenuOpen}
               aria-controls="mobile-menu"
             >

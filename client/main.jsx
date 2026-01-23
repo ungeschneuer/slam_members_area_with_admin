@@ -7,31 +7,9 @@ import App from './App.jsx'
 import ErrorFallback from './components/ErrorFallback.jsx'
 import './index.css'
 
-
-
-
-// Initialize database services asynchronously
-async function initializeServices() {
-  try {
-    
-    // Database operations handled directly in hooks using fetch
-    
-    // Service registry removed; health monitoring is handled elsewhere
-    
-    // Services simplified - no complex initialization needed
-  } catch (error) {
-    // Service initialization failed - handled silently
-  }
-}
-
-// Initialize services with delay to ensure server is ready
-setTimeout(() => {
-  initializeServices();
-}, 2000); // Wait 2 seconds for server to be ready
-
 // CRITICAL: Unregister any existing service workers to prevent caching issues
-// Only run in production and once per session
-if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+// Run in both development and production to ensure clean state
+if ('serviceWorker' in navigator) {
   const SW_CLEANUP_KEY = 'slam25-sw-cleanup-done';
   
   // Check if cleanup was already done this session
@@ -40,12 +18,12 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator) {
       try {
         // Unregister all service workers
         const registrations = await navigator.serviceWorker.getRegistrations();
+        console.log(`Found ${registrations.length} ServiceWorker registrations to clean up`);
+        
         const unregisterPromises = registrations.map(registration => 
           registration.unregister().catch(err => {
             // Log error but continue with other registrations
-            if (import.meta.env.DEV) {
-              console.warn('Failed to unregister service worker:', err);
-            }
+            console.warn('Failed to unregister service worker:', err);
           })
         );
         
@@ -55,12 +33,12 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator) {
         if ('caches' in window) {
           try {
             const cacheNames = await caches.keys();
+            console.log(`Found ${cacheNames.length} caches to clear`);
+            
             const deletePromises = cacheNames.map(cacheName => 
               caches.delete(cacheName).catch(err => {
                 // Log error but continue with other caches
-                if (import.meta.env.DEV) {
-                  console.warn('Failed to delete cache:', cacheName, err);
-                }
+                console.warn('Failed to delete cache:', cacheName, err);
               })
             );
             
@@ -69,21 +47,23 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator) {
             // Mark cleanup as done for this session
             sessionStorage.setItem(SW_CLEANUP_KEY, 'true');
             
-            if (import.meta.env.DEV) {
-              console.log('Service Worker cleanup completed');
+            console.log('Service Worker cleanup completed');
+            
+            // If we found ServiceWorkers, reload to ensure clean state
+            if (registrations.length > 0) {
+              console.log('ServiceWorkers found - reloading page for clean state');
+              setTimeout(() => {
+                window.location.reload();
+              }, 1000);
             }
           } catch (cacheError) {
-            if (import.meta.env.DEV) {
-              console.warn('Cache cleanup failed:', cacheError);
-            }
+            console.warn('Cache cleanup failed:', cacheError);
             // Fallback: Force cache busting for critical resources
             forceCacheBusting();
           }
         }
       } catch (error) {
-        if (import.meta.env.DEV) {
-          console.warn('Service Worker cleanup failed:', error);
-        }
+        console.error('Service Worker cleanup failed:', error);
         // Fallback: Force cache busting for critical resources
         forceCacheBusting();
       }

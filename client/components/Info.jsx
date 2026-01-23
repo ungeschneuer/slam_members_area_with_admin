@@ -126,7 +126,7 @@ const Info = () => {
           </div>
 
           {/* Additional Links */}
-          {currentPage.additional_links && currentPage.additional_links.length > 0 && (
+          {currentPage.additional_links && Array.isArray(currentPage.additional_links) && currentPage.additional_links.length > 0 && (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Weiterführende Links</h3>
               <div className="space-y-2">

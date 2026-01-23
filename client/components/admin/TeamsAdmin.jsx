@@ -73,9 +73,9 @@ const TeamsAdmin = () => {
 
     const filtered = teams.filter(team => {
       const matchesSearch = !searchTerm || 
-        team.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (team.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         team.members?.some(member => 
-          member.name.toLowerCase().includes(searchTerm.toLowerCase())
+          (member.name || '').toLowerCase().includes(searchTerm.toLowerCase())
         );
 
       return matchesSearch;

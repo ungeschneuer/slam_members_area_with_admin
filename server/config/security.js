@@ -100,47 +100,7 @@ export const corsConfig = {
   maxAge: 86400 // 24 hours
 };
 
-// Content Security Policy
-export const cspConfig = {
-  directives: {
-    defaultSrc: ["'self'"],
-    styleSrc: ["'self'", "'unsafe-inline'"],
-    scriptSrc: ["'self'", "'unsafe-eval'"],
-    imgSrc: [
-      "'self'", 
-      "data:", 
-      "https:",
-      "https://*.tile.openstreetmap.org",
-      "https://a.tile.openstreetmap.org",
-      "https://b.tile.openstreetmap.org", 
-      "https://c.tile.openstreetmap.org"
-    ],
-    connectSrc: [
-      "'self'", 
-      "https://szene.slam25.de",
-      "http://localhost:3005",
-      "https://localhost:3005",
-      "ws:", 
-      "wss:",
-      "https://*.tile.openstreetmap.org",
-      "https://a.tile.openstreetmap.org",
-      "https://b.tile.openstreetmap.org",
-      "https://c.tile.openstreetmap.org",
-      "https://nominatim.openstreetmap.org"
-    ],
-    fontSrc: ["'self'", "https:"],
-    objectSrc: ["'none'"],
-    mediaSrc: ["'self'"],
-    frameSrc: ["'none'"],
-    workerSrc: ["'self'", "blob:"],
-    manifestSrc: ["'self'"],
-    baseUri: ["'self'"],
-    formAction: ["'self'"],
-    frameAncestors: ["'none'"],
-    upgradeInsecureRequests: []
-  },
-  reportOnly: false
-};
+// CSP disabled - No content security policy limitations
 
 // File upload security
 export const fileUploadConfig = {

@@ -21,8 +21,7 @@ import { ParticipantsService } from '../services/participantsService.js';
 import { generateSlug, generateUniqueSlug, validateSlugInput } from '../utils/slugUtils.js';
 import { generateUniqueSlugInTransaction, generateRequestIdFromReq } from '../services/slugGenerationService.js';
 import { executeTransaction } from '../config/database.js';
-
-const allowedRoles = ['Wettbewerb-Teilnehmer*in', 'Supporter*in', 'SLAM25-Team', 'SLAM-MC'];
+import { ALLOWED_PARTICIPANT_ROLES } from '../../shared/constants/roles.js';
 const allowedRegions = [
   'Bayern',
   'Baden-Württemberg',
@@ -422,7 +421,7 @@ router.post('/bulk-import', ...adminMiddleware(), async (req, res) => {
           const validated = validationResult.data;
           
           // Validate role and region
-          if (!allowedRoles.includes(validated.role)) {
+          if (!ALLOWED_PARTICIPANT_ROLES.includes(validated.role)) {
             results.errors.push({
               row: rowNumber,
               name: validated.name,

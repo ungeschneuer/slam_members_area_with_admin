@@ -1,6 +1,7 @@
 import ExcelJS from 'exceljs';
 import { z } from 'zod';
 import { generateSlug, generateUniqueSlug } from '../utils/slugUtils.js';
+import { ALLOWED_PARTICIPANT_ROLES } from '@shared/constants/roles.js';
 
 // Column indices for Excel/CSV templates
 const TEMPLATE_COLUMNS = {
@@ -22,7 +23,8 @@ const participantSchema = z.object({
 });
 
 // Allowed roles and regions (matching AdminParticipants.jsx)
-const allowedRoles = ['Teilnehmer*in', 'Supporter*in', 'Crew', 'SLAM-MC'];
+// Use centralized role constants
+const allowedRoles = ALLOWED_PARTICIPANT_ROLES;
 const allowedRegions = [
   'Bayern',
   'Baden-Württemberg',
@@ -67,7 +69,7 @@ export async function generateParticipantTemplate() {
   // Create sample data row
   const sampleData = [
     'Max Mustermann',
-    'Teilnehmer*in',
+    'Wettbewerb-Teilnehmer*in',
     'Berlin',
     'er/ihm',
     '@max_mustermann'
@@ -166,7 +168,7 @@ export function downloadParticipantTemplateCSV() {
   const headers = ['Name', 'Rolle', 'Region', 'Pronomen', 'Instagram'];
   const sampleData = [
     'Max Mustermann',
-    'Teilnehmer*in',
+    'Wettbewerb-Teilnehmer*in',
     'Berlin',
     'er/ihm',
     '@max_mustermann'
@@ -606,8 +608,8 @@ export function checkForDuplicates(newParticipants, existingParticipants) {
 
   newParticipants.forEach(participant => {
     const isDuplicate = existingParticipants.some(existing =>
-      existing.name.toLowerCase().trim() === participant.name.toLowerCase().trim() &&
-      existing.region.toLowerCase().trim() === participant.region.toLowerCase().trim()
+      (existing.name || '').toLowerCase().trim() === (participant.name || '').toLowerCase().trim() &&
+      (existing.region || '').toLowerCase().trim() === (participant.region || '').toLowerCase().trim()
     );
 
     if (isDuplicate) {

@@ -3,17 +3,32 @@ import xss from 'xss';
 import logger from '../config/logger.js';
 
 /**
+ * Sanitize plain text input (no HTML allowed, preserves special characters like &)
+ * @param {string} input - Raw plain text input
+ * @returns {string} Sanitized plain text
+ */
+export const sanitizePlainText = (input) => {
+  if (!input || typeof input !== 'string') return input;
+  
+  // For plain text: just remove HTML tags and dangerous patterns
+  // This preserves special characters like &, ä, ö, ü, ß
+  return input
+    .replace(/<[^>]*>/g, '') // Remove all HTML tags
+    .replace(/javascript:/gi, '') // Remove javascript: protocol
+    .replace(/data:/gi, '') // Remove data: protocol
+    .replace(/on\w+\s*=/gi, '') // Remove event handlers
+    .trim();
+};
+
+/**
  * Sanitize text input to prevent XSS attacks
+ * @deprecated Use sanitizePlainText() for titles/names or sanitizeHtml() for content
  * @param {string} input - Raw input string
  * @returns {string} Sanitized string
  */
 export const sanitizeText = (input) => {
-  if (!input || typeof input !== 'string') return input;
-  return xss(input, {
-    whiteList: {}, // Remove all HTML tags
-    stripIgnoreTag: true, // Remove all HTML
-    stripIgnoreTagBody: ['script'] // Remove script tags and their content
-  });
+  // For backward compatibility, use plain text sanitization
+  return sanitizePlainText(input);
 };
 
 /**
@@ -55,30 +70,30 @@ export const sanitizeHtml = (input) => {
  */
 export const sanitizeUrl = (input) => {
   if (!input || typeof input !== 'string') return input;
-  // Remove any HTML/script content and trim
-  return sanitizeText(input).trim();
+  // URLs are plain text, not HTML
+  return sanitizePlainText(input).trim();
 };
 
 /**
  * Sanitize object with text fields
  * @param {object} obj - Object to sanitize
- * @param {string[]} textFields - Fields to sanitize as text
- * @param {string[]} htmlFields - Fields to sanitize as HTML
+ * @param {string[]} plainTextFields - Fields to sanitize as plain text (titles, names)
+ * @param {string[]} htmlFields - Fields to sanitize as HTML (content)
  * @returns {object} Sanitized object
  */
-export const sanitizeObject = (obj, textFields = [], htmlFields = []) => {
+export const sanitizeObject = (obj, plainTextFields = [], htmlFields = []) => {
   if (!obj || typeof obj !== 'object') return obj;
   
   const sanitized = { ...obj };
   
-  // Sanitize text fields
-  textFields.forEach(field => {
+  // Sanitize plain text fields (preserves & and special characters)
+  plainTextFields.forEach(field => {
     if (sanitized[field] !== undefined) {
-      sanitized[field] = sanitizeText(sanitized[field]);
+      sanitized[field] = sanitizePlainText(sanitized[field]);
     }
   });
   
-  // Sanitize HTML fields
+  // Sanitize HTML fields (uses xss library)
   htmlFields.forEach(field => {
     if (sanitized[field] !== undefined) {
       sanitized[field] = sanitizeHtml(sanitized[field]);

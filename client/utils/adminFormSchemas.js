@@ -219,13 +219,13 @@ export const getRoleOptions = (type) => {
       ];
     
     case 'participants':
-      return ['Teilnehmer', 'Moderator', 'Technik'];
+      return ['Teilnehmer', 'Moderator', 'Technik', 'Fotograf*in', 'Feature', 'DJ'];
     
     case 'featureArtists':
-      return ['Feature Artist', 'Support Act', 'Special Guest'];
+      return ['Feature Artist', 'Support Act', 'Special Guest', 'Feature', 'DJ'];
     
     default:
-      return ['Teilnehmer'];
+      return ['Teilnehmer', 'Fotograf*in', 'Feature', 'DJ'];
   }
 };
 
