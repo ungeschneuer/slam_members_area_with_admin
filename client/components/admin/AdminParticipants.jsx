@@ -1,38 +1,31 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { useParticipants, useCreateParticipant, useUpdateParticipant, useDeleteParticipant, useBulkImportParticipants } from '../../hooks/index.js';
+import { useNavigate } from 'react-router-dom';
+import { useParticipants, useDeleteParticipant, useBulkImportParticipants } from '../../hooks/index.js';
 import { ALLOWED_PARTICIPANT_ROLES } from '@shared/constants/roles.js';
 import LoadingSpinner from '../LoadingSpinner';
 import { ErrorMessage, SuccessMessage } from '../StatusMessages.jsx';
 import PaginationControls from '../PaginationControls.jsx';
 import ConsolidatedAdminTable from './ConsolidatedAdminTable.jsx';
-import { useForm } from 'react-hook-form';
-import TextInput from '../forms/TextInput.jsx';
-import SelectInput from '../forms/SelectInput.jsx';
 import SearchFilters from '../forms/SearchFilters.jsx';
-import { formatInstagramUrl, normalizeInstagramInput, extractInstagramUsername } from '../../utils/instagramUtils.js';
+import { formatInstagramUrl } from '../../utils/instagramUtils.js';
 import { handleLinkClick } from '../../utils/linkUtils.js';
-import { generateSlug, generateUniqueSlug } from '../../utils/slugUtils.js';
 import { getRegionFlag } from '../../utils/detailViewUtils.js';
 import { downloadParticipantTemplate, downloadParticipantTemplateCSV, parseParticipantFile, checkForDuplicates } from '../../services/excelService.js';
-import { z } from 'zod';
-import { zodResolver } from '@hookform/resolvers/zod';
 import { ADMIN_PARTICIPANTS_LIMIT } from '../../config/api.js';
 
 export default function AdminParticipants() {
+  const navigate = useNavigate();
+
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(24);
-  
+
   // Load all participants for search (no pagination on API call)
   const { data: allParticipantsResponse, isLoading: loading, error } = useParticipants({ limit: ADMIN_PARTICIPANTS_LIMIT, offset: 0 }, true); // isAdmin = true
-  const createParticipant = useCreateParticipant();
-  const updateParticipant = useUpdateParticipant();
   const deleteParticipant = useDeleteParticipant();
   const bulkImport = useBulkImportParticipants();
-  
-  // Initialize real-time updates
-  const [editingParticipant, setEditingParticipant] = useState(null);
-  const [showAddForm, setShowAddForm] = useState(false);
+
+  // State
   const [showBulkImport, setShowBulkImport] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
@@ -50,43 +43,6 @@ export default function AdminParticipants() {
     isProcessing: false,
     step: 'upload' // 'upload' | 'validation' | 'importing' | 'results'
   });
-  
-  // Bulk import functionality
-  // Bulk import functionality removed as part of simplification
-
-  const schema = z.object({
-    name: z.string().min(1, 'Name ist erforderlich'),
-    region: z.string().optional(),
-    role: z.string().min(1, 'Rolle ist erforderlich'),
-    pronouns: z.string().optional(),
-    instagram: z.string().optional()
-  });
-
-  const { register, handleSubmit, reset, setValue, watch, formState: { errors, isSubmitting } } = useForm({
-    resolver: zodResolver(schema),
-    defaultValues: {
-      name: '',
-      region: '',
-      role: 'Wettbewerb-Teilnehmer*in',
-      pronouns: '',
-      instagram: ''
-    }
-  });
-
-
-  // RHF for edit modal
-  const editForm = useForm({
-    resolver: zodResolver(schema),
-    defaultValues: {
-      name: '',
-      slug: '',
-      region: '',
-      role: 'Wettbewerb-Teilnehmer*in',
-      pronouns: '',
-      instagram: ''
-    }
-  });
-  const { register: registerEdit, handleSubmit: handleEditSubmit, reset: resetEdit, formState: { errors: editErrors, isSubmitting: isEditSubmitting } } = editForm;
 
   const bundeslaender = [
     'Bayern',
@@ -177,81 +133,13 @@ export default function AdminParticipants() {
   const paginationInfo = useMemo(() => {
     const totalItems = filteredParticipants.length;
     const totalPages = pageSize === 'all' ? 1 : Math.ceil(totalItems / pageSize);
-    
+
     return {
       totalItems,
       totalPages,
       currentPage
     };
   }, [filteredParticipants.length, pageSize, currentPage]);
-
-  const onAddSubmit = async (data) => {
-    try {
-      // Get existing slugs for uniqueness check
-      const existingSlugs = allParticipants.map(p => p.slug);
-      
-      const payload = {
-        ...data,
-        slug: generateUniqueSlug(data.name, existingSlugs), // UNIQUE SLUG
-        instagram: data.instagram ? (() => {
-          try {
-            const normalized = normalizeInstagramInput(data.instagram);
-            return extractInstagramUsername(normalized) || data.instagram.replace(/^@/, '');
-          } catch (error) {
-            // Instagram normalization failed - using original value
-            return data.instagram.replace(/^@/, '');
-          }
-        })() : ''
-      };
-      
-      await createParticipant.mutateAsync(payload);
-      reset();
-      setShowAddForm(false);
-      setSuccess('Teilnehmer*innen erfolgreich hinzugefügt!');
-      setTimeout(() => setSuccess(null), 3000);
-    } catch (error) {
-      setFormError(error.message);
-      // Error adding participant - handled by error state
-    }
-  };
-
-  useEffect(() => {
-    if (editingParticipant) {
-      resetEdit({
-        name: editingParticipant.name || '',
-        slug: editingParticipant.slug || '',
-        region: editingParticipant.region || '',
-        role: editingParticipant.role || 'Wettbewerb-Teilnehmer*in',
-        pronouns: editingParticipant.pronouns || '',
-        instagram: editingParticipant.instagram || ''
-      });
-    }
-  }, [editingParticipant, resetEdit]);
-
-  const onEditSubmit = async (data) => {
-    try {
-      const payload = {
-        ...editingParticipant,
-        ...data,
-        instagram: data.instagram ? (() => {
-          try {
-            const normalized = normalizeInstagramInput(data.instagram);
-            return extractInstagramUsername(normalized) || data.instagram.replace(/^@/, '');
-          } catch (error) {
-            // Instagram normalization failed - using original value
-            return data.instagram.replace(/^@/, '');
-          }
-        })() : ''
-      };
-      await updateParticipant.mutateAsync({ id: editingParticipant.id, ...payload });
-      setEditingParticipant(null);
-      setSuccess('Teilnehmer*innen erfolgreich aktualisiert!');
-      setTimeout(() => setSuccess(null), 3000);
-    } catch (error) {
-      setFormError(error.message);
-      // Error updating participant - handled by error state
-    }
-  };
 
   const handleDelete = async (id) => {
     if (window.confirm('Bist du sicher, dass du diese*n Teilnehmer*in löschen möchtest?')) {
@@ -495,49 +383,13 @@ export default function AdminParticipants() {
               Datei importieren
             </button>
             <button
-              onClick={() => setShowAddForm(!showAddForm)}
+              onClick={() => navigate('/admin/participants/new')}
               className="w-full sm:w-auto min-h-[44px] btn-primary touch-manipulation active:scale-95"
             >
-              {showAddForm ? 'Abbrechen' : 'Teilnehmer*innen hinzufügen'}
+              Teilnehmer*innen hinzufügen
             </button>
           </div>
         </div>
-
-        {/* Add Participant Form */}
-        {showAddForm && (
-          <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6 mb-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Neuen Teilnehmer*innen hinzufügen</h3>
-            <form onSubmit={handleSubmit(onAddSubmit)} className="space-y-4">
-              <div className="grid grid-cols-1 gap-4">
-                <TextInput label="" name="name" register={register} rules={{ required: 'Name ist erforderlich' }} errors={errors} placeholder="Name" />
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <SelectInput label="" name="role" register={register} rules={{ required: 'Rolle ist erforderlich' }} errors={errors} options={[{ value: '', label: 'Rolle auswählen' }, ...roles.map(r => ({ value: r, label: r }))]} />
-                <SelectInput label="" name="region" register={register} errors={errors} options={[{ value: '', label: 'Bundesland/Region auswählen' }, ...bundeslaender.map(b => ({ value: b, label: b }))]} />
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <TextInput label="" name="pronouns" register={register} errors={errors} placeholder="Pronomen (z.B. er/ihm, sie/ihr, they/them)" />
-                <TextInput label="" name="instagram" register={register} errors={errors} placeholder="Instagram-Benutzername (optional, z. B. @john_doe oder john_doe)" />
-              </div>
-              <div className="flex flex-col sm:flex-row gap-3">
-                <button
-                  type="submit"
-                  disabled={isSubmitting || createParticipant.isPending}
-                  className="w-full sm:w-auto min-h-[44px] px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-70 touch-manipulation active:scale-95"
-                >
-                  {isSubmitting || createParticipant.isPending ? 'Hinzufügen...' : 'Hinzufügen'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowAddForm(false)}
-                  className="w-full sm:w-auto min-h-[44px] px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 touch-manipulation active:scale-95"
-                >
-                  Abbrechen
-                </button>
-              </div>
-            </form>
-          </div>
-        )}
 
         {/* Search and Filter Controls */}
         <SearchFilters
@@ -629,7 +481,7 @@ export default function AdminParticipants() {
           actions={(participant) => (
             <>
               <button
-                onClick={() => setEditingParticipant(participant)}
+                onClick={() => navigate(`/admin/participants/${participant.id}/edit`)}
                 className="min-h-[44px] min-w-[44px] px-4 py-2 text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 transition-colors touch-manipulation active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-500 rounded"
               >
                 Bearbeiten
@@ -672,99 +524,6 @@ export default function AdminParticipants() {
           </div>
         )}
       </div>
-
-      {/* Edit Participant Modal */}
-      {editingParticipant && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md sm:max-w-lg w-full max-h-[90vh] overflow-y-auto">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Teilnehmer*innen bearbeiten</h3>
-            <form onSubmit={handleEditSubmit(onEditSubmit)} className="space-y-4">
-              <div>
-                <input
-                  type="text"
-                  placeholder="Name"
-                  aria-invalid={editErrors.name ? 'true' : 'false'}
-                  {...registerEdit('name', { required: 'Name ist erforderlich' })}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                />
-                {editErrors.name && (
-                  <p className="mt-1 text-sm text-red-600 dark:text-red-400" role="alert">{editErrors.name.message}</p>
-                )}
-              </div>
-              <div>
-                <input
-                  type="text"
-                  placeholder="Slug"
-                  aria-invalid={editErrors.slug ? 'true' : 'false'}
-                  {...registerEdit('slug', { required: 'Slug ist erforderlich' })}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                />
-                {editErrors.slug && (
-                  <p className="mt-1 text-sm text-red-600 dark:text-red-400" role="alert">{editErrors.slug.message}</p>
-                )}
-              </div>
-              <div>
-                <select
-                  aria-invalid={editErrors.role ? 'true' : 'false'}
-                  {...registerEdit('role', { required: 'Rolle ist erforderlich' })}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                >
-                  <option value="">Rolle auswählen</option>
-                  {roles.map(role => (
-                    <option key={role} value={role}>{role}</option>
-                  ))}
-                </select>
-                {editErrors.role && (
-                  <p className="mt-1 text-sm text-red-600 dark:text-red-400" role="alert">{editErrors.role.message}</p>
-                )}
-              </div>
-              <div>
-                <select
-                  aria-invalid={editErrors.region ? 'true' : 'false'}
-                  {...registerEdit('region')}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                >
-                  <option value="">Bundesland/Region auswählen</option>
-                  {bundeslaender.map(bundesland => (
-                    <option key={bundesland} value={bundesland}>{bundesland}</option>
-                  ))}
-                </select>
-                {editErrors.region && (
-                  <p className="mt-1 text-sm text-red-600 dark:text-red-400" role="alert">{editErrors.region.message}</p>
-                )}
-              </div>
-              <input
-                type="text"
-                placeholder="Pronomen"
-                {...registerEdit('pronouns')}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-              />
-              <input
-                type="text"
-                placeholder="Instagram-Benutzername (z.B. john_doe oder @john_doe)"
-                {...registerEdit('instagram')}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-              />
-              <div className="flex flex-col sm:flex-row gap-3">
-                <button
-                  type="submit"
-                  disabled={isEditSubmitting || updateParticipant.isPending}
-                  className="w-full sm:flex-1 min-h-[44px] btn-primary disabled:opacity-70 touch-manipulation active:scale-95"
-                >
-                  {isEditSubmitting || updateParticipant.isPending ? 'Speichern...' : 'Speichern'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setEditingParticipant(null)}
-                  className="w-full sm:flex-1 min-h-[44px] px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 touch-manipulation active:scale-95"
-                >
-                  Abbrechen
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* Bulk Import Modal */}
       {showBulkImport && (
