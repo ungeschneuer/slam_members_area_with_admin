@@ -26,6 +26,7 @@ import Footer from './components/Footer.jsx';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext.jsx';
 import { AuthProvider, useAuth } from './contexts/AuthContext.jsx';
 import { UIProvider, useUI } from './contexts/UIContext.jsx';
+import { ToastProvider } from './contexts/ToastContext.jsx';
 import { RouteTransition, FadeIn, StaggeredContainer } from './components/Transitions.jsx';
 import authService from './services/authService.js';
 
@@ -266,14 +267,15 @@ function App() {
     <ThemeProvider>
       <AuthProvider>
         <UIProvider>
-          <Router>
-            <div className="min-h-screen bg-[#E7EFE4] dark:bg-gray-900">
-              <UserPasswordGate>
-                <Navigation />
-                <BreakingNews />
-                <main id="main-content" role="main" tabIndex="-1">
-                  <ErrorBoundary name="MainRoutes" showDetails>
-                  <Routes>
+          <ToastProvider>
+            <Router>
+              <div className="min-h-screen bg-[#E7EFE4] dark:bg-gray-900">
+                <UserPasswordGate>
+                  <Navigation />
+                  <BreakingNews />
+                  <main id="main-content" role="main" tabIndex="-1">
+                    <ErrorBoundary name="MainRoutes" showDetails>
+                    <Routes>
             <Route path="/" element={
               <ErrorBoundary name="MemberDashboard">
                 <RouteTransition>
@@ -403,13 +405,14 @@ function App() {
                 </FadeIn>
               </RouteTransition>
             } />
-          </Routes>
-                  </ErrorBoundary>
-                </main>
-              </UserPasswordGate>
-              <Footer />
-            </div>
-          </Router>
+            </Routes>
+                    </ErrorBoundary>
+                  </main>
+                </UserPasswordGate>
+                <Footer />
+              </div>
+            </Router>
+          </ToastProvider>
         </UIProvider>
       </AuthProvider>
     </ThemeProvider>

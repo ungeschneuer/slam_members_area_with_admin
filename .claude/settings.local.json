@@ -1,0 +1,34 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git fetch:*)",
+      "Bash(git log:*)",
+      "Bash(git grep:*)",
+      "Bash(git merge:*)",
+      "Bash(git diff:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nMerge branch ''main'' into claude/analyze-project-P5RoK\n\nResolved conflicts in client/services/excelService.js:\n- Integrated ExcelJS migration \\(security fix: xlsx → exceljs\\)\n- Adopted centralized role constants from shared/constants/roles.js\n- Updated sample data to use new role names \\(Wettbewerb-Teilnehmer*in\\)\n- Applied null-safe comparison in checkForDuplicates function\n\nChanges from main:\n- Enhanced participant role management with 11 roles \\(was 4\\)\n- Added new roles: Feature, DJ, Moderator*in, Techniker*in, etc.\n- Centralized role constants in shared/constants/roles.js\n- Code cleanup and documentation archival\n\nChanges from this branch:\n- Security: Replaced vulnerable xlsx with exceljs\n- Performance: Increased DB connection pool \\(2 → 15 connections\\)\n- Architecture: Replaced fetch monkey-patching with Axios interceptors\n- Logging: Replaced console.* with structured logger\n- Documentation: Added AXIOS_MIGRATION.md and DATABASE_CONNECTION_POOL.md\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git push:*)",
+      "Bash(git checkout:*)",
+      "Bash(git branch:*)",
+      "Bash(gh api:*)",
+      "Bash(for pr in 1 2 3 5 6 7)",
+      "Bash(do echo \"=== PR #$pr ===\")",
+      "Bash(done)",
+      "Bash(git cat-file:*)",
+      "Bash(for file in AdminParticipantsForm.jsx AdminTeamsForm.jsx AdminNewsEdit.jsx AdminCityTipsForm.jsx AdminLinksForm.jsx)",
+      "Bash(do echo \"=== $file ===\")",
+      "Bash(echo:*)",
+      "Bash(for file in AdminCityTips.jsx AdminLinks.jsx AdminNews.jsx AdminParticipants.jsx TeamsAdmin.jsx)",
+      "Bash(do echo \"=== Checking $file ===\")",
+      "Bash(perl -C -ne 'print if /[\\\\x{1F300}-\\\\x{1F9FF}\\\\x{2600}-\\\\x{26FF}\\\\x{2700}-\\\\x{27BF}]/':*)",
+      "Bash(perl -C -ne:*)",
+      "Bash(gh pr checkout:*)",
+      "Bash(git commit:*)",
+      "Bash(gh pr comment:*)",
+      "Bash(gh pr merge:*)",
+      "Bash(gh pr view:*)",
+      "Bash(git pull:*)"
+    ]
+  }
+}

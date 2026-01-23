@@ -165,8 +165,8 @@ router.get('/:slug', async (req, res) => {
       [slug]
     );
     const duration = endTiming(startTime);
-    
-    if (!participant) {
+
+    if (!participant.rows || participant.rows.length === 0) {
       logger.info('Participant not found', { slug, duration: `${Math.round(duration)}ms` });
       return sendNotFoundResponse(res, 'Participant');
     }
@@ -295,7 +295,7 @@ router.put('/:id', ...adminMiddleware(), async (req, res) => { // Optimistic loc
       'SELECT * FROM participants WHERE id = $1',
       [parseInt(id)]
     );
-    if (!existing) {
+    if (!existing.rows || existing.rows.length === 0) {
       return sendNotFoundResponse(res, 'Participant');
     }
     const name = typeof sanitizedData.name === 'string' ? sanitizedData.name : existing.name;

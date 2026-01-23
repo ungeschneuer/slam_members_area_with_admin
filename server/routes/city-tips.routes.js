@@ -81,8 +81,8 @@ router.get('/:slug', async (req, res) => {
       [slug]
     );
     const duration = endTiming(startTime);
-    
-    if (!cityTip) {
+
+    if (!cityTip.rows || cityTip.rows.length === 0) {
       logger.info('City tip not found', { slug, duration: `${Math.round(duration)}ms` });
       return sendNotFoundResponse(res, 'City tip');
     }
@@ -166,7 +166,7 @@ router.put('/:id', ...adminMiddleware(), ...validateCityTipId, ...validateCityTi
       'SELECT * FROM city_tips WHERE id = $1',
       [parseInt(id)]
     );
-    if (!existing) {
+    if (!existing.rows || existing.rows.length === 0) {
       return sendNotFoundResponse(res, 'City tip');
     }
 
