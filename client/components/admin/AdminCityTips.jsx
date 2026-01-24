@@ -6,11 +6,14 @@ import { ErrorMessage, SuccessMessage } from '../StatusMessages.jsx';
 import ConsolidatedAdminTable from './ConsolidatedAdminTable.jsx';
 import { getCategoryOptions } from '../../../shared/constants/categories.js';
 import { getCategoryIcon, getCategoryColor } from '../../utils/categoryUtils.js';
+import { useToast } from '../../contexts/ToastContext.jsx';
+import logger from '../../services/logger.js';
 
 export default function AdminCityTips() {
   const navigate = useNavigate();
   const { data: cityTipsData, isLoading, error } = useCityTips({}, true);
   const deleteCityTipMutation = useDeleteCityTip();
+  const { showSuccessToast } = useToast();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -43,10 +46,10 @@ export default function AdminCityTips() {
 
     try {
       await deleteCityTipMutation.mutateAsync(id);
-      setSuccess('Stadt-Tipp erfolgreich gelöscht!');
-      setTimeout(() => setSuccess(null), 3000);
+      showSuccessToast('Stadt-Tipp erfolgreich gelöscht!');
     } catch (error) {
-      console.error('Error deleting city tip:', error);
+      // Error toast is already shown by mutation's onError handler
+      logger.error('Delete city tip error in component', { error: error.message });
     }
   };
 

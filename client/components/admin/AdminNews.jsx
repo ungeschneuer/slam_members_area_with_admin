@@ -6,11 +6,14 @@ import { ErrorMessage, SuccessMessage } from '../StatusMessages.jsx';
 import ConsolidatedAdminTable from './ConsolidatedAdminTable.jsx';
 import { formatDate } from '../../utils/detailViewUtils.js';
 import { getNewsCategoryLabel } from "../../../shared/constants/categories.js";
+import { useToast } from '../../contexts/ToastContext.jsx';
+import logger from '../../services/logger.js';
 
 export default function AdminNews() {
   const navigate = useNavigate();
   const { data: newsData, isLoading, error } = useNews({}, true);
   const deleteNewsMutation = useDeleteNews();
+  const { showSuccessToast } = useToast();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -54,10 +57,10 @@ export default function AdminNews() {
 
     try {
       await deleteNewsMutation.mutateAsync(id);
-      setSuccess('Nachricht erfolgreich gelöscht!');
-      setTimeout(() => setSuccess(null), 3000);
+      showSuccessToast('Nachricht erfolgreich gelöscht!');
     } catch (error) {
-      console.error('Error deleting news:', error);
+      // Error toast is already shown by mutation's onError handler
+      logger.error('Delete news error in component', { error: error.message });
     }
   };
 
