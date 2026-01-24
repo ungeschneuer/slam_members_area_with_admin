@@ -293,7 +293,14 @@ router.post('/:id/upload-image', ...adminMiddleware(), uploadNewsFile.single('im
     
     if (newsResult.rows.length === 0) {
       // Delete uploaded file if article doesn't exist
-      fs.unlinkSync(file.path);
+      try {
+        fs.unlinkSync(file.path);
+      } catch (error) {
+        logger.warn('Failed to delete uploaded file after news not found', {
+          path: file.path,
+          error: error.message
+        });
+      }
       return sendNotFoundResponse(res, 'News article');
     }
     
@@ -303,7 +310,14 @@ router.post('/:id/upload-image', ...adminMiddleware(), uploadNewsFile.single('im
     if (news.featured_image_url) {
       const oldFilePath = path.join(process.cwd(), 'public', news.featured_image_url);
       if (fs.existsSync(oldFilePath)) {
-        fs.unlinkSync(oldFilePath);
+        try {
+          fs.unlinkSync(oldFilePath);
+        } catch (error) {
+          logger.warn('Failed to delete old news image file', {
+            path: oldFilePath,
+            error: error.message
+          });
+        }
       }
     }
     

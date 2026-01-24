@@ -228,7 +228,14 @@ router.post('/:id/upload-file', ...adminMiddleware(), uploadInfoPageFile.single(
     
     // Validate file type
     if (!['image/', 'application/pdf'].some(t => file.mimetype.includes(t))) {
-      fs.unlinkSync(file.path);
+      try {
+        fs.unlinkSync(file.path);
+      } catch (error) {
+        logger.warn('Failed to delete invalid file type upload', {
+          path: file.path,
+          error: error.message
+        });
+      }
       return res.status(400).json({
         success: false,
         error: 'Only images and PDFs are allowed'
@@ -243,7 +250,14 @@ router.post('/:id/upload-file', ...adminMiddleware(), uploadInfoPageFile.single(
     
     if (pageResult.rows.length === 0) {
       // Delete uploaded file if page doesn't exist
-      fs.unlinkSync(file.path);
+      try {
+        fs.unlinkSync(file.path);
+      } catch (error) {
+        logger.warn('Failed to delete uploaded file after info page not found', {
+          path: file.path,
+          error: error.message
+        });
+      }
       return sendNotFoundResponse(res, 'Info page');
     }
     
@@ -253,7 +267,14 @@ router.post('/:id/upload-file', ...adminMiddleware(), uploadInfoPageFile.single(
     if (page.file_url) {
       const oldFilePath = path.join(process.cwd(), 'public', page.file_url);
       if (fs.existsSync(oldFilePath)) {
-        fs.unlinkSync(oldFilePath);
+        try {
+          fs.unlinkSync(oldFilePath);
+        } catch (error) {
+          logger.warn('Failed to delete old info page file', {
+            path: oldFilePath,
+            error: error.message
+          });
+        }
       }
     }
     
