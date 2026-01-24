@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useParticipants } from '../../hooks/index.js';
 import { useRounds, useNews, useTimetable, useCityTips, useInfoPages } from '../../hooks/index.js';
 import LoadingSpinner from '../LoadingSpinner.jsx';
+import logger from '../../services/logger.js';
 // Service health monitoring removed - using simple polling instead
 
 // Dashboard Components
@@ -41,7 +42,9 @@ export default function AdminDashboard() {
       try {
         await loadDashboardData();
       } catch (error) {
-        // Data loading failed - handled silently
+        // Dashboard data loading failed - log for debugging
+        logger.error('Dashboard initial load failed', { error: error.message });
+        // Error state is already handled by individual query hooks
       }
     };
 
@@ -63,9 +66,10 @@ export default function AdminDashboard() {
     setDashboardError(null);
     try {
 
-      
+
       // Data loaded successfully
     } catch (err) {
+      logger.error('Dashboard data load error', { error: err.message });
       setDashboardError(err.message);
       // Error loading dashboard data - handled by error state
     } finally {
