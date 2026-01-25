@@ -9,6 +9,7 @@ import { getContentTypeGradient } from '../utils/detailViewUtils.js';
 import { handleLinkClick } from '../utils/linkUtils.js';
 import { getCategoryIcon, getCategoryLabel } from '../utils/categoryUtils.js';
 import BackButton from './shared/BackButton.jsx';
+import logger from '../services/logger.js';
 
 const CityTipDetail = () => {
   const { slug } = useParams();
@@ -46,14 +47,14 @@ const CityTipDetail = () => {
         // Add marker with popup
         const popupContent = cityTip.name || 'Ort';
         createMarkerWithPopup(
-          map, 
-          lat, 
-          lng, 
-          popupContent, 
+          map,
+          lat,
+          lng,
+          popupContent,
           { icon: createDefaultIcon() }
         );
       } catch (error) {
-        console.error('Error initializing map:', error);
+        logger.error('Error initializing city tip detail map', { error: error.message, cityTip: cityTip?.name });
       }
     };
 
@@ -81,8 +82,12 @@ const CityTipDetail = () => {
         })
         .catch(error => {
           const processedError = geocodingService.handleError(error);
-          console.warn('Geocoding failed:', processedError.message);
-          // Could show user notification here if needed
+          logger.warn('Geocoding failed for city tip', {
+            address,
+            cityTip: cityTip?.name,
+            error: processedError.message
+          });
+          // Map won't be shown, but page content is still accessible
         });
     }
   }, [cityTip]);
