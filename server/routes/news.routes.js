@@ -2,7 +2,7 @@ import express from 'express';
 import fs from 'fs';
 import path from 'path';
 // Optimized query service removed - using simple database queries
-import { executeQuery } from '../config/database.js';
+import { executeQuery, executeTransaction } from '../config/database.js';
 import {
   startTiming,
   endTiming,
@@ -206,44 +206,49 @@ router.post('/breaking-news/:id', ...adminMiddleware(), async (req, res) => {
   try {
     const { id } = req.params;
     const { duration } = req.body; // Duration in hours
-    
+
     const startTime = startTiming();
-    
-    // Clean up expired breaking news before setting new one
-    await executeQuery('UPDATE news SET is_breaking_news = false, breaking_news_until = NULL WHERE is_breaking_news = true AND breaking_news_until < NOW()');
-    
-    // Clear any existing breaking news
-    await executeQuery('UPDATE news SET is_breaking_news = false, breaking_news_until = NULL WHERE is_breaking_news = true');
-    
+
     // Calculate breaking news expiration time
     const breaking_news_until = duration ? new Date(Date.now() + duration * 60 * 60 * 1000) : null;
-    
-    // Set the new breaking news
-    const result = await executeQuery(`
-      UPDATE news 
-      SET is_breaking_news = true, 
-          breaking_news_until = $2, 
-          "updated_at" = NOW()
-      WHERE id = $1 AND status = 'PUBLISHED'
-      RETURNING *
-    `, [parseInt(id), breaking_news_until]);
-    
+
+    // Use transaction to ensure all 3 updates succeed or all fail
+    const result = await executeTransaction(async (client) => {
+      // 1. Clean up expired breaking news before setting new one
+      await client.query('UPDATE news SET is_breaking_news = false, breaking_news_until = NULL WHERE is_breaking_news = true AND breaking_news_until < NOW()');
+
+      // 2. Clear any existing breaking news
+      await client.query('UPDATE news SET is_breaking_news = false, breaking_news_until = NULL WHERE is_breaking_news = true');
+
+      // 3. Set the new breaking news
+      const updateResult = await client.query(`
+        UPDATE news
+        SET is_breaking_news = true,
+            breaking_news_until = $2,
+            "updated_at" = NOW()
+        WHERE id = $1 AND status = 'PUBLISHED'
+        RETURNING *
+      `, [parseInt(id), breaking_news_until]);
+
+      if (updateResult.rows.length === 0) {
+        throw new Error('News article not found or not published');
+      }
+
+      return updateResult.rows[0];
+    });
+
     const duration_ms = endTiming(startTime);
-    
-    if (result.rows.length === 0) {
-      return sendNotFoundResponse(res, 'News article not found or not published');
-    }
-    
+
     logger.info('Breaking news set successfully', {
       articleId: id,
       duration: `${Math.round(duration_ms)}ms`,
       expiresAt: breaking_news_until
     });
-    
+
     // Clear cache and notify clients for real-time updates
     ('news');
-    
-    sendSuccessResponse(res, result.rows[0], 'SET_BREAKING_NEWS', duration_ms);
+
+    sendSuccessResponse(res, result, 'SET_BREAKING_NEWS', duration_ms);
   } catch (error) {
     sendErrorResponse(res, error, 'Failed to set breaking news');
   }
