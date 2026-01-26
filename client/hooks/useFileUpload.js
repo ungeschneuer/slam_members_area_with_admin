@@ -65,11 +65,36 @@ export function useFileUpload() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Upload failed');
+        let errorMessage = 'Upload failed';
+
+        try {
+          // Attempt to parse error response as JSON
+          const contentType = response.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            const errorData = await response.json();
+            errorMessage = errorData.error || errorMessage;
+          } else {
+            // Non-JSON error response, try to read as text
+            const errorText = await response.text();
+            errorMessage = errorText || `HTTP ${response.status}: ${response.statusText}`;
+          }
+        } catch (parseError) {
+          // If parsing fails, use HTTP status
+          console.error('Failed to parse error response:', parseError);
+          errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        }
+
+        throw new Error(errorMessage);
       }
 
-      const result = await response.json();
+      let result;
+      try {
+        result = await response.json();
+      } catch (parseError) {
+        console.error('Failed to parse success response:', parseError);
+        throw new Error('Upload succeeded but response format was invalid');
+      }
+
       onSuccess?.(result);
       return result;
     } catch (err) {

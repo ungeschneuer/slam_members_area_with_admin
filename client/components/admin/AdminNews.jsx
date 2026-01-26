@@ -55,13 +55,10 @@ export default function AdminNews() {
   const handleDelete = async (id) => {
     if (!window.confirm('Bist du sicher, dass du diese Nachricht löschen möchtest?')) return;
 
-    try {
-      await deleteNewsMutation.mutateAsync(id);
-      showSuccessToast('Nachricht erfolgreich gelöscht!');
-    } catch (error) {
-      // Error toast is already shown by mutation's onError handler
-      logger.error('Delete news error in component', { error: error.message });
-    }
+    // Note: Error handling is done by the mutation's onError handler
+    // Success toast is shown here after successful deletion
+    await deleteNewsMutation.mutateAsync(id);
+    showSuccessToast('Nachricht erfolgreich gelöscht!');
   };
 
   const getStatusBadge = (status) => {

@@ -19,6 +19,8 @@ export default function InteractiveMap({ locations, onLocationClick, selectedLoc
   const [showTileError, setShowTileError] = useState(false);
   const [mapError, setMapError] = useState(null);
   const tileLayerRef = useRef(null);
+  const errorTimeoutRef = useRef(null);
+  const errorCountRef = useRef(0);
 
   // Initialize map
   const initializeMap = useCallback(() => {
@@ -32,23 +34,22 @@ export default function InteractiveMap({ locations, onLocationClick, selectedLoc
       tileLayerRef.current = tileLayer;
       
       // Track tile errors with debouncing
-      let errorCount = 0;
-      let errorTimeout = null;
-      
       const handleTileError = () => {
-        errorCount++;
-        
+        errorCountRef.current++;
+
         // Clear existing timeout
-        if (errorTimeout) clearTimeout(errorTimeout);
-        
+        if (errorTimeoutRef.current) {
+          clearTimeout(errorTimeoutRef.current);
+        }
+
         // Show error after 5 failed tiles
-        if (errorCount >= 5) {
+        if (errorCountRef.current >= 5) {
           setShowTileError(true);
         }
-        
+
         // Reset error count after 5 seconds of no errors
-        errorTimeout = setTimeout(() => {
-          errorCount = 0;
+        errorTimeoutRef.current = setTimeout(() => {
+          errorCountRef.current = 0;
           setShowTileError(false);
         }, 5000);
       };
@@ -66,6 +67,13 @@ export default function InteractiveMap({ locations, onLocationClick, selectedLoc
 
   // Cleanup map
   const cleanupMap = useCallback(() => {
+    // Clear error timeout to prevent memory leak
+    if (errorTimeoutRef.current) {
+      clearTimeout(errorTimeoutRef.current);
+      errorTimeoutRef.current = null;
+    }
+    errorCountRef.current = 0;
+
     if (mapInstanceRef.current) {
       try {
         // Clear all markers first

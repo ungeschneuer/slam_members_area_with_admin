@@ -55,16 +55,31 @@ router.get('/', async (req, res) => {
       'SELECT * FROM city_tips ORDER BY name',
       []
     );
-    
+
     const duration = endTiming(startTime);
-    
+
+    // Ensure we always return an array
+    let cityTips = [];
+    if (data && Array.isArray(data.rows)) {
+      cityTips = data.rows;
+    } else if (Array.isArray(data)) {
+      cityTips = data;
+    } else {
+      logger.warn('City tips query returned unexpected data structure', {
+        dataType: typeof data,
+        hasRows: data?.hasOwnProperty('rows'),
+        duration: `${Math.round(duration)}ms`
+      });
+      cityTips = [];
+    }
+
     logger.info('City tips fetched successfully', {
-      count: data.length,
+      count: cityTips.length,
       options,
       duration: `${Math.round(duration)}ms`
     });
-    
-    sendSuccessResponse(res, data.rows || data, 'GET_CITY_TIPS', duration);
+
+    sendSuccessResponse(res, cityTips, 'GET_CITY_TIPS', duration);
   } catch (error) {
     sendErrorResponse(res, error, 'Failed to fetch city tips');
   }
@@ -76,24 +91,27 @@ router.get('/:slug', async (req, res) => {
   const startTime = startTiming();
   
   try {
-    const cityTip = await executeQuery(
+    const result = await executeQuery(
       'SELECT * FROM city_tips WHERE slug = $1',
       [slug]
     );
     const duration = endTiming(startTime);
 
-    if (!cityTip.rows || cityTip.rows.length === 0) {
+    // Extract city tip from result
+    const cityTipRows = Array.isArray(result.rows) ? result.rows : (Array.isArray(result) ? result : []);
+
+    if (cityTipRows.length === 0) {
       logger.info('City tip not found', { slug, duration: `${Math.round(duration)}ms` });
       return sendNotFoundResponse(res, 'City tip');
     }
-    
-    logger.info('Optimized city tip by slug query completed', {
+
+    logger.info('City tip by slug query completed', {
       slug,
       duration: `${Math.round(duration)}ms`,
       queryType: 'BASIC'
     });
-    
-    sendSuccessResponse(res, cityTip, 'GET_CITY_TIP', duration);
+
+    sendSuccessResponse(res, cityTipRows[0], 'GET_CITY_TIP', duration);
   } catch (error) {
     sendErrorResponse(res, error, 'Failed to fetch city tip by slug');
   }

@@ -8,7 +8,8 @@ class ImageService {
     this.cdnBaseUrl = import.meta.env.VITE_CDN_URL || '';
     this.webpSupported = this.checkWebPSupport();
     this.retinaSupported = window.devicePixelRatio > 1;
-    
+    this.failedImages = new Map(); // Track failed images to avoid repeated attempts
+
     this.initializeIntersectionObserver();
   }
 
@@ -129,10 +130,36 @@ class ImageService {
       imgElement.dispatchEvent(new Event('load'));
       
     } catch (error) {
-      console.warn('Failed to load optimized image:', error);
+      // Track failed image loads
+      const failureInfo = {
+        url: originalSrc,
+        error: error.message,
+        timestamp: new Date().toISOString(),
+        attemptedOptimizedUrl: this.generateOptimizedUrl(originalSrc, {
+          width: imgElement.dataset.width,
+          height: imgElement.dataset.height,
+          quality: imgElement.dataset.quality || 85
+        })
+      };
+
+      this.failedImages.set(originalSrc, failureInfo);
+
+      // Log structured error for tracking
+      console.warn('Failed to load optimized image', {
+        originalUrl: originalSrc,
+        errorMessage: error.message,
+        errorType: error.name,
+        timestamp: failureInfo.timestamp
+      });
+
       // Fallback to original URL
       imgElement.src = originalSrc;
       imgElement.classList.remove('lazy');
+
+      // Dispatch custom event for application-wide error tracking
+      window.dispatchEvent(new CustomEvent('slam:image-load-error', {
+        detail: failureInfo
+      }));
     }
   }
 
@@ -306,10 +333,24 @@ class ImageService {
   getCacheStats() {
     return {
       cachedImages: this.imageCache.size,
+      failedImages: this.failedImages.size,
       webpSupported: this.webpSupported,
       retinaSupported: this.retinaSupported,
       cdnConfigured: !!this.cdnBaseUrl
     };
+  }
+
+  // Get failed images for debugging
+  getFailedImages() {
+    return Array.from(this.failedImages.entries()).map(([url, info]) => ({
+      url,
+      ...info
+    }));
+  }
+
+  // Clear failed images tracking
+  clearFailedImages() {
+    this.failedImages.clear();
   }
 
   // Setup lazy loading for all images with data-src attribute
