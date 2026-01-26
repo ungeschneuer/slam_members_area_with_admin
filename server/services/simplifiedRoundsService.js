@@ -48,14 +48,25 @@ export class SimplifiedRoundsService {
   async getRoundsWithAssignments() {
     const hasAssignments = await this.hasAssignmentsTable();
     if (!hasAssignments) {
+      logger.warn('round_assignments table does not exist - returning rounds without assignment data', {
+        method: 'getRoundsWithAssignments',
+        fallbackBehavior: 'empty_assignments_array'
+      });
+
       const fallbackQuery = `
-        SELECT 
+        SELECT
           r.*,
           '[]'::json AS assignments
         FROM rounds r
         ORDER BY r.date, r.start_time
       `;
       const fallbackResult = await executeQuery(fallbackQuery, []);
+
+      logger.info('Returned rounds without assignments', {
+        roundCount: fallbackResult.rows.length,
+        hasAssignments: false
+      });
+
       return fallbackResult.rows;
     }
 
@@ -119,15 +130,31 @@ export class SimplifiedRoundsService {
   async getRoundWithAssignments(roundId) {
     const hasAssignments = await this.hasAssignmentsTable();
     if (!hasAssignments) {
+      logger.warn('round_assignments table does not exist - returning round without assignment data', {
+        method: 'getRoundWithAssignments',
+        roundId,
+        fallbackBehavior: 'empty_assignments_array'
+      });
+
       const fallbackQuery = `
-        SELECT 
+        SELECT
           r.*,
           '[]'::json AS assignments
         FROM rounds r
         WHERE r.id = $1
       `;
       const fb = await executeQuery(fallbackQuery, [roundId]);
-      if (fb.rows.length === 0) return null;
+
+      if (fb.rows.length === 0) {
+        logger.info('Round not found', { roundId });
+        return null;
+      }
+
+      logger.info('Returned round without assignments', {
+        roundId,
+        hasAssignments: false
+      });
+
       return fb.rows[0];
     }
 
@@ -287,6 +314,12 @@ export class SimplifiedRoundsService {
   async updateRoundAssignments(roundId, assignments) {
     const hasAssignments = await this.hasAssignmentsTable();
     if (!hasAssignments) {
+      logger.warn('round_assignments table does not exist - cannot update assignments', {
+        method: 'updateRoundAssignments',
+        roundId,
+        attemptedAssignments: assignments.length,
+        fallbackBehavior: 'no_operation'
+      });
       // No-op if assignments table does not exist
       return;
     }

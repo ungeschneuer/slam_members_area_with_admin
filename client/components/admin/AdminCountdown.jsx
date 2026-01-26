@@ -17,14 +17,20 @@ export default function AdminCountdown() {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   const [timezoneName, setTimezoneName] = useState('Berlin Zeit');
+  const [timezoneWarning, setTimezoneWarning] = useState(null);
 
   // Fetch timezone name for display
   useEffect(() => {
     const fetchTimezoneName = async () => {
       try {
         const response = await fetch(`${import.meta.env.VITE_API_URL}/settings`);
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
         const data = await response.json();
-        
+
         if (data.success && data.data.timezone) {
           const timezone = data.data.timezone;
           // Convert timezone to readable name
@@ -38,12 +44,15 @@ export default function AdminCountdown() {
             'Australia/Sydney': 'Sydney Zeit'
           };
           setTimezoneName(timezoneNames[timezone] || `${timezone} Zeit`);
+          setTimezoneWarning(null);
         }
       } catch (error) {
-        // Failed to fetch timezone configuration - using fallback
+        console.error('Failed to fetch timezone configuration:', error);
+        setTimezoneWarning('Failed to load timezone configuration. Using default: Berlin Zeit');
+        setTimezoneName('Berlin Zeit');
       }
     };
-    
+
     fetchTimezoneName();
   }, []);
 
@@ -73,14 +82,19 @@ export default function AdminCountdown() {
   // Update form when countdownData changes
   useEffect(() => {
     if (!countdownData) return;
-    
+
     const fetchAndFormat = async () => {
       try {
         // Get configured timezone from API
         const settingsResponse = await fetch(`${import.meta.env.VITE_API_URL}/settings`);
+
+        if (!settingsResponse.ok) {
+          throw new Error(`HTTP error! status: ${settingsResponse.status}`);
+        }
+
         const settings = await settingsResponse.json();
         const timezone = settings?.data?.timezone || 'Europe/Berlin';
-        
+
         const mapped = {
           title: countdownData.title ?? 'Countdown zum SLAM25',
           subtitle: countdownData.subtitle ?? `28. Oktober 2025 • 12:00 Uhr (${timezoneName})`,
@@ -90,12 +104,12 @@ export default function AdminCountdown() {
           button_link: countdownData.button_link || '/timetable',
           is_active: countdownData.is_active ?? true
         };
-        
+
         const rawDate = mapped.target_date;
-        
+
         if (rawDate) {
           const utcDate = new Date(rawDate);
-          
+
           // Format in configured timezone using formatToParts
           const formatter = new Intl.DateTimeFormat('en-CA', {
             timeZone: timezone,
@@ -106,16 +120,16 @@ export default function AdminCountdown() {
             minute: '2-digit',
             hour12: false
           });
-          
+
           const parts = formatter.formatToParts(utcDate);
           const year = parts.find(p => p.type === 'year').value;
           const month = parts.find(p => p.type === 'month').value;
           const day = parts.find(p => p.type === 'day').value;
           const hour = parts.find(p => p.type === 'hour').value;
           const minute = parts.find(p => p.type === 'minute').value;
-          
+
           const localDateTime = `${year}-${month}-${day}T${hour}:${minute}`;
-          
+
           reset({
             title: mapped.title,
             subtitle: mapped.subtitle,
@@ -128,11 +142,23 @@ export default function AdminCountdown() {
         }
       } catch (error) {
         console.error('Error formatting countdown date:', error);
+        setTimezoneWarning('Failed to format date with configured timezone. Using default timezone.');
+
+        // Fallback: reset form with original data
+        reset({
+          title: countdownData.title ?? 'Countdown zum SLAM25',
+          subtitle: countdownData.subtitle ?? `28. Oktober 2025 • 12:00 Uhr (${timezoneName})`,
+          target_date: countdownData.target_date || '2025-10-28T12:00',
+          button_text: countdownData.button_text || 'Zum Zeitplan',
+          button_emoji: countdownData.button_emoji || '📅',
+          button_link: countdownData.button_link || '/timetable',
+          is_active: Boolean(countdownData.is_active ?? true)
+        });
       }
     };
-    
+
     fetchAndFormat();
-  }, [countdownData, reset]);
+  }, [countdownData, reset, timezoneName]);
 
   const onSubmit = async (data) => {
     setError(null);
@@ -262,6 +288,21 @@ export default function AdminCountdown() {
       </div>
 
       {/* Error and Success Messages */}
+      {timezoneWarning && (
+        <div className="mb-6 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <p className="text-sm text-yellow-800 dark:text-yellow-200">{timezoneWarning}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {error && (
         <div className="mb-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
           <div className="flex">

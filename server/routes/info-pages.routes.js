@@ -2,11 +2,11 @@ import express from 'express';
 import fs from 'fs';
 import path from 'path';
 // Optimized query service removed - using simple database queries
-import { 
-  startTiming, 
-  endTiming, 
-  sendSuccessResponse, 
-  sendErrorResponse, 
+import {
+  startTiming,
+  endTiming,
+  sendSuccessResponse,
+  sendErrorResponse,
   sendNotFoundResponse,
   executeCrudOperation,
   normalizeData,
@@ -22,6 +22,7 @@ import { UPLOAD_ERRORS, UPLOAD_SUCCESS_MESSAGES } from '../utils/uploadConstants
 import { generateSlug, generateUniqueSlug, validateSlugInput } from '../utils/slugUtils.js';
 import { generateUniqueSlugInTransaction, generateRequestIdFromReq } from '../services/slugGenerationService.js';
 import { executeTransaction } from '../config/database.js';
+import { safeDeleteFile } from '../utils/fileUtils.js';
 
 const router = express.Router();
 
@@ -211,29 +212,31 @@ router.delete('/:id', ...adminMiddleware(), async (req, res) => {
 
 // Universal file upload for info page (admin endpoint)
 router.post('/:id/upload-file', ...adminMiddleware(), uploadInfoPageFile.single('file'), handleUploadError, async (req, res) => {
+  const warnings = [];
+
   try {
     const { id } = req.params;
     const { description } = req.body; // Custom description from form
     const file = req.file;
-    
+
     if (!file) {
       return res.status(400).json({
         success: false,
         error: UPLOAD_ERRORS.NO_FILE
       });
     }
-    
+
     // Detect file type based on mimetype
     const fileType = file.mimetype.startsWith('image/') ? 'image' : 'pdf';
-    
+
     // Validate file type
     if (!['image/', 'application/pdf'].some(t => file.mimetype.includes(t))) {
-      try {
-        fs.unlinkSync(file.path);
-      } catch (error) {
-        logger.warn('Failed to delete invalid file type upload', {
+      // Use async file deletion
+      const deleteResult = await safeDeleteFile(`/../../${file.path}`);
+      if (!deleteResult.success && deleteResult.error?.serious) {
+        logger.error('Failed to delete invalid file type upload - serious error', {
           path: file.path,
-          error: error.message
+          error: deleteResult.error
         });
       }
       return res.status(400).json({
@@ -241,66 +244,89 @@ router.post('/:id/upload-file', ...adminMiddleware(), uploadInfoPageFile.single(
         error: 'Only images and PDFs are allowed'
       });
     }
-    
+
     // Check if info page exists
     const pageResult = await executeQuery(
       'SELECT * FROM info_pages WHERE id = $1',
       [parseInt(id)]
     );
-    
+
     if (pageResult.rows.length === 0) {
       // Delete uploaded file if page doesn't exist
-      try {
-        fs.unlinkSync(file.path);
-      } catch (error) {
-        logger.warn('Failed to delete uploaded file after info page not found', {
+      const deleteResult = await safeDeleteFile(`/../../${file.path}`);
+      if (!deleteResult.success && deleteResult.error?.serious) {
+        logger.error('Failed to delete uploaded file after info page not found - serious error', {
           path: file.path,
-          error: error.message
+          error: deleteResult.error
         });
       }
       return sendNotFoundResponse(res, 'Info page');
     }
-    
+
     const page = pageResult.rows[0];
-    
+
     // Delete old file if it exists
     if (page.file_url) {
-      const oldFilePath = path.join(process.cwd(), 'public', page.file_url);
-      if (fs.existsSync(oldFilePath)) {
-        try {
-          fs.unlinkSync(oldFilePath);
-        } catch (error) {
-          logger.warn('Failed to delete old info page file', {
-            path: oldFilePath,
-            error: error.message
-          });
-        }
+      const deleteResult = await safeDeleteFile(page.file_url);
+
+      if (deleteResult.deleted) {
+        logger.info('Old info page file deleted successfully', {
+          path: page.file_url
+        });
+      } else if (!deleteResult.success && deleteResult.error?.serious) {
+        // Track serious cleanup failures
+        warnings.push({
+          type: 'OLD_FILE_CLEANUP',
+          message: `Failed to delete old file: ${deleteResult.error.message}`,
+          path: page.file_url,
+          serious: true
+        });
+        logger.error('Serious error deleting old info page file', {
+          path: page.file_url,
+          error: deleteResult.error
+        });
+      } else if (!deleteResult.success) {
+        // Non-serious error (file not found, etc.)
+        warnings.push({
+          type: 'OLD_FILE_CLEANUP',
+          message: `Old file cleanup issue: ${deleteResult.error?.message || 'Unknown'}`,
+          path: page.file_url,
+          serious: false
+        });
       }
     }
-    
+
     // Update database with new file path, type, and description
     const filePath = `/uploads/info-pages/${file.filename}`;
     await executeQuery(
       'UPDATE info_pages SET file_url = $1, file_type = $2, file_description = $3, updated_at = NOW() WHERE id = $4',
       [filePath, fileType, description || '', parseInt(id)]
     );
-    
+
     logger.info('Info page file uploaded successfully', {
       pageId: id,
       filename: file.filename,
       filePath,
       fileType,
-      description
+      description,
+      warnings: warnings.length > 0 ? warnings : undefined
     });
-    
-    res.json({
+
+    const response = {
       success: true,
       message: `File uploaded successfully`,
       file: {
         filePath: filePath,
         fileType: fileType
       }
-    });
+    };
+
+    // Include warnings in response if any occurred
+    if (warnings.length > 0) {
+      response.warnings = warnings;
+    }
+
+    res.json(response);
   } catch (error) {
     logger.error('Error uploading info page file:', error);
     sendErrorResponse(res, error, 'Failed to upload file');
