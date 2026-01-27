@@ -17,7 +17,7 @@ import logger from './logger.js';
 // Create axios instance with default configuration
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3005/api',
-  timeout: 30000, // 30 seconds
+  timeout: 10000, // 10 seconds (reduced from 30 for better UX)
   withCredentials: true, // Important: Include cookies for JWT
   headers: {
     'Content-Type': 'application/json'
@@ -183,6 +183,15 @@ api.interceptors.response.use(
  * Helper function to extract error message from axios error
  */
 export const getErrorMessage = (error) => {
+  // Handle network/timeout errors with German messages
+  if (error.code === 'ECONNABORTED' || error.code === 'ERR_NETWORK') {
+    return 'Netzwerkfehler - Bitte überprüfe deine Internetverbindung';
+  }
+  if (error.request && !error.response) {
+    return 'Keine Antwort vom Server - Bitte überprüfe deine Internetverbindung';
+  }
+
+  // Handle API error responses
   if (error.response?.data?.error) {
     return error.response.data.error;
   }
@@ -192,7 +201,7 @@ export const getErrorMessage = (error) => {
   if (error.message) {
     return error.message;
   }
-  return 'An unexpected error occurred';
+  return 'Ein unbekannter Fehler ist aufgetreten';
 };
 
 /**

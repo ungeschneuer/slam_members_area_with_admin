@@ -222,7 +222,7 @@ export const validateTimetableEntry = [
   handleValidationErrors
 ];
 
-import { getCategoryValues } from '../../shared/constants/cityTipsCategories.js';
+import { getCategoryValues } from '../../shared/constants/categories.js';
 
 // Enhanced validation for city tips
 export const validateCityTip = [

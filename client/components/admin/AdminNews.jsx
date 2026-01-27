@@ -5,12 +5,15 @@ import LoadingSpinner from '../LoadingSpinner';
 import { ErrorMessage, SuccessMessage } from '../StatusMessages.jsx';
 import ConsolidatedAdminTable from './ConsolidatedAdminTable.jsx';
 import { formatDate } from '../../utils/detailViewUtils.js';
-import { getNewsCategoryLabel } from '../../utils/newsCategories.js';
+import { getNewsCategoryLabel } from "../../../shared/constants/categories.js";
+import { useToast } from '../../contexts/ToastContext.jsx';
+import logger from '../../services/logger.js';
 
 export default function AdminNews() {
   const navigate = useNavigate();
   const { data: newsData, isLoading, error } = useNews({}, true);
   const deleteNewsMutation = useDeleteNews();
+  const { showSuccessToast } = useToast();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -52,13 +55,10 @@ export default function AdminNews() {
   const handleDelete = async (id) => {
     if (!window.confirm('Bist du sicher, dass du diese Nachricht löschen möchtest?')) return;
 
-    try {
-      await deleteNewsMutation.mutateAsync(id);
-      setSuccess('Nachricht erfolgreich gelöscht!');
-      setTimeout(() => setSuccess(null), 3000);
-    } catch (error) {
-      console.error('Error deleting news:', error);
-    }
+    // Note: Error handling is done by the mutation's onError handler
+    // Success toast is shown here after successful deletion
+    await deleteNewsMutation.mutateAsync(id);
+    showSuccessToast('Nachricht erfolgreich gelöscht!');
   };
 
   const getStatusBadge = (status) => {

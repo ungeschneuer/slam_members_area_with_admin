@@ -3,7 +3,7 @@ import InteractiveMap from './InteractiveMap';
 import { useCityTips, usePageTitle } from '../hooks/index.js';
 import LoadingSpinner from './LoadingSpinner';
 import { ErrorMessage } from './StatusMessages.jsx';
-import { getCategoryOptionsWithAll } from '../../shared/constants/cityTipsCategories.js';
+import { getCategoryOptionsWithAll } from '../../shared/constants/categories.js';
 import { getAvailableContentFilterOptions, validateFilterValue } from '../utils/filterUtils.js';
 import { getCategoryIcon, getCategoryLabel, getCategoryColor } from '../utils/categoryUtils.js';
 

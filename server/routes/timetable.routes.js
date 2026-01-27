@@ -51,12 +51,29 @@ router.get('/:slug', async (req, res) => {
     };
     const toTime = (t) => {
       if (!t) return t;
-      if (typeof t === 'string' && /^\d{2}:\d{2}$/.test(t)) return t;
-      const dt = new Date(`1970-01-01T${t}Z`);
-      if (Number.isNaN(dt.getTime())) return t;
-      const hh = String(dt.getUTCHours()).padStart(2, '0');
-      const mm = String(dt.getUTCMinutes()).padStart(2, '0');
-      return `${hh}:${mm}`;
+      try {
+        if (typeof t === 'string' && /^\d{2}:\d{2}$/.test(t)) return t;
+        const dt = new Date(`1970-01-01T${t}Z`);
+        if (Number.isNaN(dt.getTime())) {
+          logger.warn('Time normalization: invalid date format', {
+            originalValue: t,
+            result: 'returning_original',
+            context: 'individual_event'
+          });
+          return t;
+        }
+        const hh = String(dt.getUTCHours()).padStart(2, '0');
+        const mm = String(dt.getUTCMinutes()).padStart(2, '0');
+        return `${hh}:${mm}`;
+      } catch (error) {
+        logger.error('Time normalization: unexpected error', {
+          error: error.message,
+          originalValue: t,
+          result: 'returning_original',
+          context: 'individual_event'
+        });
+        return t;
+      }
     };
     const normalized = {
       ...timetableEvent,
@@ -100,13 +117,23 @@ router.get('/', async (req, res) => {
         // If already HH:mm, keep it
         if (typeof t === 'string' && /^\d{2}:\d{2}$/.test(t)) return t;
         const dt = new Date(`1970-01-01T${t}Z`);
-        if (isNaN(dt.getTime())) return null; // Handle invalid dates
+        if (isNaN(dt.getTime())) {
+          logger.warn('Time normalization: invalid date format', {
+            originalValue: t,
+            result: 'returning_original'
+          });
+          return t; // Return original value instead of null
+        }
         const hh = String(dt.getUTCHours()).padStart(2, '0');
         const mm = String(dt.getUTCMinutes()).padStart(2, '0');
         return `${hh}:${mm}`;
       } catch (error) {
-        logger.error('toTime error:', error, 'value:', t);
-        return null;
+        logger.error('Time normalization: unexpected error', {
+          error: error.message,
+          originalValue: t,
+          result: 'returning_original'
+        });
+        return t; // Return original value to prevent data loss
       }
     };
     // Debug logging to identify the issue

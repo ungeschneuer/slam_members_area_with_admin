@@ -1,14 +1,15 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { 
-  createMap, 
-  destroyMap, 
-  removeMarker, 
-  resizeMap, 
-  createCustomIcon, 
+import {
+  createMap,
+  destroyMap,
+  removeMarker,
+  resizeMap,
+  createCustomIcon,
   createMarkerWithPopup,
-  isValidCoordinates 
+  isValidCoordinates
 } from '../utils/leafletUtils.js';
-import { getCategoryByValue, getCategoryHexColor } from '../../shared/constants/cityTipsCategories.js';
+import { getCategoryByValue, getCategoryHexColor } from '../../shared/constants/categories.js';
+import logger from '../services/logger.js';
 
 export default function InteractiveMap({ locations, onLocationClick, selectedLocation, availableCategories = [] }) {
   const mapRef = useRef(null);
@@ -16,7 +17,10 @@ export default function InteractiveMap({ locations, onLocationClick, selectedLoc
   const markersRef = useRef([]);
   const [isMapReady, setIsMapReady] = useState(false);
   const [showTileError, setShowTileError] = useState(false);
+  const [mapError, setMapError] = useState(null);
   const tileLayerRef = useRef(null);
+  const errorTimeoutRef = useRef(null);
+  const errorCountRef = useRef(0);
 
   // Initialize map
   const initializeMap = useCallback(() => {
@@ -30,23 +34,22 @@ export default function InteractiveMap({ locations, onLocationClick, selectedLoc
       tileLayerRef.current = tileLayer;
       
       // Track tile errors with debouncing
-      let errorCount = 0;
-      let errorTimeout = null;
-      
       const handleTileError = () => {
-        errorCount++;
-        
+        errorCountRef.current++;
+
         // Clear existing timeout
-        if (errorTimeout) clearTimeout(errorTimeout);
-        
+        if (errorTimeoutRef.current) {
+          clearTimeout(errorTimeoutRef.current);
+        }
+
         // Show error after 5 failed tiles
-        if (errorCount >= 5) {
+        if (errorCountRef.current >= 5) {
           setShowTileError(true);
         }
-        
+
         // Reset error count after 5 seconds of no errors
-        errorTimeout = setTimeout(() => {
-          errorCount = 0;
+        errorTimeoutRef.current = setTimeout(() => {
+          errorCountRef.current = 0;
           setShowTileError(false);
         }, 5000);
       };
@@ -55,13 +58,22 @@ export default function InteractiveMap({ locations, onLocationClick, selectedLoc
       
       mapInstanceRef.current = map;
       setIsMapReady(true);
+      setMapError(null);
     } catch (error) {
-      console.error('Error initializing map:', error);
+      logger.error('Error initializing map', { error: error.message });
+      setMapError('Karte konnte nicht geladen werden');
     }
   }, []);
 
   // Cleanup map
   const cleanupMap = useCallback(() => {
+    // Clear error timeout to prevent memory leak
+    if (errorTimeoutRef.current) {
+      clearTimeout(errorTimeoutRef.current);
+      errorTimeoutRef.current = null;
+    }
+    errorCountRef.current = 0;
+
     if (mapInstanceRef.current) {
       try {
         // Clear all markers first
@@ -82,7 +94,7 @@ export default function InteractiveMap({ locations, onLocationClick, selectedLoc
         setIsMapReady(false);
         setShowTileError(false);
       } catch (error) {
-        console.error('Error cleaning up map:', error);
+        logger.error('Error cleaning up map', { error: error.message });
       }
     }
   }, []);
@@ -244,7 +256,7 @@ export default function InteractiveMap({ locations, onLocationClick, selectedLoc
         }
       }
     } catch (error) {
-      console.error('Error updating markers:', error);
+      logger.error('Error updating markers', { error: error.message });
     }
   }, [isMapReady, locations, selectedLocation, onLocationClick]);
 
@@ -268,8 +280,21 @@ export default function InteractiveMap({ locations, onLocationClick, selectedLoc
 
   return (
     <div className="relative w-full h-full">
-      {showTileError && (
-        <div 
+      {mapError && (
+        <div
+          className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-red-50 dark:bg-red-900/20 border border-red-400 dark:border-red-800 rounded-lg px-6 py-4 shadow-lg z-[1000] max-w-md"
+          role="alert"
+          aria-live="assertive"
+        >
+          <p className="text-sm text-red-800 dark:text-red-200 flex items-center gap-2">
+            <span>⚠️</span>
+            <span>{mapError}</span>
+          </p>
+        </div>
+      )}
+
+      {showTileError && !mapError && (
+        <div
           className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-yellow-50 border border-yellow-400 rounded-lg px-4 py-2 shadow-lg z-[1000] max-w-md"
           role="alert"
           aria-live="polite"
@@ -280,7 +305,7 @@ export default function InteractiveMap({ locations, onLocationClick, selectedLoc
           </p>
         </div>
       )}
-      
+
       <div
         ref={mapRef}
         className="w-full h-full rounded-lg overflow-hidden border-2 border-gray-200 dark:border-gray-600"

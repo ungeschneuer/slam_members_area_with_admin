@@ -3,6 +3,8 @@ import { API_URL } from '../config/api.js';
 import authService from '../services/authService.js';
 import { useEntityData } from './useEntityData.js';
 import { getQueryConfig } from '../config/polling.js';
+import logger from '../services/logger.js';
+import { useToast } from '../contexts/ToastContext.jsx';
 
 // Query keys for city tips
 export const cityTipsKeys = {
@@ -82,11 +84,11 @@ export function useCityTipBySlug(slug) {
 // Hook to create a city tip
 export function useCreateCityTip() {
   const queryClient = useQueryClient();
-  
+  const { showErrorToast } = useToast();
+
   return useMutation({
+    networkMode: 'always', // Execute even when offline to show proper error messages
     mutationFn: async (cityTipData) => {
-      console.log('[useCreateCityTip] Starting mutation with data:', cityTipData);
-      
       try {
         const response = await authService.authenticatedRequest(
           `${API_URL}/city-tips`,
@@ -96,20 +98,18 @@ export function useCreateCityTip() {
             body: JSON.stringify(cityTipData)
           }
         );
-        
-        console.log('[useCreateCityTip] Response status:', response.status);
-        console.log('[useCreateCityTip] Response headers:', Object.fromEntries(response.headers.entries()));
-        
-        const result = await response.json();
-        console.log('[useCreateCityTip] Response body:', result);
-        
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${result.error || result.message || 'Unknown error'}`);
+
+        const result = await response.json().catch(() => {
+          throw new Error('Ungültige Serverantwort');
+        });
+
+        if (!result.success && result.error) {
+          throw new Error(result.error);
         }
-        
+
         return result?.data || result;
       } catch (error) {
-        console.error('[useCreateCityTip] Mutation error:', error);
+        logger.error('Create city tip error', { error: error.message });
         throw error;
       }
     },
@@ -117,7 +117,7 @@ export function useCreateCityTip() {
       // Invalidate all city-tips-related queries to ensure admin components update
       queryClient.invalidateQueries({ queryKey: ['city-tips'] });
       queryClient.invalidateQueries({ queryKey: cityTipsKeys.lists() });
-      
+
       // If we have the created city tip data, add it to the cache
       if (data?.data) {
         queryClient.setQueryData(cityTipsKeys.detail(data.data.id), data.data);
@@ -126,31 +126,50 @@ export function useCreateCityTip() {
         }
       }
     },
+    onError: (error) => {
+      logger.error('Create city tip mutation error', { error: error.message });
+      showErrorToast('Fehler beim Erstellen des Stadttipps: ' + (error.message || 'Unbekannter Fehler'));
+    }
   });
 }
 
 // Hook to update a city tip
 export function useUpdateCityTip() {
   const queryClient = useQueryClient();
-  
+  const { showErrorToast } = useToast();
+
   return useMutation({
+    networkMode: 'always', // Execute even when offline to show proper error messages
     mutationFn: async ({ id, ...cityTipData }) => {
-      const response = await authService.authenticatedRequest(
-        `${API_URL}/city-tips/${id}`,
-        {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(cityTipData)
+      try {
+        const response = await authService.authenticatedRequest(
+          `${API_URL}/city-tips/${id}`,
+          {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(cityTipData)
+          }
+        );
+
+        const result = await response.json().catch(() => {
+          throw new Error('Ungültige Serverantwort');
+        });
+
+        if (!result.success && result.error) {
+          throw new Error(result.error);
         }
-      );
-      const result = await response.json();
-      return result?.data || result;
+
+        return result?.data || result;
+      } catch (error) {
+        logger.error('Update city tip error', { error: error.message });
+        throw error;
+      }
     },
     onSuccess: (data, variables) => {
       // Invalidate all city-tips-related queries to ensure admin components update
       queryClient.invalidateQueries({ queryKey: ['city-tips'] });
       queryClient.invalidateQueries({ queryKey: cityTipsKeys.lists() });
-      
+
       // Update the specific city tip in cache
       if (data?.data) {
         queryClient.setQueryData(cityTipsKeys.detail(variables.id), data.data);
@@ -159,31 +178,54 @@ export function useUpdateCityTip() {
         }
       }
     },
+    onError: (error) => {
+      logger.error('Update city tip mutation error', { error: error.message });
+      showErrorToast('Fehler beim Aktualisieren des Stadttipps: ' + (error.message || 'Unbekannter Fehler'));
+    }
   });
 }
 
 // Hook to delete a city tip
 export function useDeleteCityTip() {
   const queryClient = useQueryClient();
-  
+  const { showErrorToast } = useToast();
+
   return useMutation({
+    networkMode: 'always', // Execute even when offline to show proper error messages
     mutationFn: async (id) => {
-      const response = await authService.authenticatedRequest(
-        `${API_URL}/city-tips/${id}`,
-        {
-          method: 'DELETE'
+      try {
+        const response = await authService.authenticatedRequest(
+          `${API_URL}/city-tips/${id}`,
+          {
+            method: 'DELETE'
+          }
+        );
+
+        const result = await response.json().catch(() => {
+          throw new Error('Ungültige Serverantwort');
+        });
+
+        if (!result.success && result.error) {
+          throw new Error(result.error);
         }
-      );
-      const result = await response.json();
-      return result?.data || result;
+
+        return result?.data || result;
+      } catch (error) {
+        logger.error('Delete city tip error', { error: error.message });
+        throw error;
+      }
     },
     onSuccess: (data, id) => {
       // Remove from cache
       queryClient.removeQueries({ queryKey: cityTipsKeys.detail(id) });
-      
+
       // Invalidate all city-tips-related queries to ensure admin components update
       queryClient.invalidateQueries({ queryKey: ['city-tips'] });
       queryClient.invalidateQueries({ queryKey: cityTipsKeys.lists() });
     },
+    onError: (error) => {
+      logger.error('Delete city tip mutation error', { error: error.message });
+      showErrorToast('Fehler beim Löschen des Stadttipps: ' + (error.message || 'Unbekannter Fehler'));
+    }
   });
 }

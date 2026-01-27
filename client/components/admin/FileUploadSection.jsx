@@ -74,20 +74,36 @@ function FileUploadSection({
         fieldName: currentConfig.fieldName,
         additionalData: type === 'universal' ? { description: description || '' } : {},
         onSuccess: (result) => {
-          if (type === 'universal') {
-            const filePath = result.file?.filePath;
-            const fileType = result.file?.fileType;
-            onUpload?.(filePath, fileType);
-          } else {
-            const filePath = result[type === 'image' ? 'image' : 'pdf']?.filePath;
-            onUpload?.(filePath);
+          try {
+            if (type === 'universal') {
+              const filePath = result.file?.filePath;
+              const fileType = result.file?.fileType;
+
+              if (!filePath) {
+                throw new Error('File path not returned from server');
+              }
+
+              onUpload?.(filePath, fileType);
+            } else {
+              const filePath = result[type === 'image' ? 'image' : 'pdf']?.filePath;
+
+              if (!filePath) {
+                throw new Error('File path not returned from server');
+              }
+
+              onUpload?.(filePath);
+            }
+            setUploadSuccess(true);
+            setTimeout(() => setUploadSuccess(false), 3000);
+          } catch (callbackError) {
+            console.error('Error in upload callback:', callbackError);
+            setLocalError('Upload succeeded but failed to update UI. Please refresh the page.');
           }
-          setUploadSuccess(true);
-          setTimeout(() => setUploadSuccess(false), 3000);
         }
       });
     } catch (err) {
       // Error already handled by hook
+      console.error('Upload error:', err);
     }
   };
 

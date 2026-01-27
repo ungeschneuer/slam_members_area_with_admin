@@ -4,11 +4,14 @@ import { useLinks, useDeleteLink } from '../../hooks/index.js';
 import LoadingSpinner from '../LoadingSpinner.jsx';
 import { ErrorMessage, SuccessMessage } from '../StatusMessages.jsx';
 import ConsolidatedAdminTable from './ConsolidatedAdminTable.jsx';
+import { useToast } from '../../contexts/ToastContext.jsx';
+import logger from '../../services/logger.js';
 
 const AdminLinks = () => {
   const navigate = useNavigate();
   const { data: linksData, isLoading, error } = useLinks({}, true);
   const deleteLinkMutation = useDeleteLink();
+  const { showSuccessToast } = useToast();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -54,10 +57,10 @@ const AdminLinks = () => {
 
     try {
       await deleteLinkMutation.mutateAsync(id);
-      setSuccess('Link erfolgreich gelöscht!');
-      setTimeout(() => setSuccess(null), 3000);
+      showSuccessToast('Link erfolgreich gelöscht!');
     } catch (error) {
-      console.error('Error deleting link:', error);
+      // Error toast is already shown by mutation's onError handler
+      logger.error('Delete link error in component', { error: error.message });
     }
   };
 

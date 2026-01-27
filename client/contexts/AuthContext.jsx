@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import authService from '../services/authService.js';
+import logger from '../services/logger.js';
 
 const AuthContext = createContext();
 
@@ -24,6 +25,7 @@ export function AuthProvider({ children }) {
         }
       } catch (error) {
         // Auth check failed - user not authenticated
+        logger.error('Auth check failed during initialization', { error: error.message });
         setIsAdmin(false);
         setIsUserAuthenticated(false);
       } finally {
@@ -51,6 +53,7 @@ export function AuthProvider({ children }) {
       }
     } catch (error) {
       // User auth check failed - keep current state
+      logger.warn('User auth status check failed', { error: error.message });
     }
   };
 
@@ -64,6 +67,7 @@ export function AuthProvider({ children }) {
       return success;
     } catch (error) {
       // Login failed
+      logger.error('Admin login failed', { error: error.message });
       return false;
     }
   };
@@ -74,7 +78,8 @@ export function AuthProvider({ children }) {
       setIsAdmin(false);
       setIsUserAuthenticated(false);
     } catch (error) {
-      // Logout failed
+      // Logout failed - still clear local state
+      logger.error('Admin logout failed', { error: error.message });
     }
   };
 
@@ -100,6 +105,7 @@ export function AuthProvider({ children }) {
       }
     } catch (error) {
       // User login failed
+      logger.error('User login failed', { error: error.message });
       return { success: false, error: 'Netzwerkfehler' };
     }
   };
@@ -112,7 +118,8 @@ export function AuthProvider({ children }) {
       });
       setIsUserAuthenticated(false);
     } catch (error) {
-      // User logout failed
+      // User logout failed - still clear local state
+      logger.warn('User logout failed', { error: error.message });
     }
   };
 

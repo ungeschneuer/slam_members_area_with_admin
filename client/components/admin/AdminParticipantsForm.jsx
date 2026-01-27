@@ -78,7 +78,7 @@ export default function AdminParticipantsForm() {
   const createParticipant = useCreateParticipant();
   const updateParticipant = useUpdateParticipant();
 
-  const { register, handleSubmit, reset, formState: { errors, isSubmitting }, setError } = useForm({
+  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(schema),
     defaultValues: {
       name: '',
@@ -133,13 +133,11 @@ export default function AdminParticipantsForm() {
         await createParticipant.mutateAsync(payload);
       }
 
-      // Navigate back to list
+      // Navigate back to list (only on success)
       navigate('/admin/participants');
     } catch (err) {
-      setError('root', {
-        type: 'server',
-        message: isEditMode ? 'Fehler beim Aktualisieren des Teilnehmers.' : 'Fehler beim Erstellen des Teilnehmers.'
-      });
+      // Error is already handled by mutation's onError (shows toast)
+      // Don't navigate away on error - stay on form so user can retry
     }
   };
 
@@ -168,12 +166,6 @@ export default function AdminParticipantsForm() {
           </p>
         </div>
       </div>
-
-      {errors.root && (
-        <div className="p-4 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200">
-          {errors.root.message}
-        </div>
-      )}
 
       <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">

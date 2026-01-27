@@ -60,7 +60,7 @@ const router = express.Router();
 router.get('/search', async (req, res) => {
   try {
     const startTime = startTiming();
-    
+
     // Parse search parameters
     const searchTerm = req.query.search || '';
     const role = req.query.role || '';
@@ -68,12 +68,12 @@ router.get('/search', async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 25;
     const offset = (page - 1) * limit;
-    
+
     // Build dynamic WHERE clause
     const whereConditions = [];
     const queryParams = [];
     let paramIndex = 1;
-    
+
     // Search term filtering (name, region, role, pronouns)
     if (searchTerm.trim()) {
       whereConditions.push(`(
@@ -85,58 +85,65 @@ router.get('/search', async (req, res) => {
       queryParams.push(`%${searchTerm.trim()}%`);
       paramIndex++;
     }
-    
+
     // Role filtering
     if (role && role !== 'all') {
       whereConditions.push(`role = $${paramIndex}`);
       queryParams.push(role);
       paramIndex++;
     }
-    
+
     // Region filtering
     if (region && region !== 'all') {
       whereConditions.push(`region = $${paramIndex}`);
       queryParams.push(region);
       paramIndex++;
     }
-    
+
     // Build the complete query
     const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
-    
-    // Get filtered participants with pagination
-    const participantsQuery = `
-      SELECT * FROM participants 
-      ${whereClause}
-      ORDER BY name 
+
+    // Use CTE to get both count and paginated results in a single atomic query
+    // This prevents race conditions where data changes between count and data queries
+    const combinedQuery = `
+      WITH filtered_participants AS (
+        SELECT * FROM participants
+        ${whereClause}
+      ),
+      total_count AS (
+        SELECT COUNT(*) as count FROM filtered_participants
+      )
+      SELECT
+        (SELECT count FROM total_count) as total_count,
+        json_agg(fp.* ORDER BY fp.name) FILTER (WHERE fp.id IS NOT NULL) as participants
+      FROM filtered_participants fp
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `;
     queryParams.push(limit, offset);
-    
-    const participants = await executeQuery(participantsQuery, queryParams);
-    
-    // Get total count for pagination (without LIMIT/OFFSET)
-    const countQuery = `SELECT COUNT(*) FROM participants ${whereClause}`;
-    const countParams = queryParams.slice(0, -2); // Remove limit and offset
-    const countResult = await executeQuery(countQuery, countParams);
-    const totalCount = parseInt(countResult.rows[0].count);
-    
+
+    const result = await executeQuery(combinedQuery, queryParams);
+
+    // Extract results from the combined query
+    const totalCount = parseInt(result.rows[0]?.total_count || 0);
+    const participants = result.rows[0]?.participants || [];
+
     const duration = endTiming(startTime);
-    
+
     logger.info('Participants search completed', {
       duration: `${Math.round(duration)}ms`,
       searchTerm,
       role,
       region,
-      participantCount: participants.rows.length,
+      participantCount: participants.length,
       totalCount,
       page,
       limit,
-      queryType: 'SEARCH_OPTIMIZED'
+      queryType: 'SEARCH_ATOMIC_CTE'
     });
-    
+
     // Include pagination metadata in response
     const responseData = {
-      data: participants.rows || participants,
+      data: participants,
       meta: {
         totalCount,
         limit,
@@ -147,9 +154,20 @@ router.get('/search', async (req, res) => {
         filters: { role, region }
       }
     };
-    
-    sendSuccessResponse(res, responseData, 'SEARCH_OPTIMIZED', duration);
+
+    sendSuccessResponse(res, responseData, 'SEARCH_ATOMIC_CTE', duration);
   } catch (error) {
+    logger.error('Failed to search participants', {
+      error: error.message,
+      stack: error.stack,
+      searchParams: {
+        search: req.query.search,
+        role: req.query.role,
+        region: req.query.region,
+        page: req.query.page,
+        limit: req.query.limit
+      }
+    });
     sendErrorResponse(res, error, 'Failed to search participants');
   }
 });
@@ -165,8 +183,8 @@ router.get('/:slug', async (req, res) => {
       [slug]
     );
     const duration = endTiming(startTime);
-    
-    if (!participant) {
+
+    if (!participant.rows || participant.rows.length === 0) {
       logger.info('Participant not found', { slug, duration: `${Math.round(duration)}ms` });
       return sendNotFoundResponse(res, 'Participant');
     }
@@ -295,7 +313,7 @@ router.put('/:id', ...adminMiddleware(), async (req, res) => { // Optimistic loc
       'SELECT * FROM participants WHERE id = $1',
       [parseInt(id)]
     );
-    if (!existing) {
+    if (!existing.rows || existing.rows.length === 0) {
       return sendNotFoundResponse(res, 'Participant');
     }
     const name = typeof sanitizedData.name === 'string' ? sanitizedData.name : existing.name;

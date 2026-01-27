@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useRounds, useParticipants, usePageTitle } from '../hooks/index.js';
 import LoadingSpinner from './LoadingSpinner.jsx';
 import { ErrorMessage, SuccessMessage } from './StatusMessages.jsx';
-import { translateRoundStatus, getRoundStatusIcon, getRoundStatusColor } from '../utils/categoryTranslations.js';
+import { translateRoundStatus, getRoundStatusIcon, getRoundStatusColor } from "../../shared/constants/categories.js";
 import { hasCrewRole, getCrewRolesFromAssignment } from '../utils/crewRoleUtils.js';
 import { createParticipantLookupMap } from '../utils/participantLookupUtils.js';
 import { getAvailableContentFilterOptions, getAvailableComplexFilterOptions, validateFilterValue } from '../utils/filterUtils.js';

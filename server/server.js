@@ -370,7 +370,9 @@ process.on('uncaughtException', async (error) => {
   }
   logger.error('Uncaught Exception:', error);
   if (process.env.SENTRY_DSN) {
-    try { Sentry.captureException(error); await Sentry.flush(2000); } catch (_) {}
+    try { Sentry.captureException(error); await Sentry.flush(2000); } catch (sentryError) {
+      logger.warn('Failed to send exception to Sentry', { error: sentryError.message });
+    }
   }
   if (process.env.NODE_ENV !== 'test') {
     gracefulShutdown('uncaughtException');
@@ -380,7 +382,9 @@ process.on('uncaughtException', async (error) => {
 process.on('unhandledRejection', async (reason, promise) => {
   logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
   if (process.env.SENTRY_DSN) {
-    try { Sentry.captureException(reason instanceof Error ? reason : new Error(String(reason))); await Sentry.flush(2000); } catch (_) {}
+    try { Sentry.captureException(reason instanceof Error ? reason : new Error(String(reason))); await Sentry.flush(2000); } catch (sentryError) {
+      logger.warn('Failed to send rejection to Sentry', { error: sentryError.message });
+    }
   }
   if (process.env.NODE_ENV !== 'test') {
     gracefulShutdown('unhandledRejection');

@@ -3,6 +3,8 @@ import { API_URL } from '../config/api.js';
 import authService from '../services/authService.js';
 import { useEntityData } from './useEntityData.js';
 import { getQueryConfig } from '../config/polling.js';
+import logger from '../services/logger.js';
+import { useToast } from '../contexts/ToastContext.jsx';
 
 // Participants hooks for data management
 // STANDARDIZED: All data fetching hooks use consistent patterns:
@@ -99,19 +101,34 @@ export function useParticipant(id) {
 // Hook to create a participant
 export function useCreateParticipant() {
   const queryClient = useQueryClient();
-  
+  const { showErrorToast } = useToast();
+
   return useMutation({
+    networkMode: 'always', // Execute even when offline to show proper error messages
     mutationFn: async (participantData) => {
-      const response = await authService.authenticatedRequest(
-        `${API_URL}/participants`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(participantData)
+      try {
+        const response = await authService.authenticatedRequest(
+          `${API_URL}/participants`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(participantData)
+          }
+        );
+
+        const result = await response.json().catch(() => {
+          throw new Error('Ungültige Serverantwort');
+        });
+
+        if (!result.success && result.error) {
+          throw new Error(result.error);
         }
-      );
-      const result = await response.json();
-      return result?.data || result;
+
+        return result?.data || result;
+      } catch (error) {
+        logger.error('Create participant error', { error: error.message });
+        throw error;
+      }
     },
     onMutate: async (newParticipant) => {
       // Cancel any outgoing refetches
@@ -128,7 +145,9 @@ export function useCreateParticipant() {
       
       return { previousParticipants };
     },
-    onError: (err, newParticipant, context) => {
+    onError: (error, newParticipant, context) => {
+      logger.error('Create participant mutation error', { error: error.message });
+      showErrorToast('Fehler beim Erstellen des Teilnehmers: ' + (error.message || 'Unbekannter Fehler'));
       // If the mutation fails, use the context returned from onMutate to roll back
       if (context?.previousParticipants) {
         queryClient.setQueryData(participantsKeys.lists(), context.previousParticipants);
@@ -150,19 +169,34 @@ export function useCreateParticipant() {
 // Hook to update a participant
 export function useUpdateParticipant() {
   const queryClient = useQueryClient();
-  
+  const { showErrorToast } = useToast();
+
   return useMutation({
+    networkMode: 'always', // Execute even when offline to show proper error messages
     mutationFn: async ({ id, ...participantData }) => {
-      const response = await authService.authenticatedRequest(
-        `${API_URL}/participants/${id}`,
-        {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(participantData)
+      try {
+        const response = await authService.authenticatedRequest(
+          `${API_URL}/participants/${id}`,
+          {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(participantData)
+          }
+        );
+
+        const result = await response.json().catch(() => {
+          throw new Error('Ungültige Serverantwort');
+        });
+
+        if (!result.success && result.error) {
+          throw new Error(result.error);
         }
-      );
-      const result = await response.json();
-      return result?.data || result;
+
+        return result?.data || result;
+      } catch (error) {
+        logger.error('Update participant error', { error: error.message });
+        throw error;
+      }
     },
     onMutate: async ({ id, ...participantData }) => {
       // Cancel any outgoing refetches
@@ -191,7 +225,9 @@ export function useUpdateParticipant() {
       
       return { previousParticipants, previousParticipant };
     },
-    onError: (err, variables, context) => {
+    onError: (error, variables, context) => {
+      logger.error('Update participant mutation error', { error: error.message });
+      showErrorToast('Fehler beim Aktualisieren des Teilnehmers: ' + (error.message || 'Unbekannter Fehler'));
       // If the mutation fails, use the context returned from onMutate to roll back
       if (context?.previousParticipants) {
         queryClient.setQueryData(participantsKeys.lists(), context.previousParticipants);
@@ -216,17 +252,32 @@ export function useUpdateParticipant() {
 // Hook to delete a participant
 export function useDeleteParticipant() {
   const queryClient = useQueryClient();
-  
+  const { showErrorToast } = useToast();
+
   return useMutation({
+    networkMode: 'always', // Execute even when offline to show proper error messages
     mutationFn: async (id) => {
-      const response = await authService.authenticatedRequest(
-        `${API_URL}/participants/${id}`,
-        {
-          method: 'DELETE'
+      try {
+        const response = await authService.authenticatedRequest(
+          `${API_URL}/participants/${id}`,
+          {
+            method: 'DELETE'
+          }
+        );
+
+        const result = await response.json().catch(() => {
+          throw new Error('Ungültige Serverantwort');
+        });
+
+        if (!result.success && result.error) {
+          throw new Error(result.error);
         }
-      );
-      const result = await response.json();
-      return result?.data || result;
+
+        return result?.data || result;
+      } catch (error) {
+        logger.error('Delete participant error', { error: error.message });
+        throw error;
+      }
     },
     onMutate: async (id) => {
       // Cancel any outgoing refetches
@@ -248,7 +299,9 @@ export function useDeleteParticipant() {
       
       return { previousParticipants, previousParticipant };
     },
-    onError: (err, id, context) => {
+    onError: (error, id, context) => {
+      logger.error('Delete participant mutation error', { error: error.message });
+      showErrorToast('Fehler beim Löschen des Teilnehmers: ' + (error.message || 'Unbekannter Fehler'));
       // If the mutation fails, use the context returned from onMutate to roll back
       if (context?.previousParticipants) {
         queryClient.setQueryData(participantsKeys.lists(), context.previousParticipants);
@@ -268,30 +321,42 @@ export function useDeleteParticipant() {
 // Hook to bulk import participants
 export function useBulkImportParticipants() {
   const queryClient = useQueryClient();
-  
+  const { showErrorToast } = useToast();
+
   return useMutation({
+    networkMode: 'always', // Execute even when offline to show proper error messages
     mutationFn: async (participants) => {
-      const response = await authService.authenticatedRequest(
-        `${API_URL}/participants/bulk-import`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ participants })
+      try {
+        const response = await authService.authenticatedRequest(
+          `${API_URL}/participants/bulk-import`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ participants })
+          }
+        );
+
+        if (!response.ok) {
+          const error = await response.json().catch(() => {
+            throw new Error('Ungültige Serverantwort');
+          });
+          throw new Error(error.error || 'Bulk import failed');
         }
-      );
-      
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Bulk import failed');
+
+        return await response.json().catch(() => {
+          throw new Error('Ungültige Serverantwort');
+        });
+      } catch (error) {
+        logger.error('Bulk import participants error', { error: error.message });
+        throw error;
       }
-      
-      return await response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: participantsKeys.lists() });
     },
     onError: (error) => {
-      console.error('Bulk import failed:', error);
+      logger.error('Bulk import participants mutation error', { error: error.message });
+      showErrorToast('Fehler beim Massenimport der Teilnehmer: ' + (error.message || 'Unbekannter Fehler'));
     }
   });
 }

@@ -16,6 +16,7 @@ export default function AdminUserPassword() {
   const [isLoading, setIsLoading] = useState(false);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
+  const [statusError, setStatusError] = useState(null);
 
   const { register, handleSubmit, formState: { errors }, reset } = useForm({
     resolver: zodResolver(schema)
@@ -26,13 +27,24 @@ export default function AdminUserPassword() {
     const checkStatus = async () => {
       try {
         const response = await fetch(`${import.meta.env.VITE_API_URL}/settings/user-password/status`);
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
         const data = await response.json();
-        
+
         if (data.success) {
           setIsProtected(data.data.isProtected);
+          setStatusError(null);
+        } else {
+          throw new Error(data.error || 'Failed to check protection status');
         }
       } catch (error) {
-        // Failed to check protection status
+        console.error('Failed to check protection status:', error);
+        setStatusError('Failed to load password protection status. Please refresh the page.');
+        // Set a default value to prevent infinite loading
+        setIsProtected(false);
       }
     };
 
@@ -90,6 +102,22 @@ export default function AdminUserPassword() {
           Passwort-Schutz für den Benutzer-Bereich verwalten
         </p>
       </div>
+
+      {/* Status Error */}
+      {statusError && (
+        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <span className="text-yellow-400">⚠️</span>
+            </div>
+            <div className="ml-3">
+              <p className="text-yellow-800 dark:text-yellow-200 text-sm">
+                {statusError}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Status Card */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">

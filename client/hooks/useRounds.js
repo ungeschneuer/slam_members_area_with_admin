@@ -3,6 +3,8 @@ import { API_URL } from '../config/api.js';
 import authService from '../services/authService.js';
 import { useEntityData } from './useEntityData.js';
 import { getQueryConfig } from '../config/polling.js';
+import logger from '../services/logger.js';
+import { useToast } from '../contexts/ToastContext.jsx';
 
 // Query keys for rounds
 export const roundsKeys = {
@@ -80,8 +82,10 @@ export function useRoundBySlug(slug) {
 // Hook to create a round
 export function useCreateRound() {
   const queryClient = useQueryClient();
-  
+  const { showErrorToast } = useToast();
+
   return useMutation({
+    networkMode: 'always', // Execute even when offline to show proper error messages
     mutationFn: async (roundData) => {
       try {
         const response = await authService.authenticatedRequest(
@@ -92,16 +96,18 @@ export function useCreateRound() {
             body: JSON.stringify(roundData)
           }
         );
-        
-        const result = await response.json();
-        
+
+        const result = await response.json().catch(() => {
+          throw new Error('Ungültige Serverantwort');
+        });
+
         if (!result.success && result.error) {
           throw new Error(result.error);
         }
-        
+
         return result?.data || result;
       } catch (error) {
-        console.error('Create round error:', error);
+        logger.error('Create round error', { error: error.message });
         throw error;
       }
     },
@@ -109,7 +115,7 @@ export function useCreateRound() {
       // Invalidate all rounds-related queries to ensure admin components update
       queryClient.invalidateQueries({ queryKey: roundsKeys.all });
       queryClient.invalidateQueries({ queryKey: roundsKeys.lists() });
-      
+
       // If we have the created round data, add it to the cache
       if (data && data.id) {
         queryClient.setQueryData(roundsKeys.detail(data.id), data);
@@ -119,7 +125,8 @@ export function useCreateRound() {
       }
     },
     onError: (error) => {
-      console.error('Create round mutation error:', error);
+      logger.error('Create round mutation error', { error: error.message });
+      showErrorToast('Fehler beim Erstellen der Runde: ' + (error.message || 'Unbekannter Fehler'));
     }
   });
 }
@@ -127,8 +134,10 @@ export function useCreateRound() {
 // Hook to update a round
 export function useUpdateRound() {
   const queryClient = useQueryClient();
-  
+  const { showErrorToast } = useToast();
+
   return useMutation({
+    networkMode: 'always', // Execute even when offline to show proper error messages
     mutationFn: async ({ id, version, ...roundData }) => {
       try {
         const response = await authService.authenticatedRequest(
@@ -139,16 +148,18 @@ export function useUpdateRound() {
             body: JSON.stringify({ ...roundData, version })
           }
         );
-        
-        const result = await response.json();
-        
+
+        const result = await response.json().catch(() => {
+          throw new Error('Ungültige Serverantwort');
+        });
+
         if (!result.success && result.error) {
           throw new Error(result.error);
         }
-        
+
         return result?.data || result;
       } catch (error) {
-        console.error('Update round error:', error);
+        logger.error('Update round error', { error: error.message });
         throw error;
       }
     },
@@ -156,7 +167,7 @@ export function useUpdateRound() {
       // Invalidate all rounds-related queries to ensure admin components update
       queryClient.invalidateQueries({ queryKey: roundsKeys.all });
       queryClient.invalidateQueries({ queryKey: roundsKeys.lists() });
-      
+
       // Update the specific round in cache
       if (data && data.id) {
         queryClient.setQueryData(roundsKeys.detail(variables.id), data);
@@ -166,7 +177,8 @@ export function useUpdateRound() {
       }
     },
     onError: (error) => {
-      console.error('Update round mutation error:', error);
+      logger.error('Update round mutation error', { error: error.message });
+      showErrorToast('Fehler beim Aktualisieren der Runde: ' + (error.message || 'Unbekannter Fehler'));
     }
   });
 }
@@ -174,8 +186,10 @@ export function useUpdateRound() {
 // Hook to delete a round
 export function useDeleteRound() {
   const queryClient = useQueryClient();
-  
+  const { showErrorToast } = useToast();
+
   return useMutation({
+    networkMode: 'always', // Execute even when offline to show proper error messages
     mutationFn: async (id) => {
       try {
         // Check if user is authenticated before making the request
@@ -189,29 +203,32 @@ export function useDeleteRound() {
             method: 'DELETE'
           }
         );
-        
+
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
           throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
         }
-        
-        const result = await response.json();
+
+        const result = await response.json().catch(() => {
+          throw new Error('Ungültige Serverantwort');
+        });
         return result?.data || result;
       } catch (error) {
-        console.error('Delete round error:', error);
+        logger.error('Delete round error', { error: error.message });
         throw error;
       }
     },
     onSuccess: (data, id) => {
       // Remove from cache
       queryClient.removeQueries({ queryKey: roundsKeys.detail(id) });
-      
+
       // Invalidate all rounds-related queries to ensure admin components update
       queryClient.invalidateQueries({ queryKey: roundsKeys.all });
       queryClient.invalidateQueries({ queryKey: roundsKeys.lists() });
     },
     onError: (error) => {
-      console.error('Delete round mutation error:', error);
+      logger.error('Delete round mutation error', { error: error.message });
+      showErrorToast('Fehler beim Löschen der Runde: ' + (error.message || 'Unbekannter Fehler'));
     }
   });
 }

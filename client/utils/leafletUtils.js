@@ -1,5 +1,6 @@
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import logger from '../services/logger.js';
 
 
 // Fix for default markers in Leaflet (guarded for non-browser/test env)
@@ -34,9 +35,9 @@ export const createTileLayer = (url = 'https://{s}.tile.openstreetmap.org/{z}/{x
     ...options
   });
 
-  // Add simple console warning for tile errors
+  // Log tile errors for debugging
   tileLayer.on('tileerror', (error) => {
-    console.warn('Kartenkachel konnte nicht geladen werden:', error.tile?.src || 'unknown');
+    logger.warn('Map tile failed to load', { src: error.tile?.src || 'unknown' });
   });
 
   return tileLayer;
@@ -57,7 +58,7 @@ export const createDefaultIcon = (options = {}) => {
 };
 
 // Import shared constants for consistency
-import { getCategoryByValue, getCategoryHexColor } from '../../shared/constants/cityTipsCategories.js';
+import { getCategoryByValue, getCategoryHexColor } from '../../shared/constants/categories.js';
 
 // Custom marker icons for different categories
 export const createCustomIcon = (category) => {
@@ -107,7 +108,7 @@ export const createMap = (container, options = {}) => {
     
     return { map, tileLayer }; // Return both map and tileLayer
   } catch (error) {
-    console.error('Error creating map:', error);
+    logger.error('Error creating leaflet map', { error: error.message });
     throw error;
   }
 };
@@ -132,7 +133,7 @@ export const destroyMap = (map) => {
       map.remove();
     }
   } catch (error) {
-    console.error('Error destroying map:', error);
+    logger.error('Error destroying leaflet map', { error: error.message });
   }
 };
 
@@ -143,7 +144,7 @@ export const removeMarker = (map, marker) => {
       map.removeLayer(marker);
     }
   } catch (error) {
-    console.error('Error removing marker:', error);
+    logger.error('Error removing map marker', { error: error.message });
   }
 };
 
@@ -184,7 +185,7 @@ export const resizeMap = (map) => {
 
     mapResizeTimeouts.set(map, timeoutId);
   } catch (error) {
-    console.error('Error resizing map:', error);
+    logger.error('Error resizing leaflet map', { error: error.message });
   }
 };
 
@@ -216,7 +217,7 @@ export const createMarkerWithPopup = (map, lat, lng, popupContent, options = {})
     
     return marker;
   } catch (error) {
-    console.error('Error creating marker:', error);
+    logger.error('Error creating map marker', { error: error.message });
     return null;
   }
 };

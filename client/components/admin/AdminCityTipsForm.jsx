@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { createValidationSchema, getDefaultValues } from '../../../shared/schemas/validationFactory.js';
 import { geocodingService } from '../../services/geocodingService.js';
-import { getCategoryOptions } from '../../../shared/constants/cityTipsCategories.js';
+import { getCategoryOptions } from '../../../shared/constants/categories.js';
 import LoadingSpinner from '../LoadingSpinner.jsx';
 import { ErrorMessage } from '../StatusMessages.jsx';
 

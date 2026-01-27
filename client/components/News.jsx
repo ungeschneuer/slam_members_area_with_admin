@@ -4,7 +4,7 @@ import { useNews, usePageTitle } from '../hooks/index.js';
 import LoadingSpinner from './LoadingSpinner';
 import { ErrorMessage, SuccessMessage } from './StatusMessages.jsx';
 import { getAvailablePublishedFilterOptions, validateFilterValue } from '../utils/filterUtils.js';
-import { getNewsCategoryFilterOptions, getNewsCategoryLabel, getNewsCategoryIcon } from '../utils/newsCategories.js';
+import { getNewsCategoryFilterOptions, getNewsCategoryLabel, getNewsCategoryIcon } from "../../shared/constants/categories.js";
 import PDFDisplay from './shared/PDFDisplay.jsx';
 
 export default function News() {
