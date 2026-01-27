@@ -69,12 +69,8 @@ export function useCityTipBySlug(slug) {
         throw new Error(`Failed to fetch city tip: ${response.statusText}`);
       }
       const result = await response.json();
-      // Extract the actual city tip data from the database result
-      const data = result?.data;
-      if (data && data.rows && data.rows.length > 0) {
-        return data.rows[0];
-      }
-      return null;
+      // The API sends the city tip directly in result.data
+      return result?.data || null;
     },
     enabled: !!slug,
     ...getQueryConfig('cityTips', false, { refetchInterval: false }), // Detail pages don't need polling
