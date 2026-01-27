@@ -236,6 +236,11 @@ temp/
 # OS generated files
 .DS_Store
 .DS_Store?
+
+# Temporary and test files
+TEST_*.md
+*.log.local
+scratchpad/
 ._*
 .Spotlight-V100
 .Trashes
