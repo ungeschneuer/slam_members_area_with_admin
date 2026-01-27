@@ -1,1 +1,0 @@
-You are an expert senior developer. Review the given implementation. Do you see possible problems? Are best practices and standards are followed (fitting to the project and the given rules of simplicity)? Update plans and todos accordingly.

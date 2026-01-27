@@ -10,6 +10,8 @@ A full-stack Poetry Slam application with React frontend and Express.js backend 
 - **City Tips** - Location recommendations and interactive maps
 - **News & Community** - News feed and community features
 - **PWA Support** - Progressive Web App with offline capabilities
+- **Error Handling** - Comprehensive error handling with toast notifications
+- **API Validation** - Fully validated API-database schema alignment
 
 ## 🌐 Uberspace Deployment
 
@@ -173,6 +175,18 @@ npm run test:coverage
 - **Database validation** for admin routes to prevent deleted user access
 - **No hardcoded secrets** - application fails fast if misconfigured
 
+## 🛡️ Error Handling & Reliability
+
+- **Toast Notification System** - User-friendly error and success messages
+- **Comprehensive Logging** - Structured logging with Winston
+- **Transaction Safety** - Database operations with rollback on errors
+- **Network Error Handling** - Offline-aware with German error messages
+- **Validation** - All API endpoints validated against database schema
+- **Memory Leak Prevention** - Proper cleanup in all components
+- **Error Categorization** - Distinguishes serious vs benign errors
+
+See [Error Handling Documentation](./docs/ERROR_HANDLING_AUDIT.md) for details.
+
 ## 📱 PWA Features
 
 - Service worker for offline functionality
@@ -200,6 +214,30 @@ MIT License - see LICENSE file for details
 4. Add tests for new functionality
 5. Submit a pull request
 
+## 📚 Documentation
+
+Comprehensive documentation is available in the [docs](./docs) directory:
+
+- [Documentation Index](./docs/README.md) - Complete documentation guide
+- [API-Database Alignment Report](./API_DATABASE_ALIGNMENT_REPORT.md) - Schema validation
+- [Error Handling Audit](./docs/ERROR_HANDLING_AUDIT.md) - Error handling improvements
+- [Database Connection Pool](./docs/DATABASE_CONNECTION_POOL.md) - Pool optimization
+- [Uberspace Configuration](./UBERSPACE_CONFIGURATION.md) - Deployment guide
+- [Security Documentation](./SECURITY.md) - Security features
+
 ## 📞 Support
 
-For issues and questions, please check the documentation or create an issue in the repository.
+For issues and questions:
+1. Check the [documentation index](./docs/README.md)
+2. Review relevant documentation files
+3. Create an issue in the repository
+
+## ✨ Recent Updates (January 2026)
+
+- ✅ Comprehensive error handling system with toast notifications
+- ✅ API-Database schema validation (16 tables, 82 indexes verified)
+- ✅ Transaction safety for all critical operations
+- ✅ Memory leak fixes in map components
+- ✅ Structured error logging and categorization
+- ✅ Network error handling with offline support
+- ✅ File operation error handling improvements
