@@ -88,9 +88,8 @@ export function useInfoPageBySlug(slug) {
       if (response.status === 404) return null;
       if (!response.ok) throw new Error(`Failed to fetch info page: ${response.statusText}`);
       const result = await response.json();
-      // Handle nested data structure or direct object
-      const data = result?.data?.rows?.[0] || result?.data || result || null;
-      return data;
+      // The API sends the info page directly in result.data
+      return result?.data || null;
     },
     enabled: !!slug,
     ...getQueryConfig('infoPages', false, { refetchInterval: false }), // Detail pages don't need polling
