@@ -216,7 +216,7 @@ export default function AdminTeamsForm() {
               type="text"
               aria-invalid={errors.name ? 'true' : 'false'}
               {...register('name')}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#185757] focus:border-transparent dark:bg-gray-700 dark:text-white"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-700 dark:text-white"
               placeholder="Team Name"
             />
             {errors.name && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.name.message}</p>}
@@ -231,7 +231,7 @@ export default function AdminTeamsForm() {
               type="text"
               aria-invalid={errors.instagram ? 'true' : 'false'}
               {...register('instagram')}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#185757] focus:border-transparent dark:bg-gray-700 dark:text-white"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-700 dark:text-white"
               placeholder="@username oder https://instagram.com/username"
             />
             {errors.instagram && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.instagram.message}</p>}
@@ -262,7 +262,7 @@ export default function AdminTeamsForm() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-6 py-3 bg-[#185757] text-white rounded-lg hover:bg-[#1a6666] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+              className="px-6 py-3 bg-primary text-white rounded-lg hover:bg-[#1a6666] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
             >
               {isSubmitting ? 'Speichern...' : (isEditMode ? 'Änderungen speichern' : 'Team erstellen')}
             </button>

@@ -330,10 +330,10 @@ export default function Timetable() {
         };
       case 'individual-round':
         return {
-          cardBg: 'bg-[#A2D2B9]/20 dark:bg-[#185757]/40',
-          cardBorder: 'border-[#185757]/30 dark:border-[#185757]/70',
-          timeCircle: 'bg-[#185757]',
-          accent: 'text-[#185757] dark:text-[#A2D2B9]'
+          cardBg: 'bg-accent/20 dark:bg-primary/40',
+          cardBorder: 'border-primary/30 dark:border-primary/70',
+          timeCircle: 'bg-primary',
+          accent: 'text-primary dark:text-accent'
         };
       case 'workshop':
         return {
@@ -527,7 +527,7 @@ export default function Timetable() {
                           <div className="flex-1 min-w-0">
                             {/* Title */}
                             <div className="mb-2">
-                              <h3 className="text-sm font-semibold text-gray-900 dark:text-white leading-tight group-hover:text-[#185757] dark:group-hover:text-[#A2D2B9] transition-colors">
+                              <h3 className="text-sm font-semibold text-gray-900 dark:text-white leading-tight group-hover:text-primary dark:group-hover:text-accent transition-colors">
                                 {event.title || 'Unbekanntes Event'}
                               </h3>
                               {/* Event Type Badge */}
@@ -566,7 +566,7 @@ export default function Timetable() {
                             
                             {/* Navigation Arrow - Bottom right */}
                             <div className="flex justify-end mt-2">
-                              <div className="flex items-center text-[#185757] dark:text-[#A2D2B9] group-hover:text-[#0f3a3b] dark:group-hover:text-[#8BC4A3] transition-colors">
+                              <div className="flex items-center text-primary dark:text-accent group-hover:text-primary-hover dark:group-hover:text-accent-hover transition-colors">
                                 <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                 </svg>
@@ -589,7 +589,7 @@ export default function Timetable() {
                             {/* Title Row with Navigation Arrow */}
                             <div className="flex items-start justify-between mb-2">
                               <div className="flex-1 min-w-0">
-                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white leading-tight group-hover:text-[#185757] dark:group-hover:text-[#A2D2B9] transition-colors">
+                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white leading-tight group-hover:text-primary dark:group-hover:text-accent transition-colors">
                                   {event.title || 'Unbekanntes Event'}
                                 </h3>
                                 {/* Event Type Badge */}
@@ -602,7 +602,7 @@ export default function Timetable() {
                                 )}
                               </div>
                               {/* Navigation Arrow - Rounds-style */}
-                              <div className="flex items-center text-[#185757] dark:text-[#A2D2B9] group-hover:text-[#0f3a3b] dark:group-hover:text-[#8BC4A3] transition-colors ml-2">
+                              <div className="flex items-center text-primary dark:text-accent group-hover:text-primary-hover dark:group-hover:text-accent-hover transition-colors ml-2">
                                 <svg className="w-6 h-6 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                 </svg>
@@ -663,7 +663,7 @@ export default function Timetable() {
                                         };
                                         handleLinkClick(timetableLink, e);
                                       }}
-                                      className="inline-flex items-center space-x-1 px-3 py-1 bg-[#A2D2B9]/20 dark:bg-[#185757]/30 text-[#185757] dark:text-[#A2D2B9] rounded-lg hover:bg-[#A2D2B9]/30 dark:hover:bg-[#185757]/40 transition-colors cursor-pointer"
+                                      className="inline-flex items-center space-x-1 px-3 py-1 bg-accent/20 dark:bg-primary/30 text-primary dark:text-accent rounded-lg hover:bg-accent/30 dark:hover:bg-primary/40 transition-colors cursor-pointer"
                                     >
                                       <span>{getLinkIcon(link.type)}</span>
                                       <span className="text-sm">{link.title || 'Link'}</span>

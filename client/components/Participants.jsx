@@ -482,7 +482,7 @@ export default function Participants() {
                               <div className="mt-2 space-y-1">
                                 {item.members.map((member, index) => (
                                   <div key={index} className="flex items-center space-x-2">
-                                    <span className="text-[#185757] dark:text-[#A2D2B9]">•</span>
+                                    <span className="text-primary dark:text-accent">•</span>
                                     <span className="text-gray-700 dark:text-gray-300 truncate">{member.name}</span>
                                   </div>
                                 ))}
@@ -559,7 +559,7 @@ export default function Participants() {
                  </div>
                 {/* Always-visible bottom-right arrow (decorative) */}
                 <div className="absolute bottom-4 right-4" aria-hidden="true">
-                  <svg className="w-5 h-5 text-[#185757] dark:text-[#A2D2B9] group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5 text-primary dark:text-accent group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path>
                   </svg>
                 </div>

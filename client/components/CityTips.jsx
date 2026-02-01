@@ -223,7 +223,7 @@ export default function CityTips() {
   if (loading) {
     return (
       <div className="text-center py-12">
-        <div className="w-24 h-24 bg-[#A2D2B9]/20 dark:bg-[#185757]/30 rounded-full flex items-center justify-center mx-auto mb-4">
+        <div className="w-24 h-24 bg-accent/20 dark:bg-primary/30 rounded-full flex items-center justify-center mx-auto mb-4">
           <span className="text-3xl">🗺️</span>
         </div>
         <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Stadt-Tipps werden geladen...</h3>
@@ -318,7 +318,7 @@ export default function CityTips() {
                 onClick={() => setCategoryFilter(category.id)}
                 className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-medium transition-colors ${
                   categoryFilter === category.id
-                    ? 'bg-[#A2D2B9]/20 dark:bg-[#185757]/30 text-[#185757] dark:text-[#A2D2B9]'
+                    ? 'bg-accent/20 dark:bg-primary/30 text-primary dark:text-accent'
                     : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
                 }`}
               >
@@ -339,7 +339,7 @@ export default function CityTips() {
           <div className="flex items-center space-x-2">
             <button
               onClick={() => setViewMode('grid')}
-              className={`p-2 rounded-lg ${viewMode === 'grid' ? 'bg-[#A2D2B9]/20 dark:bg-[#185757]/30 text-[#185757] dark:text-[#A2D2B9]' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}
+              className={`p-2 rounded-lg ${viewMode === 'grid' ? 'bg-accent/20 dark:bg-primary/30 text-primary dark:text-accent' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}
             >
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                 <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
@@ -347,7 +347,7 @@ export default function CityTips() {
             </button>
             <button
               onClick={() => setViewMode('list')}
-              className={`p-2 rounded-lg ${viewMode === 'list' ? 'bg-[#A2D2B9]/20 dark:bg-[#185757]/30 text-[#185757] dark:text-[#A2D2B9]' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}
+              className={`p-2 rounded-lg ${viewMode === 'list' ? 'bg-accent/20 dark:bg-primary/30 text-primary dark:text-accent' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}
             >
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
@@ -401,7 +401,7 @@ export default function CityTips() {
                         </div>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-gray-900 dark:text-white mb-1 group-hover:text-[#185757] dark:group-hover:text-[#A2D2B9] transition-colors text-sm leading-tight" title={location.name}>
+                        <h3 className="font-semibold text-gray-900 dark:text-white mb-1 group-hover:text-primary dark:group-hover:text-accent transition-colors text-sm leading-tight" title={location.name}>
                           {location.name}
                         </h3>
                         <p className="text-sm text-gray-600 dark:text-gray-400 mb-2 overflow-hidden" style={{
@@ -448,7 +448,7 @@ export default function CityTips() {
                         e.stopPropagation();
                         handleDetailsClick(location);
                       }}
-                      className="text-[#185757] dark:text-[#A2D2B9] hover:text-[#0f3a3b] dark:hover:text-[#8BC4A3] text-sm font-medium"
+                      className="text-primary dark:text-accent hover:text-primary-hover dark:hover:text-accent-hover text-sm font-medium"
                     >
                       Details anzeigen →
                     </button>
@@ -466,7 +466,7 @@ export default function CityTips() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
-                      <h3 className="font-semibold text-gray-900 dark:text-white group-hover:text-[#185757] dark:group-hover:text-[#A2D2B9] transition-colors text-sm leading-tight" title={location.name}>
+                      <h3 className="font-semibold text-gray-900 dark:text-white group-hover:text-primary dark:group-hover:text-accent transition-colors text-sm leading-tight" title={location.name}>
                         {location.name}
                       </h3>
                       <div className="flex items-center space-x-2">
@@ -493,7 +493,7 @@ export default function CityTips() {
                   <div className="flex items-center space-x-2">
                     <button
                       onClick={() => handleDetailsClick(location)}
-                      className="px-4 py-2 bg-[#185757] text-white rounded-lg hover:bg-[#0f3a3b] transition-colors text-sm"
+                      className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover transition-colors text-sm"
                     >
                       Details
                     </button>

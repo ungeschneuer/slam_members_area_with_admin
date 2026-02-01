@@ -240,7 +240,7 @@ export default function Rounds() {
   const getCompetitionTypeColor = (type) => {
     switch (type) {
       case 'Einzelwettbewerb':
-        return 'bg-[#A2D2B9]/20 text-[#185757] dark:bg-[#185757]/30 dark:text-[#A2D2B9]';
+        return 'bg-accent/20 text-primary dark:bg-primary/30 dark:text-accent';
       case 'Teamwettbewerb':
         return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
       case 'U20-Wettbewerb':
@@ -254,7 +254,7 @@ export default function Rounds() {
   const getCompetitionTypeIndicator = (type) => {
     switch (type) {
       case 'Einzelwettbewerb':
-        return 'bg-[#185757]';
+        return 'bg-primary';
       case 'Teamwettbewerb':
         return 'bg-green-500';
       case 'U20-Wettbewerb':
@@ -268,7 +268,7 @@ export default function Rounds() {
   const getCompetitionTypeBackground = (type) => {
     switch (type) {
       case 'Einzelwettbewerb':
-        return 'bg-[#A2D2B9]/40 dark:bg-[#185757]/50 border-[#185757]/40 dark:border-[#185757]/60 hover:bg-[#A2D2B9]/50 dark:hover:bg-[#185757]/60';
+        return 'bg-accent/40 dark:bg-primary/50 border-primary/40 dark:border-primary/60 hover:bg-accent/50 dark:hover:bg-primary/60';
       case 'Teamwettbewerb':
         return 'bg-green-100/60 dark:bg-green-800/40 border-green-300 dark:border-green-600 hover:bg-green-100/70 dark:hover:bg-green-800/50';
       case 'U20-Wettbewerb':
@@ -437,7 +437,7 @@ export default function Rounds() {
                           </div>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <h3 className="text-lg font-bold text-gray-900 dark:text-white group-hover:text-[#185757] dark:group-hover:text-[#A2D2B9] transition-colors leading-tight mb-1">
+                          <h3 className="text-lg font-bold text-gray-900 dark:text-white group-hover:text-primary dark:group-hover:text-accent transition-colors leading-tight mb-1">
                             {round.title}
                           </h3>
                           <span className="text-sm text-gray-500 dark:text-gray-300 mb-2 block">
@@ -449,7 +449,7 @@ export default function Rounds() {
                             </div>
                           )}
                         </div>
-                        <div className="flex items-center text-[#185757] dark:text-[#A2D2B9] group-hover:text-[#0f3a3b] dark:group-hover:text-[#8BC4A3] transition-colors flex-shrink-0">
+                        <div className="flex items-center text-primary dark:text-accent group-hover:text-primary-hover dark:group-hover:text-accent-hover transition-colors flex-shrink-0">
                           <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                           </svg>
@@ -495,7 +495,7 @@ export default function Rounds() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between">
                           <div className="flex-1 min-w-0">
-                            <h3 className="text-lg font-bold text-gray-900 dark:text-white group-hover:text-[#185757] dark:group-hover:text-[#A2D2B9] transition-colors leading-tight mb-1">
+                            <h3 className="text-lg font-bold text-gray-900 dark:text-white group-hover:text-primary dark:group-hover:text-accent transition-colors leading-tight mb-1">
                               {round.title}
                             </h3>
                             <span className="text-sm text-gray-500 dark:text-gray-300 mb-2 block">
@@ -531,7 +531,7 @@ export default function Rounds() {
                           </div>
                           
                           {/* Navigation Arrow */}
-                          <div className="flex items-center text-[#185757] dark:text-[#A2D2B9] group-hover:text-[#0f3a3b] dark:group-hover:text-[#8BC4A3] transition-colors ml-2 flex-shrink-0">
+                          <div className="flex items-center text-primary dark:text-accent group-hover:text-primary-hover dark:group-hover:text-accent-hover transition-colors ml-2 flex-shrink-0">
                             <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                             </svg>

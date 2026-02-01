@@ -112,7 +112,7 @@ const RoundDetail = () => {
           <ErrorMessage message={error} />
           <Link 
             to="/rounds" 
-            className="mt-4 inline-block bg-[#185757] dark:bg-[#A2D2B9] text-white dark:text-gray-900 px-4 py-2 rounded-lg hover:bg-[#0f3a3b] dark:hover:bg-[#8BC4A3] transition-colors"
+            className="mt-4 inline-block bg-primary dark:bg-accent text-white dark:text-gray-900 px-4 py-2 rounded-lg hover:bg-primary-hover dark:hover:bg-accent-hover transition-colors"
           >
             Zurück zu den Runden
           </Link>
@@ -128,7 +128,7 @@ const RoundDetail = () => {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Runde nicht gefunden</h1>
           <Link 
             to="/rounds" 
-            className="bg-[#185757] dark:bg-[#A2D2B9] text-white dark:text-gray-900 px-4 py-2 rounded-lg hover:bg-[#0f3a3b] dark:hover:bg-[#8BC4A3] transition-colors"
+            className="bg-primary dark:bg-accent text-white dark:text-gray-900 px-4 py-2 rounded-lg hover:bg-primary-hover dark:hover:bg-accent-hover transition-colors"
           >
             Zurück zu den Runden
           </Link>
@@ -229,7 +229,7 @@ const RoundDetail = () => {
                   handleLinkClick(photosLink, e);
                 }}
                 aria-label="Zu den Fotos öffnen (öffnet in neuem Tab)"
-                className="inline-flex items-center px-6 py-3 bg-[#185757] dark:bg-[#A2D2B9] text-white dark:text-gray-900 rounded-lg hover:bg-[#0f3a3b] dark:hover:bg-[#8BC4A3] transition-colors duration-200 font-medium"
+                className="inline-flex items-center px-6 py-3 bg-primary dark:bg-accent text-white dark:text-gray-900 rounded-lg hover:bg-primary-hover dark:hover:bg-accent-hover transition-colors duration-200 font-medium"
               >
                 <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -560,7 +560,7 @@ const RoundDetail = () => {
                               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 ${
                                 isWinner 
                                   ? 'bg-yellow-500 text-white' 
-                                  : 'bg-[#185757] text-white'
+                                  : 'bg-primary text-white'
                               }`}>
                                 {participant.order || participantIndex + 1}
                               </div>

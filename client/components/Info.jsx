@@ -65,7 +65,7 @@ const Info = () => {
           <nav className="mb-6">
             <ol className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
               <li>
-                <Link to="/info" className="hover:text-[#185757] dark:hover:text-[#A2D2B9]">
+                <Link to="/info" className="hover:text-primary dark:hover:text-accent">
                   Info
                 </Link>
               </li>
@@ -85,7 +85,7 @@ const Info = () => {
               </p>
             )}
             <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
-              <span className="bg-[#A2D2B9]/20 dark:bg-[#185757]/30 text-[#185757] dark:text-[#A2D2B9] px-2 py-1 rounded-full text-xs font-medium">
+              <span className="bg-accent/20 dark:bg-primary/30 text-primary dark:text-accent px-2 py-1 rounded-full text-xs font-medium">
                 {translateCategoryLocal(currentPage.category)}
               </span>
             </div>
@@ -185,7 +185,7 @@ const Info = () => {
               onClick={() => setSelectedCategory('all')}
               className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
                 selectedCategory === 'all'
-                  ? 'bg-[#185757] text-white'
+                  ? 'bg-primary text-white'
                   : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
               }`}
             >
@@ -197,7 +197,7 @@ const Info = () => {
                 onClick={() => setSelectedCategory(category)}
                 className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
                   selectedCategory === category
-                    ? 'bg-[#185757] text-white'
+                    ? 'bg-primary text-white'
                     : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
                 }`}
               >
@@ -227,7 +227,7 @@ const Info = () => {
                 className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover:shadow-md transition-shadow duration-200"
               >
                 <div className="flex items-start justify-between mb-4">
-                  <span className="bg-[#A2D2B9]/20 dark:bg-[#185757]/30 text-[#185757] dark:text-[#A2D2B9] px-2 py-1 rounded-full text-xs font-medium">
+                  <span className="bg-accent/20 dark:bg-primary/30 text-primary dark:text-accent px-2 py-1 rounded-full text-xs font-medium">
                     {translateCategoryLocal(page.category)}
                   </span>
                   {page.order > 0 && (
@@ -271,7 +271,7 @@ const Info = () => {
                 )}
                 
                 <div className="flex items-center justify-end text-sm text-gray-500 dark:text-gray-400">
-                  <span className="text-[#185757] dark:text-[#A2D2B9] hover:text-[#0f3a3b] dark:hover:text-[#8BC4A3]">
+                  <span className="text-primary dark:text-accent hover:text-primary-hover dark:hover:text-accent-hover">
                     Lesen →
                   </span>
                 </div>

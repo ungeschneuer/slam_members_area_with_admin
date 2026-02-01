@@ -11,56 +11,40 @@ export default {
         'serif': ['Georgia', 'serif'],
       },
       colors: {
-        // CI Color Palette
+        // ── CI Color Palette ─────────────────────────────
+        // All values reference CSS custom properties defined
+        // in index.css so a single change propagates everywhere.
         primary: {
-          DEFAULT: '#185757',
-          hover: '#0f3a3b',
-          light: '#A2D2B9',
-          lighter: '#E7EFE4',
-          dark: '#0f3a3b'
+          DEFAULT: 'rgb(var(--color-primary) / <alpha-value>)',
+          hover:   'rgb(var(--color-primary-hover) / <alpha-value>)',
+          light:   'rgb(var(--color-primary-light) / <alpha-value>)',
+          lighter: 'rgb(var(--color-primary-lighter) / <alpha-value>)',
+          dark:    'rgb(var(--color-primary-hover) / <alpha-value>)',
         },
         accent: {
-          DEFAULT: '#A2D2B9',
-          hover: '#8BC4A3',
-          light: '#E7EFE4'
+          DEFAULT: 'rgb(var(--color-accent) / <alpha-value>)',
+          hover:   'rgb(var(--color-accent-hover) / <alpha-value>)',
+          light:   'rgb(var(--color-accent-light) / <alpha-value>)',
         },
         cream: {
-          DEFAULT: '#E7EFE4',
-          light: '#f5f9f4'
+          DEFAULT: 'rgb(var(--color-cream) / <alpha-value>)',
+          light:   'rgb(var(--color-cream-light) / <alpha-value>)',
         },
-        // Surface colors
+        // ── Semantic surface / border / text colours ─────
+        // These automatically swap between light & dark mode
+        // via the CSS variable overrides in .dark { … }.
         surface: {
-          light: '#ffffff',
-          DEFAULT: '#ffffff',
-          dark: '#1f2937', // gray-800
+          DEFAULT:  'rgb(var(--color-surface) / <alpha-value>)',
+          elevated: 'rgb(var(--color-surface-elevated) / <alpha-value>)',
         },
-        // Surface variants
-        'surface-elevated': {
-          light: '#f9fafb', // gray-50
-          dark: '#374151', // gray-700
+        'theme-border': {
+          DEFAULT: 'rgb(var(--color-border) / <alpha-value>)',
+          input:   'rgb(var(--color-border-input) / <alpha-value>)',
         },
-        // Border colors
-        border: {
-          light: '#e5e7eb', // gray-200
-          DEFAULT: '#e5e7eb',
-          dark: '#374151', // gray-700
-        },
-        'border-input': {
-          light: '#d1d5db', // gray-300
-          dark: '#4b5563', // gray-600
-        },
-        // Text colors
-        'text-primary': {
-          light: '#111827', // gray-900
-          dark: '#f9fafb', // gray-50
-        },
-        'text-secondary': {
-          light: '#374151', // gray-700
-          dark: '#d1d5db', // gray-300
-        },
-        'text-tertiary': {
-          light: '#6b7280', // gray-500
-          dark: '#9ca3af', // gray-400
+        'theme-text': {
+          DEFAULT:   'rgb(var(--color-text-primary) / <alpha-value>)',
+          secondary: 'rgb(var(--color-text-secondary) / <alpha-value>)',
+          tertiary:  'rgb(var(--color-text-tertiary) / <alpha-value>)',
         },
       },
       animation: {
@@ -83,8 +67,8 @@ export default {
         'focus-offset': '4px',
       },
       ringColor: {
-        'focus': '#A2D2B9',
-        'focus-glow': 'rgba(162, 210, 185, 0.3)',
+        'focus': 'rgb(var(--color-ring-focus) / <alpha-value>)',
+        'focus-glow': 'rgb(var(--color-ring-focus) / 0.3)',
       },
     },
   },

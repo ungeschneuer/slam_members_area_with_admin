@@ -39,7 +39,7 @@ export default function LoginForm({ onLogin }) {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-8 sm:py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-6 sm:space-y-8">
         <div className="text-center">
-          <div className="mx-auto w-20 h-20 bg-[#185757] rounded-2xl flex items-center justify-center mb-6">
+          <div className="mx-auto w-20 h-20 bg-primary rounded-2xl flex items-center justify-center mb-6">
             <span className="text-white font-bold text-2xl">A</span>
           </div>
           <h2 className="text-3xl font-bold text-gray-900 dark:text-white">
@@ -77,7 +77,7 @@ export default function LoginForm({ onLogin }) {
                 autoComplete="username"
                 aria-invalid={errors.identifier ? 'true' : 'false'}
                 {...register('identifier')}
-                className="appearance-none relative block w-full px-4 py-3 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white dark:bg-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#A2D2B9] focus:border-[#185757] focus:z-10 sm:text-sm transition-all duration-200"
+                className="appearance-none relative block w-full px-4 py-3 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white dark:bg-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-accent focus:border-primary focus:z-10 sm:text-sm transition-all duration-200"
                 placeholder="Benutzername oder E-Mail eingeben"
                 disabled={isSubmitting}
               />
@@ -97,7 +97,7 @@ export default function LoginForm({ onLogin }) {
                 autoComplete="current-password"
                 aria-invalid={errors.password ? 'true' : 'false'}
                 {...register('password')}
-                className="appearance-none relative block w-full px-4 py-3 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white dark:bg-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#A2D2B9] focus:border-[#185757] focus:z-10 sm:text-sm transition-all duration-200"
+                className="appearance-none relative block w-full px-4 py-3 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white dark:bg-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-accent focus:border-primary focus:z-10 sm:text-sm transition-all duration-200"
                 placeholder="Geben Sie Ihr Passwort ein"
                 disabled={isSubmitting}
               />
@@ -113,7 +113,7 @@ export default function LoginForm({ onLogin }) {
               name="remember-me"
               type="checkbox"
               {...register('rememberMe')}
-              className="h-4 w-4 text-[#185757] focus:ring-[#A2D2B9] border-gray-300 rounded"
+              className="h-4 w-4 text-primary focus:ring-accent border-gray-300 rounded"
               disabled={isSubmitting}
             />
             <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
@@ -125,7 +125,7 @@ export default function LoginForm({ onLogin }) {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="group relative w-full flex justify-center items-center py-3 px-4 border border-transparent text-sm font-medium rounded-xl text-white bg-[#185757] hover:bg-[#0f3a3b] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#A2D2B9] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl"
+              className="group relative w-full flex justify-center items-center py-3 px-4 border border-transparent text-sm font-medium rounded-xl text-white bg-primary hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl"
             >
               {isSubmitting ? (
                 <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">

@@ -47,7 +47,7 @@ export default function TextareaInput({
                 aria-label={ariaLabel || label}
                 aria-invalid={hasError ? 'true' : 'false'}
                 maxLength={maxLength}
-                className={`textarea-base ${hasError ? 'border-red-500 focus:ring-red-500' : 'focus:ring-[#A2D2B9] focus:border-[#185757]'} ${className}`}
+                className={`textarea-base ${hasError ? 'border-red-500 focus:ring-red-500' : 'focus:ring-accent focus:border-primary'} ${className}`}
               />
               {maxLength && (
                 <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
@@ -83,7 +83,7 @@ export default function TextareaInput({
         aria-invalid={hasError ? 'true' : 'false'}
         maxLength={maxLength}
         {...(register ? register(name, rules) : {})}
-        className={`textarea-base ${hasError ? 'border-red-500 focus:ring-red-500' : 'focus:ring-[#A2D2B9] focus:border-[#185757]'} ${className}`}
+        className={`textarea-base ${hasError ? 'border-red-500 focus:ring-red-500' : 'focus:ring-accent focus:border-primary'} ${className}`}
       />
       {hasError && (
         <p className="mt-1 text-sm text-red-600 dark:text-red-400" role="alert">{errors[name].message}</p>

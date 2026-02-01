@@ -42,7 +42,7 @@ export default function TextInput({
               autoComplete={autoComplete}
               disabled={disabled}
               aria-invalid={hasError ? 'true' : 'false'}
-              className={`input-base ${hasError ? 'border-red-500 focus:ring-red-500' : 'focus:ring-[#A2D2B9] focus:border-[#185757]'} ${className}`}
+              className={`input-base ${hasError ? 'border-red-500 focus:ring-red-500' : 'focus:ring-accent focus:border-primary'} ${className}`}
             />
           )}
         />
@@ -71,7 +71,7 @@ export default function TextInput({
         aria-invalid={hasError ? 'true' : 'false'}
         {...(register ? register(name, rules) : {})}
         disabled={disabled}
-        className={`input-base ${hasError ? 'border-red-500 focus:ring-red-500' : 'focus:ring-[#A2D2B9] focus:border-[#185757]'} ${className}`}
+        className={`input-base ${hasError ? 'border-red-500 focus:ring-red-500' : 'focus:ring-accent focus:border-primary'} ${className}`}
       />
       {hasError && (
         <p className="mt-1 text-sm text-red-600 dark:text-red-400" role="alert">{errors[name].message}</p>

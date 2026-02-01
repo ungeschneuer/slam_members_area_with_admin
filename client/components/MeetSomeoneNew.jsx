@@ -198,7 +198,7 @@ export default function MeetSomeoneNew() {
                     };
                     handleLinkClick(instagramLink, e);
                   }}
-                  className="inline-flex items-center justify-center px-4 py-2 bg-[#185757] dark:bg-[#A2D2B9] text-white dark:text-gray-900 rounded-full hover:bg-[#0f3a3b] dark:hover:bg-[#8BC4A3] transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg text-sm"
+                  className="inline-flex items-center justify-center px-4 py-2 bg-primary dark:bg-accent text-white dark:text-gray-900 rounded-full hover:bg-primary-hover dark:hover:bg-accent-hover transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg text-sm"
                   aria-label={`Instagram Profil von ${currentParticipant.name}`}
                 >
                   <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 24 24">

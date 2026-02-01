@@ -152,7 +152,7 @@ export default function AdminNavigation() {
         {/* Logo Section */}
         <div className="p-6 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-[#185757] rounded-xl flex items-center justify-center">
+            <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center">
               <span className="text-white font-bold text-lg">A</span>
             </div>
             <div>
@@ -172,7 +172,7 @@ export default function AdminNavigation() {
                   onKeyDown={(e) => handleKeyDown(e, () => handleDesktopGroupClick(group))}
                   className={`w-full text-left px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center justify-between ${
                     isGroupActive(group)
-                      ? 'bg-[#A2D2B9]/20 dark:bg-[#185757]/30 text-[#185757] dark:text-[#A2D2B9]'
+                      ? 'bg-accent/20 dark:bg-primary/30 text-primary dark:text-accent'
                       : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
                   }`}
                   aria-expanded={group.items ? expandedGroups[group.id] : undefined}
@@ -206,7 +206,7 @@ export default function AdminNavigation() {
                         onKeyDown={(e) => handleKeyDown(e, () => handleItemClick(item))}
                         className={`w-full text-left px-4 py-2 text-sm rounded-lg transition-all duration-200 ${
                           isItemActive(item)
-                            ? 'bg-[#A2D2B9]/20 dark:bg-[#185757]/30 text-[#185757] dark:text-[#A2D2B9]'
+                            ? 'bg-accent/20 dark:bg-primary/30 text-primary dark:text-accent'
                             : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
                         }`}
                       >
@@ -246,7 +246,7 @@ export default function AdminNavigation() {
               onKeyDown={(e) => handleKeyDown(e, () => handleMobileGroupClick(group))}
               className={`flex flex-col items-center gap-1 px-2 py-2 min-h-[44px] min-w-[44px] ${
                 isGroupActive(group)
-                  ? 'text-[#185757] dark:text-[#A2D2B9]'
+                  ? 'text-primary dark:text-accent'
                   : 'text-gray-600 dark:text-gray-400'
               }`}
               aria-label={group.label}
@@ -254,7 +254,7 @@ export default function AdminNavigation() {
               <span className="text-2xl">{group.icon}</span>
               <span className="text-xs font-medium">{group.label}</span>
               {isGroupActive(group) && (
-                <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-8 h-0.5 bg-[#185757] rounded-full"></div>
+                <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-8 h-0.5 bg-primary rounded-full"></div>
               )}
             </button>
           ))}
@@ -313,7 +313,7 @@ export default function AdminNavigation() {
                       onKeyDown={(e) => handleKeyDown(e, () => handleItemClick(item))}
                       className={`w-full text-left px-4 py-3 rounded-lg transition-all duration-200 flex items-center ${
                         isItemActive(item)
-                          ? 'bg-[#A2D2B9]/20 dark:bg-[#185757]/30 text-[#185757] dark:text-[#A2D2B9]'
+                          ? 'bg-accent/20 dark:bg-primary/30 text-primary dark:text-accent'
                           : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
                       }`}
                     >

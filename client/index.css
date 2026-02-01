@@ -2,6 +2,63 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================
+   CSS Custom Properties — Single Source of Truth
+   for the SLAM25 colour palette.
+
+   All component code should reference Tailwind
+   theme tokens (bg-primary, text-accent, …) which
+   in turn resolve to these variables.  Changing a
+   value here propagates everywhere automatically.
+   ============================================ */
+@layer base {
+  :root {
+    /* Brand */
+    --color-primary: 24 87 87;           /* #185757 */
+    --color-primary-hover: 15 58 59;     /* #0f3a3b */
+    --color-primary-light: 162 210 185;  /* #A2D2B9 */
+    --color-primary-lighter: 231 239 228;/* #E7EFE4 */
+
+    --color-accent: 162 210 185;         /* #A2D2B9 */
+    --color-accent-hover: 139 196 163;   /* #8BC4A3 */
+    --color-accent-light: 231 239 228;   /* #E7EFE4 */
+
+    --color-cream: 231 239 228;          /* #E7EFE4 */
+    --color-cream-light: 245 249 244;    /* #f5f9f4 */
+
+    /* Surfaces */
+    --color-surface: 255 255 255;
+    --color-surface-elevated: 249 250 251; /* gray-50 */
+
+    /* Borders */
+    --color-border: 229 231 235;         /* gray-200 */
+    --color-border-input: 209 213 219;   /* gray-300 */
+
+    /* Text */
+    --color-text-primary: 17 24 39;      /* gray-900 */
+    --color-text-secondary: 55 65 81;    /* gray-700 */
+    --color-text-tertiary: 107 114 128;  /* gray-500 */
+
+    /* Focus ring */
+    --color-ring-focus: 162 210 185;     /* #A2D2B9 */
+  }
+
+  .dark {
+    /* Surfaces */
+    --color-surface: 31 41 55;           /* gray-800 */
+    --color-surface-elevated: 55 65 81;  /* gray-700 */
+
+    /* Borders */
+    --color-border: 55 65 81;            /* gray-700 */
+    --color-border-input: 75 85 99;      /* gray-600 */
+
+    /* Text */
+    --color-text-primary: 249 250 251;   /* gray-50  */
+    --color-text-secondary: 209 213 219; /* gray-300 */
+    --color-text-tertiary: 156 163 175;  /* gray-400 */
+  }
+}
+
 /* Over-Engineered Animations for Meet Someone New Feature */
 @layer utilities {
   /* Custom keyframe animations */
@@ -43,11 +100,11 @@
   }
 
   @keyframes pulseGlow {
-    0%, 100% { 
-      box-shadow: 0 0 5px rgba(24, 87, 87, 0.5); 
+    0%, 100% {
+      box-shadow: 0 0 5px rgb(var(--color-primary) / 0.5);
     }
-    50% { 
-      box-shadow: 0 0 20px rgba(24, 87, 87, 0.8); 
+    50% {
+      box-shadow: 0 0 20px rgb(var(--color-primary) / 0.8);
     }
   }
 
@@ -151,31 +208,31 @@
   /* Focus styles for keyboard navigation - using inset box-shadow to stay within bounds */
   *:focus {
     outline: none;
-    box-shadow: inset 0 0 0 2px #A2D2B9;
+    box-shadow: inset 0 0 0 2px rgb(var(--color-ring-focus));
     position: relative;
   }
-  
+
   /* Dark mode focus rings - better visibility */
   .dark *:focus {
-    box-shadow: inset 0 0 0 2px #A2D2B9;
+    box-shadow: inset 0 0 0 2px rgb(var(--color-ring-focus));
   }
-  
+
   /* Focus-visible for better UX */
   *:focus-visible {
     outline: none;
-    box-shadow: inset 0 0 0 2px #A2D2B9;
+    box-shadow: inset 0 0 0 2px rgb(var(--color-ring-focus));
     position: relative;
   }
-  
+
   /* Alternative focus ring using box-shadow for better visibility */
   .focus-ring-shadow:focus {
     outline: none;
-    box-shadow: inset 0 0 0 2px #A2D2B9, 0 0 0 2px rgba(162, 210, 185, 0.5);
+    box-shadow: inset 0 0 0 2px rgb(var(--color-ring-focus)), 0 0 0 2px rgb(var(--color-ring-focus) / 0.5);
   }
-  
+
   .focus-ring-shadow:focus-visible {
     outline: none;
-    box-shadow: inset 0 0 0 2px #A2D2B9, 0 0 0 2px rgba(162, 210, 185, 0.5);
+    box-shadow: inset 0 0 0 2px rgb(var(--color-ring-focus)), 0 0 0 2px rgb(var(--color-ring-focus) / 0.5);
   }
   
   /* Container that ensures focus elements stay within bounds */
@@ -194,13 +251,13 @@
   
   .focus-contained:focus {
     outline: none;
-    box-shadow: inset 0 0 0 2px #A2D2B9;
+    box-shadow: inset 0 0 0 2px rgb(var(--color-ring-focus));
   }
   
   /* For elements that need external focus ring but contained */
   .focus-contained-external:focus {
     outline: none;
-    box-shadow: 0 0 0 2px #A2D2B9;
+    box-shadow: 0 0 0 2px rgb(var(--color-ring-focus));
     /* Ensure the element itself doesn't grow beyond container */
     max-width: 100%;
     max-height: 100%;
@@ -228,7 +285,7 @@
     position: absolute;
     top: -40px;
     left: 6px;
-    background: #185757;
+    background: rgb(var(--color-primary));
     color: white;
     padding: 8px;
     text-decoration: none;
@@ -351,7 +408,7 @@
   /* Enhanced mobile form styles */
   .mobile-form-input {
     @apply w-full px-4 py-3 border border-gray-300 dark:border-gray-500 rounded-lg;
-    @apply focus:ring-2 focus:ring-[#A2D2B9] focus:border-transparent;
+    @apply focus:ring-2 focus:ring-accent focus:border-transparent;
     @apply dark:bg-gray-700 dark:text-white;
     @apply transition-all duration-200;
     @apply touch-target;
@@ -372,9 +429,9 @@
   }
   
   .mobile-btn-primary {
-    @apply mobile-btn bg-[#185757] text-white;
-    @apply hover:bg-[#0f3a3b] focus:ring-[#A2D2B9];
-    @apply active:bg-[#0f3a3b];
+    @apply mobile-btn bg-primary text-white;
+    @apply hover:bg-primary-hover focus:ring-accent;
+    @apply active:bg-primary-hover;
   }
   
   .mobile-btn-secondary {
@@ -399,7 +456,7 @@
   .mobile-nav-item {
     @apply block px-4 py-3 rounded-lg text-base font-medium;
     @apply transition-all duration-200 touch-target touch-feedback;
-    @apply focus:outline-none focus:ring-2 focus:ring-[#A2D2B9];
+    @apply focus:outline-none focus:ring-2 focus:ring-accent;
   }
   
   /* Mobile grid layouts */
@@ -474,7 +531,7 @@
   /* Mobile search and filter improvements */
   .mobile-search-input {
     @apply w-full px-4 py-3 pl-10 border border-gray-300 dark:border-gray-500;
-    @apply rounded-lg focus:ring-2 focus:ring-[#A2D2B9] focus:border-transparent;
+    @apply rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent;
     @apply dark:bg-gray-700 dark:text-white;
     @apply transition-all duration-200;
     font-size: 16px;
@@ -511,7 +568,7 @@
   
   /* Mobile navigation arrows */
   .mobile-nav-arrow {
-    @apply w-4 h-4 text-[#185757] dark:text-[#A2D2B9];
+    @apply w-4 h-4 text-primary dark:text-accent;
     @apply group-hover:translate-x-1 transition-transform;
   }
   
@@ -808,7 +865,7 @@
   
   /* Loading spinner */
   .loading-spinner {
-    @apply animate-spin rounded-full border-2 border-gray-300 border-t-[#185757];
+    @apply animate-spin rounded-full border-2 border-gray-300 border-t-primary;
   }
   
   /* Progressive loading */
@@ -865,7 +922,7 @@
     @apply bg-white dark:bg-gray-700;
     @apply text-gray-900 dark:text-white;
     @apply placeholder-gray-500 dark:placeholder-gray-400;
-    @apply focus:outline-none focus:ring-2 focus:ring-[#A2D2B9] focus:border-transparent;
+    @apply focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent;
     @apply transition-colors duration-200;
   }
   
@@ -894,9 +951,9 @@
   
   .btn-primary {
     @apply btn-base;
-    @apply bg-[#185757] hover:bg-[#0f3a3b] active:bg-[#0f3a3b];
+    @apply bg-primary hover:bg-primary-hover active:bg-primary-hover;
     @apply text-white;
-    @apply focus:ring-[#A2D2B9];
+    @apply focus:ring-accent;
   }
   
   .btn-secondary {
@@ -987,8 +1044,8 @@
   
   .badge-primary {
     @apply badge-base;
-    @apply bg-[#A2D2B9] text-[#185757];
-    @apply dark:bg-[#185757] dark:text-[#A2D2B9];
+    @apply bg-accent text-primary;
+    @apply dark:bg-primary dark:text-accent;
   }
   
   .badge-success {
@@ -1078,7 +1135,7 @@
 
   .pagination-btn-active {
     @apply px-3 py-1 text-sm border rounded-md;
-    @apply bg-[#185757] text-white border-[#185757];
+    @apply bg-primary text-white border-primary;
   }
 
   /* Detail Section */

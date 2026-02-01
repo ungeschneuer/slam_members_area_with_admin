@@ -241,7 +241,7 @@ export default function AdminCountdown() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#185757]"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     );
   }
@@ -347,7 +347,7 @@ export default function AdminCountdown() {
                 type="text"
                 id="title"
                 {...register('title')}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#A2D2B9] focus:border-[#185757] dark:bg-gray-700 dark:text-white"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-accent focus:border-primary dark:bg-gray-700 dark:text-white"
                 placeholder="Countdown zum SLAM25"
               />
             </div>
@@ -360,7 +360,7 @@ export default function AdminCountdown() {
                 type="text"
                 id="subtitle"
                 {...register('subtitle')}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#A2D2B9] focus:border-[#185757] dark:bg-gray-700 dark:text-white"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-accent focus:border-primary dark:bg-gray-700 dark:text-white"
                 placeholder="28. Oktober 2025 • 12:00 Uhr (Berlin Zeit)"
               />
             </div>
@@ -395,7 +395,7 @@ export default function AdminCountdown() {
                 type="text"
                 id="button_text"
                 {...register('button_text')}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#A2D2B9] focus:border-[#185757] dark:bg-gray-700 dark:text-white"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-accent focus:border-primary dark:bg-gray-700 dark:text-white"
                 placeholder="Zum Zeitplan"
               />
             </div>
@@ -408,7 +408,7 @@ export default function AdminCountdown() {
                 type="text"
                 id="button_emoji"
                 {...register('button_emoji')}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#A2D2B9] focus:border-[#185757] dark:bg-gray-700 dark:text-white"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-accent focus:border-primary dark:bg-gray-700 dark:text-white"
                 placeholder="📅"
               />
             </div>
@@ -421,7 +421,7 @@ export default function AdminCountdown() {
                 type="text"
                 id="button_link"
                 {...register('button_link')}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#A2D2B9] focus:border-[#185757] dark:bg-gray-700 dark:text-white"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-accent focus:border-primary dark:bg-gray-700 dark:text-white"
                 placeholder="/timetable"
               />
             </div>
@@ -453,7 +453,7 @@ export default function AdminCountdown() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="px-6 py-2 bg-[#185757] text-white rounded-lg hover:bg-[#0f3a3b] focus:ring-2 focus:ring-[#A2D2B9] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover focus:ring-2 focus:ring-accent focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {isSubmitting ? 'Saving...' : 'Save Configuration'}
           </button>

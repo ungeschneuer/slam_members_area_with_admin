@@ -88,9 +88,9 @@ const Navigation = React.memo(function Navigation() {
 
   if (!configLoaded) {
     return (
-      <div className="min-h-screen bg-[#E7EFE4] dark:bg-gray-900 flex items-center justify-center">
+      <div className="min-h-screen bg-cream dark:bg-gray-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#185757] mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-gray-600 dark:text-gray-400">Lade Konfiguration...</p>
         </div>
       </div>
@@ -129,7 +129,7 @@ const Navigation = React.memo(function Navigation() {
           <div className="flex items-center">
             <Link 
               to="/" 
-              className="flex items-center space-x-3 hover:opacity-80 transition-opacity focus:outline-none focus:ring-2 focus:ring-[#A2D2B9] focus:ring-offset-2 rounded-lg"
+              className="flex items-center space-x-3 hover:opacity-80 transition-opacity focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 rounded-lg"
               aria-label="SLAM25 - Zur Startseite"
             >
               <div className="w-10 h-10 flex items-center justify-center" aria-hidden="true">
@@ -155,9 +155,9 @@ const Navigation = React.memo(function Navigation() {
               <Link
                 key={area}
                 to={areaPaths[area]}
-                className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#A2D2B9] focus:ring-offset-2 ${
+                className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 ${
                   isActive(areaPaths[area])
-                    ? 'bg-[#185757] text-white shadow-md'
+                    ? 'bg-primary text-white shadow-md'
                     : 'text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'
                 }`}
                 role="menuitem"
@@ -167,14 +167,14 @@ const Navigation = React.memo(function Navigation() {
               </Link>
             ))}
             {isAdmin && (
-              <Link to="/admin" aria-label="Admin angemeldet - zum Admin-Dashboard wechseln" data-testid="admin-indicator" className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-[#185757] text-white dark:bg-[#A2D2B9] dark:text-gray-900 hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[#A2D2B9] focus:ring-offset-2">
+              <Link to="/admin" aria-label="Admin angemeldet - zum Admin-Dashboard wechseln" data-testid="admin-indicator" className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-primary text-white dark:bg-accent dark:text-gray-900 hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2">
                 Admin
               </Link>
             )}
             <button
               type="button"
               onClick={toggleTheme}
-              className="p-2 rounded-lg text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#A2D2B9] focus:ring-offset-2"
+              className="p-2 rounded-lg text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2"
               title={`Wechsel zu ${theme === 'light' ? 'dunklem' : 'hellem'} Modus`}
               aria-label={`Zu ${theme === 'light' ? 'dunklem' : 'hellem'} Modus wechseln`}
             >
@@ -185,14 +185,14 @@ const Navigation = React.memo(function Navigation() {
           {/* Right side actions (mobile and tablet) */}
           <div className="lg:hidden flex items-center space-x-2">
             {isAdmin && (
-              <Link to="/admin" aria-label="Admin angemeldet - zum Admin-Dashboard wechseln" data-testid="admin-indicator" className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-[#185757] text-white dark:bg-[#A2D2B9] dark:text-gray-900 hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[#A2D2B9] focus:ring-offset-2">
+              <Link to="/admin" aria-label="Admin angemeldet - zum Admin-Dashboard wechseln" data-testid="admin-indicator" className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-primary text-white dark:bg-accent dark:text-gray-900 hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2">
                 Admin
               </Link>
             )}
             <button
               type="button"
               onClick={toggleTheme}
-              className="p-2 rounded-lg text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#A2D2B9] focus:ring-offset-2"
+              className="p-2 rounded-lg text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2"
               title={`Wechsel zu ${theme === 'light' ? 'dunklem' : 'hellem'} Modus`}
               aria-label={`Zu ${theme === 'light' ? 'dunklem' : 'hellem'} Modus wechseln`}
             >
@@ -202,7 +202,7 @@ const Navigation = React.memo(function Navigation() {
               type="button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               onKeyDown={handleKeyDown}
-              className="p-2 rounded-lg text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200 touch-target touch-feedback focus:outline-none focus:ring-2 focus:ring-[#A2D2B9] focus:ring-offset-2"
+              className="p-2 rounded-lg text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200 touch-target touch-feedback focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2"
               aria-label={mobileMenuOpen ? "Menü schließen" : "Menü öffnen"}
               aria-expanded={mobileMenuOpen}
               aria-controls="mobile-menu"
@@ -234,7 +234,7 @@ const Navigation = React.memo(function Navigation() {
                   onClick={() => setMobileMenuOpen(false)}
                   className={`mobile-nav-item ${
                     isActive(areaPaths[area])
-                      ? 'bg-[#185757] text-white shadow-md'
+                      ? 'bg-primary text-white shadow-md'
                       : 'text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'
                   }`}
                   role="menuitem"
@@ -243,7 +243,7 @@ const Navigation = React.memo(function Navigation() {
                   <div className="flex items-center justify-between">
                     <span className="mobile-text-base">{area}</span>
                     {isActive(areaPaths[area]) && (
-                      <span className="text-[#A2D2B9]" aria-hidden="true">✓</span>
+                      <span className="text-accent" aria-hidden="true">✓</span>
                     )}
                   </div>
                 </Link>
@@ -269,7 +269,7 @@ function App() {
         <UIProvider>
           <ToastProvider>
             <Router>
-              <div className="min-h-screen bg-[#E7EFE4] dark:bg-gray-900">
+              <div className="min-h-screen bg-cream dark:bg-gray-900">
                 <UserPasswordGate>
                   <Navigation />
                   <BreakingNews />

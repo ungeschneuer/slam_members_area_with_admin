@@ -95,7 +95,7 @@ export function LoadingMessage({ message = 'Lädt...', className = '' }) {
   return (
     <div className={`loading-state rounded-lg p-4 ${className}`}>
       <div className="flex items-center space-x-3">
-        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#185757]"></div>
+        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
         <p className="loading-message">{message}</p>
       </div>
     </div>
@@ -123,7 +123,7 @@ export function InfoMessage({ message, onDismiss, className = '' }) {
         {onDismiss && (
           <button
             onClick={onDismiss}
-            className="text-[#185757] dark:text-[#A2D2B9] hover:text-[#0f3a3b] dark:hover:text-[#8BC4A3] focus-contained p-1 rounded min-w-[24px] min-h-[24px] flex items-center justify-center"
+            className="text-primary dark:text-accent hover:text-primary-hover dark:hover:text-accent-hover focus-contained p-1 rounded min-w-[24px] min-h-[24px] flex items-center justify-center"
             aria-label="Nachricht schließen"
           >
             ✕
