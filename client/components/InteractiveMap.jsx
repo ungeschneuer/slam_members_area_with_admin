@@ -378,7 +378,7 @@ export default function InteractiveMap({ locations, onLocationClick, selectedLoc
               const map = mapInstanceRef.current;
               // Reset to default view showing all locations
               if (locations && locations.length > 0) {
-                const bounds = L.latLngBounds(locations.map(loc => [loc.coordinates?.lat || loc.latitude, loc.coordinates?.lng || loc.longitude]));
+                const bounds = L.latLngBounds(locations.map(loc => [loc.coordinates.lat, loc.coordinates.lng]));
                 map.fitBounds(bounds, { padding: [20, 20] });
               } else {
                 // Fallback to Chemnitz center
