@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useError } from './useError.js';
+import logger from '../services/logger.js';
 
 /**
  * useFormManager Hook
@@ -47,9 +48,9 @@ export function useFormManager(schema, options = {}) {
     try {
       // CRITICAL FIX: Explicitly validate and show errors
       const isValid = await form.trigger();
-      console.log('[useFormManager] Form validation:', { 
-        isValid, 
-        errors: form.formState.errors 
+      logger.debug('[useFormManager] Form validation:', {
+        isValid,
+        errors: form.formState.errors
       });
       
       if (!isValid) {
@@ -63,7 +64,7 @@ export function useFormManager(schema, options = {}) {
       await form.handleSubmit(onSubmit)();
       setIsDirty(false);
     } catch (err) {
-      console.error('[useFormManager] Submission error:', err);
+      logger.error('[useFormManager] Submission error:', { error: err.message });
       handleError(err, { context: 'form_submission', ...context });
     } finally {
       setIsSubmitting(false);

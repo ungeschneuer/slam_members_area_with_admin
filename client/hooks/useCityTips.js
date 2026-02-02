@@ -65,6 +65,7 @@ export function useCityTipBySlug(slug) {
       const response = await fetch(`${API_URL}/city-tips/${slug}`, {
         credentials: 'include'
       });
+      if (response.status === 404) return null;
       if (!response.ok) {
         throw new Error(`Failed to fetch city tip: ${response.statusText}`);
       }

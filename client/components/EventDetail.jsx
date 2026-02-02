@@ -258,7 +258,7 @@ export default function EventDetail() {
           
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-8">
             <div className="flex items-start space-x-4">
-              <div className={`w-16 h-16 bg-${getContentTypeGradient('event')} rounded-full flex items-center justify-center text-white text-2xl font-bold`}>
+              <div className={`w-16 h-16 ${getContentTypeGradient('event')} rounded-full flex items-center justify-center text-white text-2xl font-bold`}>
                 {getContentTypeIcon('event')}
               </div>
               <div className="flex-1">

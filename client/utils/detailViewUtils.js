@@ -104,15 +104,16 @@ export const getContentTypeIcon = (type) => {
   return icons[type] || '📄';
 };
 
-// Get Tailwind gradient classes for content type
+// Get Tailwind background color classes for content type
+// Returns full class names so Tailwind JIT can detect them at build time
 export const getContentTypeGradient = (type) => {
   const gradients = {
-    'participant': 'blue-500',
-    'team': 'blue-500',
-    'round': 'purple-500',
-    'news': 'blue-500',
-    'cityTip': 'blue-500',
-    'event': 'blue-500'
+    'participant': 'bg-blue-500',
+    'team': 'bg-blue-500',
+    'round': 'bg-purple-500',
+    'news': 'bg-blue-500',
+    'cityTip': 'bg-blue-500',
+    'event': 'bg-blue-500'
   };
-  return gradients[type] || 'gray-500';
+  return gradients[type] || 'bg-gray-500';
 };

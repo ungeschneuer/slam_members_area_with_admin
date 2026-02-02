@@ -139,14 +139,21 @@ export default function InteractiveMap({ locations, onLocationClick, selectedLoc
           { icon: createCustomIcon(location.category) }
         );
 
-        // Add popup with location info
+        // Add popup with location info (escape HTML to prevent XSS)
+        const escapeHtml = (str) => {
+          if (!str) return '';
+          return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+        };
+        const safeName = escapeHtml(location.name) || 'Unbekannter Ort';
+        const safeAddress = escapeHtml(location.address) || '';
+        const safeSlug = encodeURIComponent(location.slug || location.id);
         const popupContent = `
           <div style="min-width: 160px; max-width: 220px;">
-            <h3 style="margin: 0 0 6px 0; font-weight: bold; color: #1f2937; font-size: 16px;">${location.name || 'Unbekannter Ort'}</h3>
-            <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 13px;">${location.address || ''}</p>
+            <h3 style="margin: 0 0 6px 0; font-weight: bold; color: #1f2937; font-size: 16px;">${safeName}</h3>
+            <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 13px;">${safeAddress}</p>
             <div style="display: flex; justify-content: flex-end; align-items: center;">
-              <button 
-                onclick="window.location.href='/city-tips/${location.slug || location.id}'"
+              <button
+                onclick="window.location.href='/city-tips/${safeSlug}'"
                 style="
                   padding: 4px 8px;
                   background-color: #3b82f6;
@@ -371,7 +378,7 @@ export default function InteractiveMap({ locations, onLocationClick, selectedLoc
               const map = mapInstanceRef.current;
               // Reset to default view showing all locations
               if (locations && locations.length > 0) {
-                const bounds = L.latLngBounds(locations.map(loc => [loc.latitude, loc.longitude]));
+                const bounds = L.latLngBounds(locations.map(loc => [loc.coordinates?.lat || loc.latitude, loc.coordinates?.lng || loc.longitude]));
                 map.fitBounds(bounds, { padding: [20, 20] });
               } else {
                 // Fallback to Chemnitz center

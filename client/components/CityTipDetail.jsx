@@ -203,7 +203,7 @@ const CityTipDetail = () => {
           {/* Header with actions */}
           <div className="p-8 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-start space-x-4">
-              <div className={`w-16 h-16 bg-${getContentTypeGradient('cityTip')} rounded-full flex items-center justify-center text-white text-2xl font-bold shadow-lg`}>
+              <div className={`w-16 h-16 ${getContentTypeGradient('cityTip')} rounded-full flex items-center justify-center text-white text-2xl font-bold shadow-lg`}>
                 {getCategoryIcon(cityTip.category, 'cityTip')}
               </div>
               <div className="flex-1">
