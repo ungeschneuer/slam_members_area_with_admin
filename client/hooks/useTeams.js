@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { API_URL } from '../config/api.js';
 import { getQueryConfig } from '../config/polling.js';
+import authService from '../services/authService.js';
 import logger from '../services/logger.js';
 import { useToast } from '../contexts/ToastContext.jsx';
 
@@ -107,18 +108,14 @@ export const useCreateTeam = () => {
     networkMode: 'always', // Execute even when offline to show proper error messages
     mutationFn: async (teamData) => {
       try {
-        const response = await fetch(`${API_URL}/teams`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include',
-          body: JSON.stringify(teamData),
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to create team');
-        }
+        const response = await authService.authenticatedRequest(
+          `${API_URL}/teams`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(teamData),
+          }
+        );
 
         const result = await response.json().catch(() => {
           throw new Error('Ungültige Serverantwort');
@@ -135,7 +132,7 @@ export const useCreateTeam = () => {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(['teams']);
+      queryClient.invalidateQueries({ queryKey: ['teams'] });
     },
     onError: (error) => {
       logger.error('Create team mutation error', { error: error.message });
@@ -153,18 +150,14 @@ export const useUpdateTeam = () => {
     networkMode: 'always', // Execute even when offline to show proper error messages
     mutationFn: async ({ teamId, teamData }) => {
       try {
-        const response = await fetch(`${API_URL}/teams/${teamId}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include',
-          body: JSON.stringify(teamData),
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to update team');
-        }
+        const response = await authService.authenticatedRequest(
+          `${API_URL}/teams/${teamId}`,
+          {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(teamData),
+          }
+        );
 
         const result = await response.json().catch(() => {
           throw new Error('Ungültige Serverantwort');
@@ -181,8 +174,8 @@ export const useUpdateTeam = () => {
       }
     },
     onSuccess: (data, variables) => {
-      queryClient.invalidateQueries(['teams']);
-      queryClient.invalidateQueries(['teams', variables.teamId]);
+      queryClient.invalidateQueries({ queryKey: ['teams'] });
+      queryClient.invalidateQueries({ queryKey: ['teams', variables.teamId] });
     },
     onError: (error) => {
       logger.error('Update team mutation error', { error: error.message });
@@ -200,33 +193,20 @@ export const useDeleteTeam = () => {
     networkMode: 'always', // Execute even when offline to show proper error messages
     mutationFn: async (teamId) => {
       try {
-        const response = await fetch(`${API_URL}/teams/${teamId}`, {
-          method: 'DELETE',
-          credentials: 'include',
-        });
-
-        if (!response.ok) {
-          let bodyText = '';
-          try {
-            bodyText = await response.text();
-            const parsed = bodyText ? JSON.parse(bodyText) : {};
-            const err = new Error(parsed?.error || parsed?.message || `Failed to delete team (${response.status})`);
-            err.status = response.status;
-            if (parsed?.details) err.details = parsed.details;
-            throw err;
-          } catch (e) {
-            if (e instanceof SyntaxError) {
-              const err = new Error(`Failed to delete team (${response.status})`);
-              err.status = response.status;
-              throw err;
-            }
-            throw e;
+        const response = await authService.authenticatedRequest(
+          `${API_URL}/teams/${teamId}`,
+          {
+            method: 'DELETE',
           }
-        }
+        );
 
         const result = await response.json().catch(() => {
           throw new Error('Ungültige Serverantwort');
         });
+
+        if (!result.success && result.error) {
+          throw new Error(result.error);
+        }
 
         return result?.data || result;
       } catch (error) {
@@ -235,7 +215,7 @@ export const useDeleteTeam = () => {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(['teams']);
+      queryClient.invalidateQueries({ queryKey: ['teams'] });
     },
     onError: (error) => {
       logger.error('Delete team mutation error', { error: error.message });
@@ -253,18 +233,14 @@ export const useAddTeamMember = () => {
     networkMode: 'always', // Execute even when offline to show proper error messages
     mutationFn: async ({ teamId, participantId }) => {
       try {
-        const response = await fetch(`${API_URL}/teams/${teamId}/members`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include',
-          body: JSON.stringify({ participant_id: participantId }),
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to add team member');
-        }
+        const response = await authService.authenticatedRequest(
+          `${API_URL}/teams/${teamId}/members`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ participant_id: participantId }),
+          }
+        );
 
         const result = await response.json().catch(() => {
           throw new Error('Ungültige Serverantwort');
@@ -281,10 +257,10 @@ export const useAddTeamMember = () => {
       }
     },
     onSuccess: (data, variables) => {
-      queryClient.invalidateQueries(['teams']);
-      queryClient.invalidateQueries(['teams', variables.teamId]);
-      queryClient.invalidateQueries(['teams', variables.teamId, 'members']);
-      queryClient.invalidateQueries(['teams', 'participant', variables.participantId]);
+      queryClient.invalidateQueries({ queryKey: ['teams'] });
+      queryClient.invalidateQueries({ queryKey: ['teams', variables.teamId] });
+      queryClient.invalidateQueries({ queryKey: ['teams', variables.teamId, 'members'] });
+      queryClient.invalidateQueries({ queryKey: ['teams', 'participant', variables.participantId] });
     },
     onError: (error) => {
       logger.error('Add team member mutation error', { error: error.message });
@@ -302,14 +278,12 @@ export const useRemoveTeamMember = () => {
     networkMode: 'always', // Execute even when offline to show proper error messages
     mutationFn: async ({ teamId, participantId }) => {
       try {
-        const response = await fetch(`${API_URL}/teams/${teamId}/members/${participantId}`, {
-          method: 'DELETE',
-          credentials: 'include',
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to remove team member');
-        }
+        const response = await authService.authenticatedRequest(
+          `${API_URL}/teams/${teamId}/members/${participantId}`,
+          {
+            method: 'DELETE',
+          }
+        );
 
         const result = await response.json().catch(() => {
           throw new Error('Ungültige Serverantwort');
@@ -326,10 +300,10 @@ export const useRemoveTeamMember = () => {
       }
     },
     onSuccess: (data, variables) => {
-      queryClient.invalidateQueries(['teams']);
-      queryClient.invalidateQueries(['teams', variables.teamId]);
-      queryClient.invalidateQueries(['teams', variables.teamId, 'members']);
-      queryClient.invalidateQueries(['teams', 'participant', variables.participantId]);
+      queryClient.invalidateQueries({ queryKey: ['teams'] });
+      queryClient.invalidateQueries({ queryKey: ['teams', variables.teamId] });
+      queryClient.invalidateQueries({ queryKey: ['teams', variables.teamId, 'members'] });
+      queryClient.invalidateQueries({ queryKey: ['teams', 'participant', variables.participantId] });
     },
     onError: (error) => {
       logger.error('Remove team member mutation error', { error: error.message });

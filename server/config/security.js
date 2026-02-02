@@ -1,5 +1,6 @@
 // Security Configuration for SLAM25 Application
 import rateLimit from 'express-rate-limit';
+import crypto from 'crypto';
 
 // Rate limiting configurations
 export const rateLimitConfig = {
@@ -141,7 +142,7 @@ export const fileUploadConfig = {
 // Session security
 export const sessionConfig = {
   name: 'slam25.sid',
-  secret: process.env.SESSION_SECRET || 'slam25_session_secret_key_2025',
+  secret: process.env.SESSION_SECRET || (() => { console.warn('WARNING: SESSION_SECRET not set, using generated fallback. Set SESSION_SECRET in environment for production.'); return crypto.randomBytes(32).toString('hex'); })(),
   resave: false,
   saveUninitialized: false,
   rolling: true,

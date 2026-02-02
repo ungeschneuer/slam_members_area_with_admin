@@ -312,7 +312,7 @@ export function useDeleteBreakingNews() {
 
   return useMutation({
     networkMode: 'always', // Execute even when offline to show proper error messages
-    mutationFn: async (id) => {
+    mutationFn: async () => {
       try {
         const response = await authService.authenticatedRequest(
           `${API_URL}/breaking-news`,

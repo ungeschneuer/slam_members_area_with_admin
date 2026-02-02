@@ -470,7 +470,7 @@ export default function ParticipantDetail() {
                         </Link>
                       ) : (
                         <span className="inline-flex items-center px-3 py-1 text-sm text-gray-400 cursor-not-allowed">
-                          No Details Available
+                          Keine Details verfügbar
                         </span>
                       )}
                     </div>
@@ -566,7 +566,7 @@ export default function ParticipantDetail() {
                         to={`/teams/${team.slug}`}
                         className="inline-flex items-center px-3 py-1 text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
                       >
-                        View Team
+                        Team ansehen
                         <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                         </svg>
