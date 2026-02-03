@@ -1,8 +1,9 @@
 # Code Optimization Summary
 
 **Date:** 2026-02-03
-**Total Commits:** 9
-**Files Changed:** 22
+**Total Commits:** 10
+**Files Created:** 10
+**Files Changed:** 23
 
 ## Executive Summary
 
@@ -165,6 +166,41 @@ Implemented ETag-based caching for frequently polled endpoints.
 
 ---
 
+### 9. Component Refactoring: AdminTimetable
+**Impact:** 🟡 MEDIUM (Better maintainability)
+
+Refactored large AdminTimetable component by extracting inline sections into focused components.
+
+**Metrics:**
+- **File Size:** 1313 lines → 1067 lines (19% reduction)
+- **renderEventForm Function:** 323 lines → 73 lines (77% reduction)
+- **New Components:** 4 extracted components in timetable/ subdirectory
+
+**Files Created:**
+- `client/components/admin/timetable/TimetableParticipantSection.jsx`
+- `client/components/admin/timetable/TimetableLinksSection.jsx`
+- `client/components/admin/timetable/TimetableBasicInfo.jsx`
+- `client/components/admin/timetable/TimetableErrorDisplay.jsx`
+
+**Files Changed:**
+- `client/components/admin/AdminTimetable.jsx`
+
+**Technical Details:**
+- Extracted participant management into dedicated component
+- Extracted additional links section into dedicated component
+- Extracted basic information fields into dedicated component
+- Extracted error display logic into dedicated component
+- All components receive props for state and callbacks
+- Maintains same functionality with improved code organization
+
+**Benefits:**
+- Easier to maintain and test individual components
+- Better code organization and separation of concerns
+- Reduced cognitive load when reading the code
+- Reusable components for future features
+
+---
+
 ## 📊 Overall Impact Summary
 
 ### Security
@@ -208,26 +244,32 @@ Implemented ETag-based caching for frequently polled endpoints.
 7. ✅ Lazy-load Leaflet map component
 8. ✅ Add ETag support for API caching
 
+### Code Refactoring ✅
+9. ✅ Refactor AdminTimetable component (1313 lines → 1067 lines)
+
 ### Pending (Low Priority) ⏳
 - Implement CSRF protection (requires careful testing)
 - Add parseInt radix parameters throughout
 - Implement LRU cache for images
-- Refactor large components (AdminTimetable 1300+ lines)
 - Consider TypeScript migration
 
 ---
 
 ## 📁 Files Modified Summary
 
-### Created (5 files)
+### Created (10 files)
 - `client/hooks/useParticipantSearch.js`
 - `server/middleware/etag.js`
 - `database/migrations/20260203000001_add_critical_indexes.sql`
 - `database/migrations/20260203000001_add_critical_indexes_rollback.sql`
+- `client/components/admin/timetable/TimetableParticipantSection.jsx`
+- `client/components/admin/timetable/TimetableLinksSection.jsx`
+- `client/components/admin/timetable/TimetableBasicInfo.jsx`
+- `client/components/admin/timetable/TimetableErrorDisplay.jsx`
 - `docs/CODE_ANALYSIS_REPORT.md`
 - `docs/OPTIMIZATION_SUMMARY.md` (this file)
 
-### Modified (17 files)
+### Modified (18 files)
 - `.gitignore`
 - `server/services/timezoneService.js`
 - `client/utils/timezoneUtils.js`
@@ -235,6 +277,7 @@ Implemented ETag-based caching for frequently polled endpoints.
 - `server/routes/participants.routes.js`
 - `client/components/BreakingNews.jsx`
 - `client/components/admin/AdminParticipants.jsx`
+- `client/components/admin/AdminTimetable.jsx`
 - `client/components/CityTips.jsx`
 - `client/vite.config.js`
 - `server/server.js`

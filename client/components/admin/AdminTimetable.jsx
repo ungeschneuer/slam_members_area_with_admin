@@ -14,6 +14,10 @@ import { getRoundStatusColor } from "../../../shared/constants/categories.js";
 import ParticipantDropdown from './ParticipantDropdown.jsx';
 import { ADMIN_PARTICIPANTS_LIMIT } from '../../config/api.js';
 import { formatDateForDisplay, isValidDateString } from '../../utils/dateUtils.js';
+import TimetableParticipantSection from './timetable/TimetableParticipantSection.jsx';
+import TimetableLinksSection from './timetable/TimetableLinksSection.jsx';
+import TimetableBasicInfo from './timetable/TimetableBasicInfo.jsx';
+import TimetableErrorDisplay from './timetable/TimetableErrorDisplay.jsx';
 
 export default function AdminTimetable() {
   const { data: eventsData, isLoading: loadingEvents, error: errorEvents } = useTimetable({}, true); // isAdmin = true
@@ -795,292 +799,42 @@ export default function AdminTimetable() {
     const currentForm = form;
     const currentEvent = modalState.mode === 'create' ? null : editingEvent;
 
-      return (
+    return (
       <form onSubmit={form.handleSubmit(handleFormSubmit)}>
         <div className="space-y-6">
-        
-        {/* Form Validation Errors */}
-        {Object.keys(form.formState.errors).length > 0 && (
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg p-4" role="alert" aria-live="polite">
-            <h3 className="text-sm font-medium text-red-800 dark:text-red-200 mb-2">
-              Bitte korrigieren Sie die folgenden Fehler:
-            </h3>
-            <ul className="text-sm text-red-700 dark:text-red-300 space-y-1">
-              {Object.entries(form.formState.errors).map(([field, error]) => (
-                <li key={field}>
-                  <span className="font-medium">{field}:</span> {error.message}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-        
-        {/* Component Error Display */}
-        {componentError && (
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg p-4" role="alert" aria-live="polite">
-            <p className="text-sm text-red-700 dark:text-red-300">
-              {componentError.message || componentError}
-            </p>
-          </div>
-        )}
+          {/* Error Display Component */}
+          <TimetableErrorDisplay
+            formErrors={form.formState.errors}
+            componentError={componentError}
+            serverError={serverError}
+          />
 
-        {/* Server Error Display */}
-        {serverError && (
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg p-4" role="alert" aria-live="assertive">
-            <p className="text-sm text-red-700 dark:text-red-300">
-              {serverError}
-            </p>
-          </div>
-        )}
-        
-        {/* Helper text for required fields */}
-        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-          Felder mit <span className="text-red-500">*</span> sind Pflichtfelder
-        </p>
-        
-        {/* Basic Information */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Titel <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              aria-label="Titel"
-              aria-required="true"
-              {...form.register('title')}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Slug (URL-freundlich) <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              aria-label="Slug"
-              aria-required="true"
-              {...form.register('slug')}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-              placeholder="Wird automatisch generiert"
-            />
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Wird automatisch aus dem Titel generiert, kann aber manuell angepasst werden</p>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Ort <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              aria-label="Ort"
-              aria-required="true"
-              {...form.register('location')}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Datum <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="date"
-              aria-label="Datum"
-              aria-required="true"
-              {...form.register('date')}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-            />
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Startzeit <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="time"
-                aria-label="Startzeit"
-                aria-required="true"
-                {...form.register('time')}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Endzeit</label>
-              <input
-                type="time"
-                aria-label="Endzeit"
-                {...form.register('endTime')}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Typ</label>
-            <select
-              aria-label="Typ"
-              {...form.register('type')}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-            >
-              {eventTypes.map(type => (
-                <option key={type.value} value={type.value}>{type.label}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Status</label>
-            <select
-              aria-label="Status"
-              {...form.register('status')}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-            >
-              {statuses.map(status => (
-                <option key={status.value} value={status.value}>{status.label}</option>
-              ))}
-            </select>
-          </div>
-        </div>
+          {/* Basic Information Component */}
+          <TimetableBasicInfo
+            form={form}
+            eventTypes={eventTypes}
+            statuses={statuses}
+          />
 
-        {/* Descriptions */}
-        <div className="space-y-4">
-          <div>
-            <TextareaInput
-              label="Kurze Beschreibung"
-              name="description"
-              register={form.register}
-              errors={form.formState.errors}
-              placeholder="Kurze Beschreibung des Events..."
-              rows={3}
-              ariaLabel="Kurze Beschreibung"
-            />
-          </div>
-          <div>
-            <TextareaInput
-              label="Detaillierte Beschreibung"
-              name="detailedDescription"
-              register={form.register}
-              errors={form.formState.errors}
-              placeholder="Detaillierte Beschreibung mit allen wichtigen Informationen..."
-              rows={5}
-              ariaLabel="Detaillierte Beschreibung"
-            />
-          </div>
-        </div>
+          {/* Participants Component */}
+          <TimetableParticipantSection
+            availableParticipants={availableParticipants}
+            participantAssignments={participantAssignments}
+            selectedParticipant={selectedParticipant}
+            setSelectedParticipant={setSelectedParticipant}
+            onAddParticipant={handleAddParticipant}
+            onRemoveParticipant={removeParticipant}
+            loadingParticipants={loadingParticipants}
+          />
 
-        {/* Participants */}
-        {/* Participants Section */}
-        <div>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Teilnehmer*innen</h3>
-          
-          {/* Add Participant Box */}
-          <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 mb-4">
-            <h5 className="font-medium text-gray-800 dark:text-gray-200 mb-3">Teilnehmer*in hinzufügen</h5>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <ParticipantDropdown
-                  items={availableParticipants}
-                  value={selectedParticipant}
-                  onChange={(value) => setSelectedParticipant(value)}
-                  placeholder="Teilnehmer*in wählen..."
-                  searchPlaceholder="Suchen..."
-                  label="Teilnehmer*in auswählen"
-                  disabled={loadingParticipants}
-                  loading={loadingParticipants}
-                  filterFn={(p) => !participantAssignments.some(ep => ep.participantId === p.id)}
-                  searchThreshold={8}
-                />
-              </div>
-              
-              <div className="flex items-end">
-                <button
-                  type="button"
-                  onClick={handleAddParticipant}
-                  className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={!selectedParticipant}
-                >
-                  Hinzufügen
-                </button>
-              </div>
-            </div>
-          </div>
-          
-          {/* Assigned Participants List */}
-          {participantAssignments.length > 0 && (
-            <div className="space-y-2">
-              {participantAssignments.map((participant, index) => {
-                const participantData = availableParticipants.find(p => p.id === participant.participantId);
-                return (
-                  <div key={`participant-${participant.participantId}-${index}`} className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg">
-                    <span className="text-gray-900 dark:text-white">
-                      {participantData?.name || participant.name || 'Unbekannt'}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => removeParticipant(index)}
-                      className="px-3 py-1 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
-                    >
-                      Entfernen
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-          
-          {participantAssignments.length === 0 && (
-            <div className="text-center py-4 text-gray-500 dark:text-gray-400">
-              <p>Noch keine Teilnehmer*innen zugewiesen</p>
-            </div>
-          )}
-        </div>
-
-        {/* Additional Links */}
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Zusätzliche Links</h3>
-            <button
-              type="button"
-              onClick={() => appendLink({ type: linkTypes[0]?.value || '', title: '', url: '' })}
-              className="min-h-[44px] px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors touch-manipulation active:scale-95"
-            >
-              Link hinzufügen
-            </button>
-          </div>
-          
-        {linkFields.map((link, index) => (
-          <div key={`timetable-link-${link.id || `new-${index}`}`} className="flex items-center space-x-3 mb-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-            <select
-              {...form.register(`additionalLinks.${index}.type`)}
-              aria-label="Link-Typ"
-              className="w-32 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-            >
-              {linkTypes.map(type => (
-                <option key={type.value} value={type.value}>{type.label}</option>
-              ))}
-            </select>
-            <input
-              type="text"
-              placeholder="Titel"
-              aria-label="Link-Titel"
-              {...form.register(`additionalLinks.${index}.title`)}
-              className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-            />
-            <input
-              type="url"
-              placeholder="URL"
-              aria-label="Link-URL"
-              {...form.register(`additionalLinks.${index}.url`)}
-              className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-            />
-            <button
-              type="button"
-              onClick={() => removeLinkRHF(index)}
-              className="min-h-[44px] min-w-[44px] px-3 py-2 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 focus-contained rounded flex items-center justify-center touch-manipulation active:scale-95"
-            >
-              ✕
-            </button>
-          </div>
-        ))}
-        </div>
+          {/* Additional Links Component */}
+          <TimetableLinksSection
+            linkFields={linkFields}
+            linkTypes={linkTypes}
+            form={form}
+            onAppendLink={appendLink}
+            onRemoveLink={removeLinkRHF}
+          />
         </div>
 
         {/* Form Actions */}
