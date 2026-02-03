@@ -326,7 +326,7 @@ export default function AdminNewsEdit() {
             <button
               type="submit"
               disabled={updateNewsMutation.isPending || isSubmitting}
-              className="px-6 py-3 bg-[#185757] text-white rounded-lg hover:bg-[#1a6666] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+              className="px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
             >
               {updateNewsMutation.isPending || isSubmitting ? 'Speichern...' : 'Änderungen speichern'}
             </button>

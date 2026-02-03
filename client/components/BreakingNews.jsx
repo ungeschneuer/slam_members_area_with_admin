@@ -69,7 +69,7 @@ const BreakingNews = () => {
   }
 
   return (
-    <div className="bg-[#185757] dark:bg-[#A2D2B9] text-white dark:text-gray-900 shadow-lg mb-8">
+    <div className="bg-primary dark:bg-accent text-white dark:text-gray-900 shadow-lg mb-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Mobile Layout */}
         <div className="block sm:hidden py-3">

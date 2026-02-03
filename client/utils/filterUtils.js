@@ -263,7 +263,7 @@ export function getRoleBasedColors(item) {
   if (item.type === 'team') {
     return {
       bg: 'bg-blue-50 dark:bg-blue-900/20',
-      border: 'border-[#185757]/30 dark:border-[#185757]/50',
+      border: 'border-primary/30 dark:border-primary/50',
       text: 'text-blue-900 dark:text-blue-100'
     };
   }
@@ -310,12 +310,12 @@ export function getRoleBasedColors(item) {
     },
     'Organisator*in': {
       bg: 'bg-indigo-50 dark:bg-indigo-900/20',
-      border: 'border-[#185757]/30 dark:border-[#185757]/50',
+      border: 'border-primary/30 dark:border-primary/50',
       text: 'text-indigo-900 dark:text-indigo-100'
     },
     'Moderator*in': {
       bg: 'bg-pink-50 dark:bg-pink-900/20',
-      border: 'border-[#185757]/30 dark:border-[#185757]/50',
+      border: 'border-primary/30 dark:border-primary/50',
       text: 'text-pink-900 dark:text-pink-100'
     },
     'Techniker*in': {
@@ -330,7 +330,7 @@ export function getRoleBasedColors(item) {
     },
     'Videograf*in': {
       bg: 'bg-cyan-50 dark:bg-cyan-900/20',
-      border: 'border-[#185757]/30 dark:border-[#185757]/50',
+      border: 'border-primary/30 dark:border-primary/50',
       text: 'text-cyan-900 dark:text-cyan-100'
     },
     'Feature Artist': {

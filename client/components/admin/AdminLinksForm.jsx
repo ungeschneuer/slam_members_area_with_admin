@@ -153,7 +153,7 @@ export default function AdminLinksForm() {
               <input
                 type="text"
                 {...register('title')}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#185757] focus:border-transparent dark:bg-gray-700 dark:text-white"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-700 dark:text-white"
                 placeholder="Link-Titel"
               />
               {errors.title && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.title.message}</p>}
@@ -166,7 +166,7 @@ export default function AdminLinksForm() {
               <input
                 type="url"
                 {...register('url')}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#185757] focus:border-transparent dark:bg-gray-700 dark:text-white"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-700 dark:text-white"
                 placeholder="https://..."
               />
               {errors.url && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.url.message}</p>}
@@ -181,7 +181,7 @@ export default function AdminLinksForm() {
             <textarea
               {...register('description')}
               rows={3}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#185757] focus:border-transparent dark:bg-gray-700 dark:text-white"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-700 dark:text-white"
               placeholder="Kurze Beschreibung des Links..."
             />
             {errors.description && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.description.message}</p>}
@@ -197,7 +197,7 @@ export default function AdminLinksForm() {
                 <input
                   type="text"
                   {...register('icon')}
-                  className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#185757] focus:border-transparent dark:bg-gray-700 dark:text-white"
+                  className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-700 dark:text-white"
                   placeholder="🔗"
                   maxLength={10}
                 />
@@ -214,7 +214,7 @@ export default function AdminLinksForm() {
               </label>
               <select
                 {...register('category')}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#185757] focus:border-transparent dark:bg-gray-700 dark:text-white"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-700 dark:text-white"
               >
                 {categoryOptions.map((cat) => (
                   <option key={cat} value={cat}>
@@ -231,7 +231,7 @@ export default function AdminLinksForm() {
               </label>
               <select
                 {...register('color')}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#185757] focus:border-transparent dark:bg-gray-700 dark:text-white"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-700 dark:text-white"
               >
                 {colorOptions.map((color) => (
                   <option key={color.value} value={color.value}>
@@ -257,7 +257,7 @@ export default function AdminLinksForm() {
             <input
               type="number"
               {...register('sort_order')}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#185757] focus:border-transparent dark:bg-gray-700 dark:text-white"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-700 dark:text-white"
               placeholder="0"
             />
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
@@ -273,7 +273,7 @@ export default function AdminLinksForm() {
                 type="checkbox"
                 id="is_external"
                 {...register('is_external')}
-                className="h-4 w-4 text-[#185757] focus:ring-[#185757] border-gray-300 rounded"
+                className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
               />
               <label htmlFor="is_external" className="ml-2 block text-sm text-gray-900 dark:text-gray-300">
                 Externer Link (öffnet in neuem Tab)
@@ -285,7 +285,7 @@ export default function AdminLinksForm() {
                 type="checkbox"
                 id="is_active"
                 {...register('is_active')}
-                className="h-4 w-4 text-[#185757] focus:ring-[#185757] border-gray-300 rounded"
+                className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
               />
               <label htmlFor="is_active" className="ml-2 block text-sm text-gray-900 dark:text-gray-300">
                 Link ist aktiv (sichtbar für Benutzer)
@@ -298,7 +298,7 @@ export default function AdminLinksForm() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-6 py-3 bg-[#185757] text-white rounded-lg hover:bg-[#1a6666] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+              className="px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
             >
               {isSubmitting ? 'Speichern...' : (isEditMode ? 'Änderungen speichern' : 'Link erstellen')}
             </button>

@@ -124,9 +124,9 @@ export default function ConsolidatedAdminTable({
     <div className={`bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 ${className}`}>
       {/* Bulk Actions */}
       {bulkActions && selectedRows.length > 0 && (
-        <div className="px-4 py-3 bg-[#A2D2B9]/20 dark:bg-[#185757]/30 border-b border-[#185757]/30 dark:border-[#185757]/50">
+        <div className="px-4 py-3 bg-accent/20 dark:bg-primary/30 border-b border-primary/30 dark:border-primary/50">
           <div className="flex items-center justify-between">
-            <span className="text-sm text-[#185757] dark:text-[#A2D2B9]">
+            <span className="text-sm text-primary dark:text-accent">
               {selectedRows.length} Element(e) ausgewählt
             </span>
             <div className="flex flex-wrap gap-3">
@@ -142,7 +142,7 @@ export default function ConsolidatedAdminTable({
           <div
             key={row.id || row.slug || `row-${index}`}
             className={`bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 space-y-3 ${
-              selectedRows.includes(index) ? 'ring-2 ring-[#185757] dark:ring-[#A2D2B9]' : ''
+              selectedRows.includes(index) ? 'ring-2 ring-primary dark:ring-accent' : ''
             }`}
           >
             {/* Selection checkbox for mobile */}
@@ -153,7 +153,7 @@ export default function ConsolidatedAdminTable({
                   type="checkbox"
                   checked={selectedRows.includes(index)}
                   onChange={(e) => handleSelectRow(index, e.target.checked)}
-                  className="h-4 w-4 text-[#185757] focus:ring-[#A2D2B9] border-gray-300 rounded"
+                  className="h-4 w-4 text-primary focus:ring-accent border-gray-300 rounded"
                 />
                 <label htmlFor={`select-row-mobile-${row.id || index}`} className="text-sm text-gray-600 dark:text-gray-400 cursor-pointer">
                   Auswählen
@@ -207,7 +207,7 @@ export default function ConsolidatedAdminTable({
                       type="checkbox"
                       checked={selectedRows.length === data.length && data.length > 0}
                       onChange={(e) => handleSelectAll(e.target.checked)}
-                      className="h-4 w-4 text-[#185757] focus:ring-[#A2D2B9] border-gray-300 rounded"
+                      className="h-4 w-4 text-primary focus:ring-accent border-gray-300 rounded"
                       aria-label="Alle Zeilen auswählen"
                     />
                   </th>
@@ -252,7 +252,7 @@ export default function ConsolidatedAdminTable({
                 key={row.id || row.slug || `row-${index}`}
                 className={`${
                   onRowClick ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700' : ''
-                } ${selectedRows.includes(index) ? 'bg-[#A2D2B9]/20 dark:bg-[#185757]/30' : ''}`}
+                } ${selectedRows.includes(index) ? 'bg-accent/20 dark:bg-primary/30' : ''}`}
                 onClick={() => onRowClick && onRowClick(row, index)}
               >
                 {onSelectionChange && (
@@ -265,7 +265,7 @@ export default function ConsolidatedAdminTable({
                       type="checkbox"
                       checked={selectedRows.includes(index)}
                       onChange={(e) => handleSelectRow(index, e.target.checked)}
-                      className="h-4 w-4 text-[#185757] focus:ring-[#A2D2B9] border-gray-300 rounded"
+                      className="h-4 w-4 text-primary focus:ring-accent border-gray-300 rounded"
                       onClick={(e) => e.stopPropagation()}
                       aria-label={`Zeile ${index + 1} auswählen`}
                     />

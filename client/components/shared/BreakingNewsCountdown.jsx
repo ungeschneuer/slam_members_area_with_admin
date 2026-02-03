@@ -60,7 +60,7 @@ const BreakingNewsCountdown = ({
           ? 'bg-red-100 text-red-800' 
           : isNearExpiry 
             ? 'bg-yellow-100 text-yellow-800' 
-            : 'bg-[#A2D2B9]/20 text-[#185757]'
+            : 'bg-accent/20 text-primary'
       } ${className}`}>
         {timeLeft}
       </div>

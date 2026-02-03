@@ -74,7 +74,7 @@ export default function AdminSiteSettings() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#185757]"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     );
   }
@@ -166,7 +166,7 @@ export default function AdminSiteSettings() {
                 type="text"
                 id="heading"
                 {...register('heading')}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#A2D2B9] focus:border-[#185757] dark:bg-gray-700 dark:text-white"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-accent focus:border-primary dark:bg-gray-700 dark:text-white"
                 placeholder="Willkommen bei SLAM25"
               />
               <div className="flex justify-between items-center mt-1">
@@ -188,7 +188,7 @@ export default function AdminSiteSettings() {
                 type="text"
                 id="subtitle"
                 {...register('subtitle')}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#A2D2B9] focus:border-[#185757] dark:bg-gray-700 dark:text-white"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-accent focus:border-primary dark:bg-gray-700 dark:text-white"
                 placeholder="Dein Poetry Slam Community Hub"
               />
               <div className="flex justify-between items-center mt-1">
@@ -210,7 +210,7 @@ export default function AdminSiteSettings() {
                 id="description"
                 rows={4}
                 {...register('description')}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#A2D2B9] focus:border-[#185757] dark:bg-gray-700 dark:text-white resize-vertical"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-accent focus:border-primary dark:bg-gray-700 dark:text-white resize-vertical"
                 placeholder="Entdecke Teilnehmer*innen, verfolge Runden, lies Tipps und bleibe mit der Poetry Slam Community verbunden."
               />
               <div className="flex justify-between items-center mt-1">
@@ -237,7 +237,7 @@ export default function AdminSiteSettings() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="px-6 py-2 bg-[#185757] text-white rounded-lg hover:bg-[#0f3a3b] focus:ring-2 focus:ring-[#A2D2B9] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover focus:ring-2 focus:ring-accent focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {isSubmitting ? 'Speichern...' : 'Einstellungen speichern'}
           </button>

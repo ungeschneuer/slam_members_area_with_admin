@@ -178,7 +178,7 @@ export default function News() {
               <div className="flex items-start space-x-5 mb-6">
                 <div className="flex-shrink-0">
                   <div className="icon-container">
-                    <span className="text-[#185757] dark:text-[#A2D2B9] text-xl">{getCategoryIconLocal(item.category)}</span>
+                    <span className="text-primary dark:text-accent text-xl">{getCategoryIconLocal(item.category)}</span>
                   </div>
                 </div>
                 <div className="flex-1 min-w-0">
@@ -221,7 +221,7 @@ export default function News() {
                     timeZone: 'Europe/Berlin'
                   })}</span>
                 </div>
-                <div className="flex items-center text-[#185757] dark:text-[#A2D2B9] text-sm font-medium group-hover:text-[#0f3a3b] dark:group-hover:text-[#8BC4A3] transition-colors">
+                <div className="flex items-center text-primary dark:text-accent text-sm font-medium group-hover:text-primary-hover dark:group-hover:text-accent-hover transition-colors">
                   <span>Weiterlesen</span>
                   <svg className="ml-1 w-4 h-4 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />

@@ -5,7 +5,7 @@ export function DashboardSkeleton() {
   return (
     <div className="space-y-8">
       {/* Hero Section Skeleton */}
-      <div className="bg-[#185757] rounded-2xl p-8 text-white">
+      <div className="bg-primary rounded-2xl p-8 text-white">
         <div className="skeleton h-12 w-1/2 mb-4 bg-white/20"></div>
         <div className="skeleton h-6 w-3/4 mb-6 bg-white/20"></div>
         <div className="skeleton h-4 w-2/3 bg-white/20"></div>

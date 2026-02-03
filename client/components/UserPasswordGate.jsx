@@ -46,7 +46,7 @@ export default function UserPasswordGate({ children }) {
   // If still loading protection status
   if (isProtected === null) {
     return (
-      <div className="min-h-screen bg-[#A2D2B9] flex items-center justify-center">
+      <div className="min-h-screen bg-accent flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
           <p className="text-white">Lade...</p>
@@ -58,7 +58,7 @@ export default function UserPasswordGate({ children }) {
   // If API error occurred
   if (isProtected === 'error') {
     return (
-      <div className="min-h-screen bg-[#A2D2B9] flex items-center justify-center p-4">
+      <div className="min-h-screen bg-accent flex items-center justify-center p-4">
         <div className="w-full max-w-sm">
           <div className="bg-white rounded-2xl shadow-2xl p-6 text-center">
             <div className="text-red-600 mb-4">
@@ -68,9 +68,9 @@ export default function UserPasswordGate({ children }) {
             </div>
             <h2 className="text-xl font-bold text-gray-900 mb-2">Verbindungsfehler</h2>
             <p className="text-gray-600 mb-4">Es gab ein Problem beim Laden der Schutz-Status.</p>
-            <button 
-              onClick={() => window.location.reload()} 
-              className="bg-[#185657] text-white px-4 py-2 rounded-lg hover:bg-[#0f3a3b] transition-colors"
+            <button
+              onClick={() => window.location.reload()}
+              className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-hover transition-colors"
             >
               Seite neu laden
             </button>
@@ -125,12 +125,12 @@ export default function UserPasswordGate({ children }) {
 
   return (
             <ErrorBoundary name="UserPasswordGate" fallback={
-              <div className="min-h-screen bg-[#A2D2B9] flex items-center justify-center p-4">
+              <div className="min-h-screen bg-accent flex items-center justify-center p-4">
                 <div className="w-full max-w-sm">
                   {/* Conference Badge Error State */}
                   <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
                     {/* Badge Header with Logo */}
-                    <div className="bg-[#185657] p-6 text-center">
+                    <div className="bg-primary p-6 text-center">
                       <div className="mb-4">
                         <img 
                           src="/slam25.png" 
@@ -150,9 +150,9 @@ export default function UserPasswordGate({ children }) {
                       </div>
                       <h2 className="text-xl font-bold text-gray-900 mb-2">Fehler beim Laden</h2>
                       <p className="text-gray-600 mb-4">Es gab ein Problem beim Laden der Passwort-Eingabe.</p>
-                      <button 
-                        onClick={() => window.location.reload()} 
-                        className="w-full bg-[#185657] text-white py-3 px-4 rounded-lg hover:bg-[#0f3a3b] focus:ring-2 focus:ring-[#185657] focus:ring-offset-2 transition-colors font-medium"
+                      <button
+                        onClick={() => window.location.reload()}
+                        className="w-full bg-primary text-white py-3 px-4 rounded-lg hover:bg-primary-hover focus:ring-2 focus:ring-primary focus:ring-offset-2 transition-colors font-medium"
                       >
                         Seite neu laden
                       </button>
@@ -166,12 +166,12 @@ export default function UserPasswordGate({ children }) {
                 </div>
               </div>
             }>
-      <div className="min-h-screen bg-[#A2D2B9] flex items-center justify-center p-4">
+      <div className="min-h-screen bg-accent flex items-center justify-center p-4">
         <div className="w-full max-w-sm">
           {/* Conference Badge */}
           <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
             {/* Badge Header with Logo */}
-            <div className="bg-[#185657] p-6 text-center">
+            <div className="bg-primary p-6 text-center">
               <div className="mb-4">
                 <img 
                   src="/slam25.png" 
@@ -219,7 +219,7 @@ export default function UserPasswordGate({ children }) {
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full bg-[#185657] text-white py-3 px-4 rounded-lg hover:bg-[#0f3a3b] focus:ring-2 focus:ring-[#185657] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+                  className="w-full bg-primary text-white py-3 px-4 rounded-lg hover:bg-primary-hover focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
                 >
                   {isLoading ? 'Prüfe...' : 'Eintreten'}
                 </button>

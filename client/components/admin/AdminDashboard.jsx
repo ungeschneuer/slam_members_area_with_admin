@@ -122,7 +122,7 @@ export default function AdminDashboard() {
 
       {/* Actions */}
       <div className="flex flex-wrap gap-3">
-        <Link to="/admin/news/new" className="inline-flex items-center px-3 py-2 rounded-lg bg-[#185757] dark:bg-[#A2D2B9] hover:bg-[#0f3a3b] dark:hover:bg-[#8BC4A3] text-white dark:text-gray-900 text-sm font-medium transition-colors">
+        <Link to="/admin/news/new" className="inline-flex items-center px-3 py-2 rounded-lg bg-primary dark:bg-accent hover:bg-primary-hover dark:hover:bg-accent-hover text-white dark:text-gray-900 text-sm font-medium transition-colors">
           + Neue Nachricht
         </Link>
         <Link to="/admin/participants" className="inline-flex items-center px-3 py-2 rounded-lg bg-gray-900 hover:bg-black text-white text-sm font-medium transition-colors dark:bg-gray-700 dark:hover:bg-gray-600">

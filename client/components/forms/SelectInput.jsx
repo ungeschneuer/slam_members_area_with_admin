@@ -38,7 +38,7 @@ export default function SelectInput({
               id={name}
               disabled={disabled}
               aria-invalid={hasError ? 'true' : 'false'}
-              className={`select-base ${hasError ? 'border-red-500 focus:ring-red-500' : 'focus:ring-[#A2D2B9] focus:border-[#185757]'} ${className}`}
+              className={`select-base ${hasError ? 'border-red-500 focus:ring-red-500' : 'focus:ring-accent focus:border-primary'} ${className}`}
             >
               <option value="">{placeholder}</option>
               {options.map((opt) => (
@@ -71,7 +71,7 @@ export default function SelectInput({
         aria-invalid={hasError ? 'true' : 'false'}
         {...(register ? register(name, rules) : {})}
         disabled={disabled}
-        className={`select-base ${hasError ? 'border-red-500 focus:ring-red-500' : 'focus:ring-[#A2D2B9] focus:border-[#185757]'} ${className}`}
+        className={`select-base ${hasError ? 'border-red-500 focus:ring-red-500' : 'focus:ring-accent focus:border-primary'} ${className}`}
       >
         <option value="">{placeholder}</option>
         {options.map((opt) => (

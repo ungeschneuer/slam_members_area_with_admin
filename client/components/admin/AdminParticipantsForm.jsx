@@ -179,7 +179,7 @@ export default function AdminParticipantsForm() {
                 type="text"
                 aria-invalid={errors.name ? 'true' : 'false'}
                 {...register('name')}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#185757] focus:border-transparent dark:bg-gray-700 dark:text-white"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-700 dark:text-white"
                 placeholder="Vorname Nachname"
               />
               {errors.name && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.name.message}</p>}
@@ -193,7 +193,7 @@ export default function AdminParticipantsForm() {
               <select
                 aria-invalid={errors.region ? 'true' : 'false'}
                 {...register('region')}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#185757] focus:border-transparent dark:bg-gray-700 dark:text-white"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-700 dark:text-white"
               >
                 <option value="">Keine Region</option>
                 {bundeslaender.map((region) => (
@@ -213,7 +213,7 @@ export default function AdminParticipantsForm() {
               <select
                 aria-invalid={errors.role ? 'true' : 'false'}
                 {...register('role')}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#185757] focus:border-transparent dark:bg-gray-700 dark:text-white"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-700 dark:text-white"
               >
                 {roles.map((role) => (
                   <option key={role} value={role}>
@@ -233,7 +233,7 @@ export default function AdminParticipantsForm() {
                 type="text"
                 aria-invalid={errors.pronouns ? 'true' : 'false'}
                 {...register('pronouns')}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#185757] focus:border-transparent dark:bg-gray-700 dark:text-white"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-700 dark:text-white"
                 placeholder="z.B. sie/ihr, er/ihm, they/them"
               />
               {errors.pronouns && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.pronouns.message}</p>}
@@ -248,7 +248,7 @@ export default function AdminParticipantsForm() {
                 type="text"
                 aria-invalid={errors.instagram ? 'true' : 'false'}
                 {...register('instagram')}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#185757] focus:border-transparent dark:bg-gray-700 dark:text-white"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-700 dark:text-white"
                 placeholder="@username oder https://instagram.com/username"
               />
               {errors.instagram && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.instagram.message}</p>}
@@ -263,7 +263,7 @@ export default function AdminParticipantsForm() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-6 py-3 bg-[#185757] text-white rounded-lg hover:bg-[#1a6666] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+              className="px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
             >
               {isSubmitting ? 'Speichern...' : (isEditMode ? 'Änderungen speichern' : 'Teilnehmer*in erstellen')}
             </button>

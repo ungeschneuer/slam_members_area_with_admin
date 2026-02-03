@@ -177,7 +177,7 @@ export default function AdminCityTipsForm() {
               <input
                 type="text"
                 {...register('name')}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#185757] focus:border-transparent dark:bg-gray-700 dark:text-white"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-700 dark:text-white"
                 placeholder="Name des Ortes"
               />
               {errors.name && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.name.message}</p>}
@@ -190,7 +190,7 @@ export default function AdminCityTipsForm() {
               <input
                 type="text"
                 {...register('slug')}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#185757] focus:border-transparent dark:bg-gray-700 dark:text-white"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-700 dark:text-white"
                 placeholder="url-freundlicher-name"
               />
               {errors.slug && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.slug.message}</p>}
@@ -205,7 +205,7 @@ export default function AdminCityTipsForm() {
               </label>
               <select
                 {...register('category')}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#185757] focus:border-transparent dark:bg-gray-700 dark:text-white"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-700 dark:text-white"
               >
                 {categories.map((cat) => (
                   <option key={cat.value} value={cat.value}>
@@ -222,7 +222,7 @@ export default function AdminCityTipsForm() {
               </label>
               <select
                 {...register('price_range')}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#185757] focus:border-transparent dark:bg-gray-700 dark:text-white"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-700 dark:text-white"
               >
                 {predefinedPriceRanges.map((price) => (
                   <option key={price.value} value={price.value}>
@@ -242,7 +242,7 @@ export default function AdminCityTipsForm() {
             <textarea
               {...register('description')}
               rows={4}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#185757] focus:border-transparent dark:bg-gray-700 dark:text-white"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-700 dark:text-white"
               placeholder="Beschreibe den Ort..."
             />
             {errors.description && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.description.message}</p>}
@@ -257,7 +257,7 @@ export default function AdminCityTipsForm() {
               <input
                 type="text"
                 {...register('address')}
-                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#185757] focus:border-transparent dark:bg-gray-700 dark:text-white"
+                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-700 dark:text-white"
                 placeholder="Straße, Stadt, Land"
               />
               <button
@@ -281,7 +281,7 @@ export default function AdminCityTipsForm() {
               <input
                 type="text"
                 {...register('latitude')}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#185757] focus:border-transparent dark:bg-gray-700 dark:text-white"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-700 dark:text-white"
                 placeholder="z.B. 48.137154"
               />
               {errors.latitude && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.latitude.message}</p>}
@@ -294,7 +294,7 @@ export default function AdminCityTipsForm() {
               <input
                 type="text"
                 {...register('longitude')}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#185757] focus:border-transparent dark:bg-gray-700 dark:text-white"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-700 dark:text-white"
                 placeholder="z.B. 11.576124"
               />
               {errors.longitude && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.longitude.message}</p>}
@@ -309,7 +309,7 @@ export default function AdminCityTipsForm() {
             <input
               type="url"
               {...register('website')}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#185757] focus:border-transparent dark:bg-gray-700 dark:text-white"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-700 dark:text-white"
               placeholder="https://..."
             />
             {errors.website && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.website.message}</p>}
@@ -323,7 +323,7 @@ export default function AdminCityTipsForm() {
             <textarea
               {...register('opening_hours')}
               rows={3}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#185757] focus:border-transparent dark:bg-gray-700 dark:text-white"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-700 dark:text-white"
               placeholder="z.B. Mo-Fr 10-18 Uhr, Sa 10-14 Uhr"
             />
             {errors.opening_hours && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.opening_hours.message}</p>}
@@ -337,7 +337,7 @@ export default function AdminCityTipsForm() {
             <textarea
               {...register('tips')}
               rows={3}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#185757] focus:border-transparent dark:bg-gray-700 dark:text-white"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-700 dark:text-white"
               placeholder="Zusätzliche Tipps für Besucher..."
             />
             {errors.tips && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.tips.message}</p>}
@@ -350,7 +350,7 @@ export default function AdminCityTipsForm() {
             </label>
             <select
               {...register('status')}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#185757] focus:border-transparent dark:bg-gray-700 dark:text-white"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-700 dark:text-white"
             >
               <option value="ACTIVE">Aktiv</option>
               <option value="INACTIVE">Inaktiv</option>
@@ -363,7 +363,7 @@ export default function AdminCityTipsForm() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-6 py-3 bg-[#185757] text-white rounded-lg hover:bg-[#1a6666] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+              className="px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
             >
               {isSubmitting ? 'Speichern...' : (isEditMode ? 'Änderungen speichern' : 'Stadt-Tipp erstellen')}
             </button>
