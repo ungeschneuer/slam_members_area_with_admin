@@ -55,11 +55,21 @@ export function formatTimeInTimezone(date, timezone = 'Europe/Berlin', format = 
   });
   
   const parts = formatter.formatToParts(date);
-  const year = parts.find(p => p.type === 'year').value;
-  const month = parts.find(p => p.type === 'month').value;
-  const day = parts.find(p => p.type === 'day').value;
-  const hour = parts.find(p => p.type === 'hour').value;
-  const minute = parts.find(p => p.type === 'minute').value;
+
+  // Helper function to safely extract part value
+  const getPart = (type) => {
+    const part = parts.find(p => p.type === type);
+    if (!part) {
+      throw new Error(`Date part '${type}' not found in formatted date`);
+    }
+    return part.value;
+  };
+
+  const year = getPart('year');
+  const month = getPart('month');
+  const day = getPart('day');
+  const hour = getPart('hour');
+  const minute = getPart('minute');
   
   return format
     .replace('yyyy', year)
@@ -105,8 +115,18 @@ export function convertTimezone(date, fromTimezone, toTimezone) {
   });
   
   const sourceParts = sourceFormatter.formatToParts(date);
+
+  // Helper function to safely extract part value
+  const getSourcePart = (type) => {
+    const part = sourceParts.find(p => p.type === type);
+    if (!part) {
+      throw new Error(`Source date part '${type}' not found`);
+    }
+    return part.value;
+  };
+
   const sourceDate = new Date(
-    `${sourceParts.find(p => p.type === 'year').value}-${sourceParts.find(p => p.type === 'month').value}-${sourceParts.find(p => p.type === 'day').value}T${sourceParts.find(p => p.type === 'hour').value}:${sourceParts.find(p => p.type === 'minute').value}:${sourceParts.find(p => p.type === 'second').value}`
+    `${getSourcePart('year')}-${getSourcePart('month')}-${getSourcePart('day')}T${getSourcePart('hour')}:${getSourcePart('minute')}:${getSourcePart('second')}`
   );
   
   // Convert to target timezone
@@ -122,7 +142,17 @@ export function convertTimezone(date, fromTimezone, toTimezone) {
   });
   
   const targetParts = targetFormatter.formatToParts(sourceDate);
+
+  // Helper function to safely extract part value
+  const getTargetPart = (type) => {
+    const part = targetParts.find(p => p.type === type);
+    if (!part) {
+      throw new Error(`Target date part '${type}' not found`);
+    }
+    return part.value;
+  };
+
   return new Date(
-    `${targetParts.find(p => p.type === 'year').value}-${targetParts.find(p => p.type === 'month').value}-${targetParts.find(p => p.type === 'day').value}T${targetParts.find(p => p.type === 'hour').value}:${targetParts.find(p => p.type === 'minute').value}:${targetParts.find(p => p.type === 'second').value}`
+    `${getTargetPart('year')}-${getTargetPart('month')}-${getTargetPart('day')}T${getTargetPart('hour')}:${getTargetPart('minute')}:${getTargetPart('second')}`
   );
 }

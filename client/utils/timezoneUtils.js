@@ -103,10 +103,20 @@ export function getTodayBerlinDateString() {
   });
   
   const parts = formatter.formatToParts(new Date());
-  const year = parts.find(p => p.type === 'year').value;
-  const month = parts.find(p => p.type === 'month').value;
-  const day = parts.find(p => p.type === 'day').value;
-  
+
+  // Helper function to safely extract part value
+  const getPart = (type) => {
+    const part = parts.find(p => p.type === type);
+    if (!part) {
+      throw new Error(`Date part '${type}' not found in formatted date`);
+    }
+    return part.value;
+  };
+
+  const year = getPart('year');
+  const month = getPart('month');
+  const day = getPart('day');
+
   return `${year}-${month}-${day}`;
 }
 
