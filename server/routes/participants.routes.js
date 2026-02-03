@@ -389,17 +389,19 @@ router.delete('/:id', ...adminMiddleware(), async (req, res) => {
 
 // Bulk import participants (admin endpoint)
 router.post('/bulk-import', ...adminMiddleware(), async (req, res) => {
+  // Validate input before acquiring database connection
+  const { participants } = req.body;
+
+  if (!Array.isArray(participants) || participants.length === 0) {
+    return res.status(400).json({
+      success: false,
+      error: 'Participants array is required and must not be empty'
+    });
+  }
+
   const client = await pool.connect();
-  
+
   try {
-    const { participants } = req.body;
-    
-    if (!Array.isArray(participants) || participants.length === 0) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Participants array is required and must not be empty' 
-      });
-    }
     
     // Start transaction
     await client.query('BEGIN');
