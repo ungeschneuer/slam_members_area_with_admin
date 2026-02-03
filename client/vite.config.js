@@ -52,11 +52,34 @@ export default defineConfig({
         entryFileNames: 'assets/[name]-[hash].js',
         chunkFileNames: 'assets/[name]-[hash].js',
         assetFileNames: 'assets/[name]-[hash].[ext]',
-        manualChunks: {
-          vendor: ['react', 'react-dom'],
-          router: ['react-router-dom'],
-          query: ['@tanstack/react-query'],
-          leaflet: ['leaflet']
+        manualChunks(id) {
+          // Leaflet and react-leaflet are now lazy-loaded with InteractiveMap
+          // They will be automatically code-split into a separate chunk
+          if (id.includes('leaflet') || id.includes('react-leaflet')) {
+            return 'map-vendor';
+          }
+
+          // Core React libraries
+          if (id.includes('react') || id.includes('react-dom')) {
+            if (id.includes('node_modules')) {
+              return 'react-vendor';
+            }
+          }
+
+          // Router library
+          if (id.includes('react-router-dom')) {
+            return 'router-vendor';
+          }
+
+          // React Query library
+          if (id.includes('@tanstack/react-query')) {
+            return 'query-vendor';
+          }
+
+          // Other node_modules
+          if (id.includes('node_modules')) {
+            return 'vendor';
+          }
         }
       }
     },

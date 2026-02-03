@@ -1,6 +1,8 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import InteractiveMap from './InteractiveMap';
+import React, { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
 import { useCityTips, usePageTitle } from '../hooks/index.js';
+
+// Lazy load the map component to reduce initial bundle size (~200KB)
+const InteractiveMap = lazy(() => import('./InteractiveMap'));
 import LoadingSpinner from './LoadingSpinner';
 import { ErrorMessage } from './StatusMessages.jsx';
 import { getCategoryOptionsWithAll } from '../../shared/constants/categories.js';
@@ -361,12 +363,18 @@ export default function CityTips() {
       <div className="page-header-card">
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">Karte</h2>
         <div className="h-[55vh] sm:h-[50vh] lg:h-[55vh] min-h-[400px] max-h-[560px] relative overflow-hidden">
-          <InteractiveMap 
-            locations={filteredAndSortedLocations}
-            onLocationClick={handleLocationClick}
-            selectedLocation={selectedLocation}
-            availableCategories={categories}
-          />
+          <Suspense fallback={
+            <div className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-800">
+              <LoadingSpinner />
+            </div>
+          }>
+            <InteractiveMap
+              locations={filteredAndSortedLocations}
+              onLocationClick={handleLocationClick}
+              selectedLocation={selectedLocation}
+              availableCategories={categories}
+            />
+          </Suspense>
         </div>
       </div>
 
