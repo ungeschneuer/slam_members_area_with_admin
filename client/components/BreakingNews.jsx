@@ -11,21 +11,33 @@ const BreakingNews = () => {
 
   // Format date when breaking news data changes
   useEffect(() => {
+    let isMounted = true;
+
     if (breakingNews && (breakingNews.published_at || breakingNews.created_at)) {
       // Format date in configured timezone
       const formatDateAsync = async () => {
         try {
           const dateToFormat = breakingNews.published_at || breakingNews.created_at;
           const formatted = await formatDateInTimezone(dateToFormat);
-          setFormattedDate(formatted);
+          // Only update state if component is still mounted
+          if (isMounted) {
+            setFormattedDate(formatted);
+          }
         } catch (error) {
-          setFormattedDate('');
+          if (isMounted) {
+            setFormattedDate('');
+          }
         }
       };
       formatDateAsync();
     } else {
       setFormattedDate('');
     }
+
+    // Cleanup function to prevent state updates on unmounted component
+    return () => {
+      isMounted = false;
+    };
   }, [breakingNews]);
 
   // Real-time updates handled by polling
