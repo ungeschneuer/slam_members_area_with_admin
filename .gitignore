@@ -358,3 +358,4 @@ public/uploads/**/*
 # These contain sensitive production data and should never be committed
 .backups/
 .trash/
+.claude/settings.local.json
