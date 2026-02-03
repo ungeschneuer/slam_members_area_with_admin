@@ -33,7 +33,7 @@ npm run deploy:clean
 npm run deploy:incremental
 ```
 
-See [DEPLOYMENT_SECURE.md](./DEPLOYMENT_SECURE.md) for the complete secure deployment guide.
+See [UBERSPACE_CONFIGURATION.md](./docs/UBERSPACE_CONFIGURATION.md) for the complete deployment guide.
 
 ## 🏗️ Architecture
 
@@ -44,9 +44,11 @@ See [DEPLOYMENT_SECURE.md](./DEPLOYMENT_SECURE.md) for the complete secure deplo
 
 ## 📁 Project Structure
 
+For a detailed explanation of the project structure, see [docs/PROJECT_STRUCTURE.md](./docs/PROJECT_STRUCTURE.md).
+
 ```
 ├── client/                 # React frontend
-│   ├── components/         # React components
+│   ├── components/         # React components (admin, forms, shared)
 │   ├── services/          # API services
 │   └── utils/             # Utility functions
 ├── server/                # Express.js backend
@@ -54,7 +56,11 @@ See [DEPLOYMENT_SECURE.md](./DEPLOYMENT_SECURE.md) for the complete secure deplo
 │   ├── services/          # Business logic
 │   ├── middleware/        # Express middleware
 │   └── config/           # Configuration files
-├── database/              # Database migrations
+├── database/              # Database schemas and migrations
+│   ├── migrations/        # SQL migration scripts
+│   └── schemas/          # Database schema files
+├── scripts/               # Utility and deployment scripts
+├── docs/                  # Project documentation
 └── public/               # Static assets
 ```
 
@@ -219,11 +225,12 @@ MIT License - see LICENSE file for details
 Comprehensive documentation is available in the [docs](./docs) directory:
 
 - [Documentation Index](./docs/README.md) - Complete documentation guide
-- [API-Database Alignment Report](./API_DATABASE_ALIGNMENT_REPORT.md) - Schema validation
+- [Project Structure](./docs/PROJECT_STRUCTURE.md) - Detailed project organization
+- [API-Database Alignment Report](./docs/API_DATABASE_ALIGNMENT_REPORT.md) - Schema validation
 - [Error Handling Audit](./docs/ERROR_HANDLING_AUDIT.md) - Error handling improvements
 - [Database Connection Pool](./docs/DATABASE_CONNECTION_POOL.md) - Pool optimization
-- [Uberspace Configuration](./UBERSPACE_CONFIGURATION.md) - Deployment guide
-- [Security Documentation](./SECURITY.md) - Security features
+- [Uberspace Configuration](./docs/UBERSPACE_CONFIGURATION.md) - Deployment guide
+- [Security Documentation](./docs/SECURITY.md) - Security features
 
 ## 📞 Support
 
