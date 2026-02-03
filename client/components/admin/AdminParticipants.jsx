@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useParticipants, useDeleteParticipant, useBulkImportParticipants } from '../../hooks/index.js';
+import { useDeleteParticipant, useBulkImportParticipants } from '../../hooks/index.js';
+import { useParticipantSearch } from '../../hooks/useParticipantSearch.js';
 import { ALLOWED_PARTICIPANT_ROLES } from '@shared/constants/roles.js';
 import LoadingSpinner from '../LoadingSpinner';
 import { ErrorMessage, SuccessMessage } from '../StatusMessages.jsx';
@@ -11,7 +12,6 @@ import { formatInstagramUrl } from '../../utils/instagramUtils.js';
 import { handleLinkClick } from '../../utils/linkUtils.js';
 import { getRegionFlag } from '../../utils/detailViewUtils.js';
 import { downloadParticipantTemplate, downloadParticipantTemplateCSV, parseParticipantFile, checkForDuplicates } from '../../services/excelService.js';
-import { ADMIN_PARTICIPANTS_LIMIT } from '../../config/api.js';
 
 export default function AdminParticipants() {
   const navigate = useNavigate();
@@ -19,11 +19,6 @@ export default function AdminParticipants() {
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(24);
-
-  // Load all participants for search (no pagination on API call)
-  const { data: allParticipantsResponse, isLoading: loading, error } = useParticipants({ limit: ADMIN_PARTICIPANTS_LIMIT, offset: 0 }, true); // isAdmin = true
-  const deleteParticipant = useDeleteParticipant();
-  const bulkImport = useBulkImportParticipants();
 
   // State
   const [showBulkImport, setShowBulkImport] = useState(false);
@@ -34,6 +29,18 @@ export default function AdminParticipants() {
   const [importError, setImportError] = useState(null);
   const [formError, setFormError] = useState(null);
   const fileInputRef = useRef(null);
+
+  // Use server-side search with pagination and filtering
+  const { data: searchResponse, isLoading: loading, error } = useParticipantSearch({
+    search: searchTerm,
+    role: roleFilter,
+    region: regionFilter,
+    page: currentPage,
+    limit: pageSize === 'all' ? 10000 : pageSize
+  });
+
+  const deleteParticipant = useDeleteParticipant();
+  const bulkImport = useBulkImportParticipants();
   
   // Import state management
   const [importState, setImportState] = useState({
@@ -89,57 +96,32 @@ export default function AdminParticipants() {
     ensureAdminRoom();
   }, []);
 
-  // Extract all participants data
-  const allParticipants = useMemo(() => {
-    if (allParticipantsResponse?.data) {
-      return Array.isArray(allParticipantsResponse.data) ? allParticipantsResponse.data : [];
-    }
-    return Array.isArray(allParticipantsResponse) ? allParticipantsResponse : [];
-  }, [allParticipantsResponse]);
-
-  // Filter and sort all participants based on search and filters
-  const filteredParticipants = useMemo(() => {
-    const filtered = allParticipants.filter(participant => {
-      const matchesSearchTerm = (participant.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                 (participant.region || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                 (participant.role || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                 (participant.pronouns || '').toLowerCase().includes(searchTerm.toLowerCase());
-
-      const matchesRoleFilter = roleFilter === 'all' || participant.role === roleFilter;
-      const matchesRegionFilter = regionFilter === 'all' || (regionFilter === 'none' ? !participant.region : participant.region === regionFilter);
-
-      return matchesSearchTerm && matchesRoleFilter && matchesRegionFilter;
-    });
-
-    // Sort by first character of name alphabetically
-    return filtered.sort((a, b) => {
-      const nameA = (a.name || '').toLowerCase();
-      const nameB = (b.name || '').toLowerCase();
-      return nameA.localeCompare(nameB);
-    });
-  }, [allParticipants, searchTerm, roleFilter, regionFilter]);
-
-  // Paginate the filtered results
+  // Extract participants data from server-side search response
   const paginatedParticipants = useMemo(() => {
-    if (pageSize === 'all') {
-      return filteredParticipants;
-    }
-    const startIndex = (currentPage - 1) * pageSize;
-    const endIndex = startIndex + pageSize;
-    return filteredParticipants.slice(startIndex, endIndex);
-  }, [filteredParticipants, currentPage, pageSize]);
+    return searchResponse?.data || [];
+  }, [searchResponse]);
 
-  // Pagination info based on filtered results
+  // Extract pagination info from server response
   const paginationInfo = useMemo(() => {
-    const totalItems = filteredParticipants.length;
-    const totalPages = pageSize === 'all' ? 1 : Math.ceil(totalItems / pageSize);
+    if (!searchResponse?.meta) {
+      return {
+        totalItems: 0,
+        totalPages: 0,
+        currentPage: 1
+      };
+    }
 
     return {
-      totalItems,
-      totalPages,
-      currentPage
+      totalItems: searchResponse.meta.totalCount,
+      totalPages: searchResponse.meta.totalPages,
+      currentPage: searchResponse.meta.currentPage
     };
-  }, [filteredParticipants.length, pageSize, currentPage]);
+  }, [searchResponse]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, roleFilter, regionFilter]);
 
   const handleDelete = async (id) => {
     if (window.confirm('Bist du sicher, dass du diese*n Teilnehmer*in löschen möchtest?')) {
@@ -214,9 +196,11 @@ export default function AdminParticipants() {
       const parsed = await parseParticipantFile(file);
       
       // Check duplicates client-side (for preview only)
+      // Note: This checks against currently loaded participants only
+      // Server will perform comprehensive duplicate checking
       const { uniqueParticipants, duplicates } = checkForDuplicates(
         parsed.validRows,
-        allParticipants
+        paginatedParticipants
       );
       
       setImportState(prev => ({
@@ -250,9 +234,10 @@ export default function AdminParticipants() {
       setImportState(prev => ({ ...prev, isProcessing: true, step: 'importing' }));
       
       // Get unique participants from validation
+      // Note: Server will perform comprehensive duplicate checking
       const { uniqueParticipants } = checkForDuplicates(
         importState.parsedData.validRows,
-        allParticipants
+        paginatedParticipants
       );
       
       // Import to server
