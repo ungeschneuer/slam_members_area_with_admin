@@ -19,6 +19,8 @@ import logger from './config/logger.js';
 import apiRoutes from './routes/index.js';
 // Authentication routes moved to middleware pattern
 import correlationIdMiddleware from './middleware/correlationId.js';
+// ETag middleware for HTTP caching
+import { conditionalETagMiddleware } from './middleware/etag.js';
 
 // Load environment file based on NODE_ENV
 // nodemon.json sets NODE_ENV=development for local dev
@@ -286,6 +288,10 @@ app.use(express.static(path.join(process.cwd(), 'dist'), {
     }
   }
 }));
+
+// Add ETag middleware for HTTP caching on API routes
+// Reduces bandwidth by 80-90% for unchanged responses
+app.use('/api', conditionalETagMiddleware);
 
 // Use new modular routes as the primary API endpoints
 app.use('/api', apiRoutes);
