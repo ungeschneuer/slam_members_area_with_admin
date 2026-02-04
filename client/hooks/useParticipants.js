@@ -139,7 +139,7 @@ export function useCreateParticipant() {
       
       // Optimistically update to the new value
       queryClient.setQueryData(participantsKeys.lists(), (old) => {
-        const tempId = `temp-${Date.now()}`;
+        const tempId = `temp-${crypto.randomUUID()}`;
         return [...(old || []), { ...newParticipant, id: tempId, _isOptimistic: true }];
       });
       

@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
 // Token refresh now handled by Axios interceptors in services/api.js
-import Admin from './Admin';
+// Lazy-load Admin panel — only needed for admin users
+const Admin = lazy(() => import('./Admin'));
 import MemberDashboard from './components/MemberDashboard';
 import Participants from './components/Participants';
 import ParticipantDetail from './components/ParticipantDetail';
@@ -133,9 +134,11 @@ const Navigation = React.memo(function Navigation() {
               aria-label="SLAM25 - Zur Startseite"
             >
               <div className="w-10 h-10 flex items-center justify-center" aria-hidden="true">
-                <img 
-                  src="/icons/logo.png" 
-                  alt="SLAM25 Logo" 
+                <img
+                  src="/icons/logo.png"
+                  alt="SLAM25 Logo"
+                  width={40}
+                  height={40}
                   className="w-10 h-10 object-contain"
                 />
               </div>
@@ -401,7 +404,9 @@ function App() {
             <Route path="/admin/*" element={
               <RouteTransition>
                 <FadeIn>
-                  <Admin />
+                  <Suspense fallback={<div className="flex items-center justify-center min-h-[200px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>}>
+                    <Admin />
+                  </Suspense>
                 </FadeIn>
               </RouteTransition>
             } />

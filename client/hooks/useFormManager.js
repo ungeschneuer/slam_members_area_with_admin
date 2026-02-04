@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useError } from './useError.js';
@@ -247,15 +247,20 @@ export function useFormPersistence(formKey, form) {
     }
   }, [formKey]);
 
-  // Auto-save form data on changes
+  // Auto-save form data on changes (debounced to avoid excessive localStorage writes)
+  const saveTimerRef = useRef(null);
   useEffect(() => {
     const subscription = watch((value) => {
       if (value && Object.keys(value).length > 0) {
-        saveFormData(value);
+        if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = setTimeout(() => saveFormData(value), 500);
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
   }, [watch, saveFormData]);
 
   // Load form data on mount

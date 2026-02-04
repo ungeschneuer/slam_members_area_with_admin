@@ -486,8 +486,8 @@ const executeTransaction = async (queries, retries = 3) => {
 
 // Backup utilities
 const createBackup = async (backupType = 'full') => {
-  const { exec } = require('child_process');
-  const { promisify } = require('util');
+  const { exec } = await import('child_process');
+  const { promisify } = await import('util');
   const execAsync = promisify(exec);
   
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');

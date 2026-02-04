@@ -130,9 +130,11 @@ router.post('/', ...adminMiddleware(), sanitizeBody, async (req, res) => { // Id
   
   // Generate unique slug using centralized utility
   const baseSlug = slug || generateSlug(title);
+  // Escape LIKE wildcards (%, _) in baseSlug to prevent incorrect matches
+  const escapedBaseSlug = baseSlug.replace(/%/g, '\\%').replace(/_/g, '\\_');
   const existingSlugsResult = await executeQuery(
-    'SELECT slug FROM news WHERE slug LIKE $1',
-    [`${baseSlug}%`]
+    "SELECT slug FROM news WHERE slug LIKE $1 ESCAPE '\\'",
+    [`${escapedBaseSlug}%`]
   );
   const existingSlugs = existingSlugsResult.rows.map(r => r.slug);
   const generatedSlug = generateUniqueSlug(title, existingSlugs);
@@ -302,9 +304,6 @@ router.post('/breaking-news/:id', ...adminMiddleware(), async (req, res) => {
       expiresAt: breaking_news_until
     });
 
-    // Clear cache and notify clients for real-time updates
-    ('news');
-
     sendSuccessResponse(res, result, 'SET_BREAKING_NEWS', duration_ms);
   } catch (error) {
     logger.error('Failed to set breaking news', {
@@ -329,9 +328,6 @@ router.delete('/breaking-news', ...adminMiddleware(), async (req, res) => {
     logger.info('Breaking news cleared', {
       duration: `${Math.round(duration)}ms`
     });
-    
-    // Clear cache and notify clients for real-time updates
-('news');
     
     sendSuccessResponse(res, { message: 'Breaking news cleared successfully' }, 'CLEAR_BREAKING_NEWS', duration);
   } catch (error) {

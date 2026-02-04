@@ -1,5 +1,20 @@
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { API_URL } from '../config/api.js';
+
+/**
+ * Custom hook to debounce a value
+ */
+function useDebouncedValue(value, delay) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedValue(value), delay);
+    return () => clearTimeout(timer);
+  }, [value, delay]);
+
+  return debouncedValue;
+}
 
 /**
  * Hook for server-side participants search
@@ -13,13 +28,16 @@ export function useParticipantsSearch(searchTerm, filters = {}, options = {}) {
     debounceMs = 300
   } = options;
 
+  // Debounce the search term to avoid firing a request on every keystroke
+  const debouncedSearchTerm = useDebouncedValue(searchTerm, debounceMs);
+
   return useQuery({
-    queryKey: ['participants', 'search', searchTerm, filters, page, limit],
-    queryFn: async () => {
+    queryKey: ['participants', 'search', debouncedSearchTerm, filters, page, limit],
+    queryFn: async ({ signal }) => {
       const params = new URLSearchParams();
-      
-      if (searchTerm?.trim()) {
-        params.set('search', searchTerm.trim());
+
+      if (debouncedSearchTerm?.trim()) {
+        params.set('search', debouncedSearchTerm.trim());
       }
       if (filters.role && filters.role !== 'all') {
         params.set('role', filters.role);
@@ -31,7 +49,8 @@ export function useParticipantsSearch(searchTerm, filters = {}, options = {}) {
       params.set('limit', limit.toString());
 
       const response = await fetch(`${API_URL}/participants/search?${params}`, {
-        credentials: 'include'
+        credentials: 'include',
+        signal
       });
 
       if (!response.ok) {
@@ -39,24 +58,24 @@ export function useParticipantsSearch(searchTerm, filters = {}, options = {}) {
       }
 
       const result = await response.json();
-      
+
       if (result?.success === false) {
         console.warn('Participants search API returned error:', result.error);
-        return { 
-          data: [], 
-          meta: { 
-            totalCount: 0, 
-            currentPage: page, 
+        return {
+          data: [],
+          meta: {
+            totalCount: 0,
+            currentPage: page,
             totalPages: 0,
-            searchTerm: searchTerm || '',
-            filters 
-          } 
+            searchTerm: debouncedSearchTerm || '',
+            filters
+          }
         };
       }
 
       return result?.data || result;
     },
-    enabled: enabled && (searchTerm?.length >= 2 || Object.values(filters).some(f => f && f !== 'all')),
+    enabled: enabled && (debouncedSearchTerm?.length >= 2 || Object.values(filters).some(f => f && f !== 'all')),
     staleTime: 2 * 60 * 1000, // 2 minutes cache
     gcTime: 5 * 60 * 1000, // 5 minutes garbage collection
     refetchOnWindowFocus: false,
@@ -69,20 +88,13 @@ export function useParticipantsSearch(searchTerm, filters = {}, options = {}) {
  * Hook for getting available filter options from search results
  * This helps populate dropdowns with current search context
  */
-export function useParticipantsFilterOptions(searchTerm = '', baseFilters = {}) {
+export function useParticipantsFilterOptions() {
   return useQuery({
-    queryKey: ['participants', 'filter-options', searchTerm, baseFilters],
-    queryFn: async () => {
-      // Get a larger sample to determine available options
-      const params = new URLSearchParams();
-      if (searchTerm?.trim()) {
-        params.set('search', searchTerm.trim());
-      }
-      params.set('limit', '1000'); // Get more results to analyze options
-      params.set('page', '1');
-
-      const response = await fetch(`${API_URL}/participants/search?${params}`, {
-        credentials: 'include'
+    queryKey: ['participants', 'filter-options'],
+    queryFn: async ({ signal }) => {
+      const response = await fetch(`${API_URL}/participants/filter-options`, {
+        credentials: 'include',
+        signal
       });
 
       if (!response.ok) {
@@ -90,17 +102,10 @@ export function useParticipantsFilterOptions(searchTerm = '', baseFilters = {}) 
       }
 
       const result = await response.json();
-      const participants = result?.data?.data || [];
-      
-      // Extract unique regions and roles from results
-      const regions = [...new Set(participants.map(p => p.region).filter(Boolean))].sort();
-      const roles = [...new Set(participants.map(p => p.role).filter(Boolean))].sort();
-      
-      return { regions, roles };
+      return result?.data || { regions: [], roles: [] };
     },
-    enabled: searchTerm?.length >= 2,
-    staleTime: 5 * 60 * 1000, // 5 minutes cache
-    gcTime: 10 * 60 * 1000, // 10 minutes garbage collection
+    staleTime: 10 * 60 * 1000, // 10 minutes cache (options change rarely)
+    gcTime: 15 * 60 * 1000,
     refetchOnWindowFocus: false
   });
 }
