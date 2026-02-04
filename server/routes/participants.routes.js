@@ -213,7 +213,7 @@ router.get('/:slug', async (req, res) => {
       queryType: 'JOIN_OPTIMIZED'
     });
     
-    sendSuccessResponse(res, participant, 'GET_PARTICIPANT', duration);
+    sendSuccessResponse(res, participant.rows[0], 'GET_PARTICIPANT', duration);
   } catch (error) {
     sendErrorResponse(res, error, 'Failed to fetch participant by slug');
   }

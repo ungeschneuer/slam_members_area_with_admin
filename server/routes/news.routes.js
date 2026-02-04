@@ -120,43 +120,47 @@ router.get('/:slug', async (req, res) => {
 });
 
 // Create news (admin endpoint)
-router.post('/', ...adminMiddleware(), sanitizeBody, async (req, res) => { // Idempotency removed
-  // Sanitize input data to prevent XSS
-  const sanitizedData = sanitizeEntity.news(req.body);
-  const { 
-    title, content, excerpt, category, priority, featured_image_url,
-    tags, status, published_at, slug
-  } = sanitizedData;
-  
-  // Generate unique slug using centralized utility
-  const baseSlug = slug || generateSlug(title);
-  // Escape LIKE wildcards (%, _) in baseSlug to prevent incorrect matches
-  const escapedBaseSlug = baseSlug.replace(/%/g, '\\%').replace(/_/g, '\\_');
-  const existingSlugsResult = await executeQuery(
-    "SELECT slug FROM news WHERE slug LIKE $1 ESCAPE '\\'",
-    [`${escapedBaseSlug}%`]
-  );
-  const existingSlugs = existingSlugsResult.rows.map(r => r.slug);
-  const generatedSlug = generateUniqueSlug(title, existingSlugs);
-  
-  // Normalize and coerce types
-  const normalizedData = normalizeData(sanitizedData, {
-    status: { type: 'string', fallback: 'DRAFT' }
-  });
-  const normalizedNews = entityNormalizers.news(sanitizedData);
-  const tagsArray = normalizedNews.tags;
-  
-  await executeCrudOperation(
-    'create',
-    `INSERT INTO news (title, content, excerpt, category, priority, 
-     featured_image_url, tags, status, published_at, slug) 
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
-    [title, content, excerpt, category, priority, featured_image_url, 
-     tagsArray, normalizedData.status, published_at, generatedSlug],
-    'news',
-    'CREATE_NEWS',
-    res
-  );
+router.post('/', ...adminMiddleware(), sanitizeBody, async (req, res) => {
+  try {
+    // Sanitize input data to prevent XSS
+    const sanitizedData = sanitizeEntity.news(req.body);
+    const {
+      title, content, excerpt, category, priority, featured_image_url,
+      tags, status, published_at, slug
+    } = sanitizedData;
+
+    // Generate unique slug using centralized utility
+    const baseSlug = slug || generateSlug(title);
+    // Escape LIKE wildcards (%, _) in baseSlug to prevent incorrect matches
+    const escapedBaseSlug = baseSlug.replace(/%/g, '\\%').replace(/_/g, '\\_');
+    const existingSlugsResult = await executeQuery(
+      "SELECT slug FROM news WHERE slug LIKE $1 ESCAPE '\\'",
+      [`${escapedBaseSlug}%`]
+    );
+    const existingSlugs = existingSlugsResult.rows.map(r => r.slug);
+    const generatedSlug = generateUniqueSlug(title, existingSlugs);
+
+    // Normalize and coerce types
+    const normalizedData = normalizeData(sanitizedData, {
+      status: { type: 'string', fallback: 'DRAFT' }
+    });
+    const normalizedNews = entityNormalizers.news(sanitizedData);
+    const tagsArray = normalizedNews.tags;
+
+    await executeCrudOperation(
+      'create',
+      `INSERT INTO news (title, content, excerpt, category, priority,
+       featured_image_url, tags, status, published_at, slug)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+      [title, content, excerpt, category, priority, featured_image_url,
+       tagsArray, normalizedData.status, published_at, generatedSlug],
+      'news',
+      'CREATE_NEWS',
+      res
+    );
+  } catch (error) {
+    sendErrorResponse(res, error, 'Failed to create news article');
+  }
 });
 
 // Update news (admin endpoint)
@@ -212,8 +216,19 @@ router.post('/breaking-news/:id', ...adminMiddleware(), async (req, res) => {
 
     const startTime = startTiming();
 
+    // Validate duration if provided (must be a positive number, max 168 hours = 1 week)
+    if (duration !== undefined && duration !== null) {
+      const numDuration = Number(duration);
+      if (!Number.isFinite(numDuration) || numDuration <= 0 || numDuration > 168) {
+        return res.status(400).json({
+          success: false,
+          error: 'Duration must be a positive number (max 168 hours / 1 week)'
+        });
+      }
+    }
+
     // Calculate breaking news expiration time
-    const breaking_news_until = duration ? new Date(Date.now() + duration * 60 * 60 * 1000) : null;
+    const breaking_news_until = duration ? new Date(Date.now() + Number(duration) * 60 * 60 * 1000) : null;
 
     // Pre-validate that article exists and is published before starting transaction
     const preCheckResult = await executeQuery(
@@ -358,7 +373,7 @@ router.post('/:id/upload-image', ...adminMiddleware(), uploadNewsFile.single('im
 
     if (newsResult.rows.length === 0) {
       // Delete uploaded file if article doesn't exist
-      const deleteResult = await safeDeleteFile(`/../../${file.path}`);
+      const deleteResult = await safeDeleteFile(`/uploads/news/${file.filename}`);
       if (!deleteResult.success && deleteResult.error?.serious) {
         logger.error('Failed to delete uploaded file after news not found - serious error', {
           path: file.path,

@@ -49,7 +49,7 @@ router.post('/user-password', ...adminMiddleware(), async (req, res) => {
     const startTime = startTiming();
     const { password } = req.body;
     
-    if (!password || password.length < USER_PASSWORD_CONSTANTS.MIN_PASSWORD_LENGTH) {
+    if (typeof password !== 'string' || !password || password.length < USER_PASSWORD_CONSTANTS.MIN_PASSWORD_LENGTH) {
       return res.status(400).json({ 
         success: false, 
         error: `Password must be at least ${USER_PASSWORD_CONSTANTS.MIN_PASSWORD_LENGTH} characters long` 

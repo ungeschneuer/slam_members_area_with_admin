@@ -325,14 +325,13 @@ router.delete('/:id', ...adminMiddleware(), ...validateTimetableEventId, async (
 router.post('/:entryId/participants', ...adminMiddleware(), async (req, res) => {
   const { entryId } = req.params;
   const { participantId, role = 'Teilnehmer*in' } = req.body;
-  
+  const startTime = startTiming();
+
   try {
-    const startTime = startTiming();
-    
     // Check if participant is already in the timetable entry
     const existingQuery = 'SELECT id FROM timetable_participants WHERE timetable_entry_id = $1 AND participant_id = $2';
     const existingResult = await executeQuery(existingQuery, [parseInt(entryId), parseInt(participantId)]);
-    
+
     if (existingResult.rows.length > 0) {
       const duration = endTiming(startTime);
       return res.status(409).json({
@@ -344,13 +343,13 @@ router.post('/:entryId/participants', ...adminMiddleware(), async (req, res) => 
         }
       });
     }
-    
+
     const result = await executeQuery(
       'INSERT INTO timetable_participants (timetable_entry_id, participant_id, role) VALUES ($1, $2, $3) RETURNING *',
       [parseInt(entryId), parseInt(participantId), role]
     );
     const duration = endTiming(startTime);
-    
+
     sendSuccessResponse(res, result.rows[0], 'ADD_TIMETABLE_PARTICIPANT', duration, 201);
   } catch (error) {
     const duration = endTiming(startTime);

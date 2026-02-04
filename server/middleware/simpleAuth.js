@@ -14,21 +14,41 @@ const tokenBlacklist = new Map();
 // Refresh token storage (for production, use Redis)
 const refreshTokens = new Map();
 
+// Max entries to prevent unbounded growth even if cleanup fails
+const MAX_BLACKLIST_SIZE = 10000;
+const MAX_REFRESH_TOKENS = 5000;
+
 // Periodic cleanup of expired tokens to prevent memory leaks
 const CLEANUP_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 setInterval(() => {
-  const now = Date.now();
-  // Clean expired blacklisted tokens
-  for (const [token, expiresAt] of tokenBlacklist) {
-    if (expiresAt <= now) {
-      tokenBlacklist.delete(token);
+  try {
+    const now = Date.now();
+    let blacklistCleaned = 0;
+    let refreshCleaned = 0;
+    // Clean expired blacklisted tokens
+    for (const [token, expiresAt] of tokenBlacklist) {
+      if (expiresAt <= now) {
+        tokenBlacklist.delete(token);
+        blacklistCleaned++;
+      }
     }
-  }
-  // Clean expired refresh tokens
-  for (const [token, data] of refreshTokens) {
-    if (new Date() > data.expiresAt) {
-      refreshTokens.delete(token);
+    // Clean expired refresh tokens
+    for (const [token, data] of refreshTokens) {
+      if (new Date() > data.expiresAt) {
+        refreshTokens.delete(token);
+        refreshCleaned++;
+      }
     }
+    if (blacklistCleaned > 0 || refreshCleaned > 0) {
+      logger.info('Token cleanup completed', {
+        blacklistCleaned,
+        refreshCleaned,
+        blacklistRemaining: tokenBlacklist.size,
+        refreshRemaining: refreshTokens.size
+      });
+    }
+  } catch (error) {
+    logger.error('Token cleanup failed', { error: error.message });
   }
 }, CLEANUP_INTERVAL_MS).unref();
 
@@ -43,6 +63,20 @@ export const generateRefreshToken = (userId) => {
   const refreshToken = crypto.randomBytes(64).toString('hex');
   const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
   
+  // Guard against unbounded growth
+  if (refreshTokens.size >= MAX_REFRESH_TOKENS) {
+    // Evict oldest entries to make room
+    const entriesToRemove = Math.ceil(MAX_REFRESH_TOKENS * 0.1);
+    const iter = refreshTokens.keys();
+    for (let i = 0; i < entriesToRemove; i++) {
+      const key = iter.next().value;
+      if (key) refreshTokens.delete(key);
+    }
+    logger.warn('Refresh tokens reached max size, evicted oldest entries', {
+      evicted: entriesToRemove,
+      remaining: refreshTokens.size
+    });
+  }
   refreshTokens.set(refreshToken, {
     userId,
     expiresAt,
@@ -201,6 +235,20 @@ export const blacklistToken = (token) => {
     expiresAt = decoded?.exp ? decoded.exp * 1000 : Date.now() + 24 * 60 * 60 * 1000;
   } catch {
     expiresAt = Date.now() + 24 * 60 * 60 * 1000;
+  }
+  // Guard against unbounded growth
+  if (tokenBlacklist.size >= MAX_BLACKLIST_SIZE) {
+    // Evict oldest entries (first inserted) to make room
+    const entriesToRemove = Math.ceil(MAX_BLACKLIST_SIZE * 0.1);
+    const iter = tokenBlacklist.keys();
+    for (let i = 0; i < entriesToRemove; i++) {
+      const key = iter.next().value;
+      if (key) tokenBlacklist.delete(key);
+    }
+    logger.warn('Token blacklist reached max size, evicted oldest entries', {
+      evicted: entriesToRemove,
+      remaining: tokenBlacklist.size
+    });
   }
   tokenBlacklist.set(token, expiresAt);
   logger.info('Token blacklisted', {
