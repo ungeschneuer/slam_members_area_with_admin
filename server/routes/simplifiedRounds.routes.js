@@ -16,6 +16,7 @@ import { adminMiddleware } from '../middleware/simpleAuth.js';
 import { generateSlug, generateUniqueSlug } from '../utils/slugUtils.js';
 import logger from '../config/logger.js';
 import { sanitizeEntity } from '../utils/sanitization.js';
+import { validateIdMiddleware } from '../utils/validators.js';
 
 const router = express.Router();
 
@@ -129,13 +130,8 @@ router.post('/', ...adminMiddleware(), async (req, res) => {
 });
 
 // Update round
-router.put('/:id', ...adminMiddleware(), async (req, res) => {
+router.put('/:id', ...adminMiddleware(), validateIdMiddleware('id', 'Round'), async (req, res) => {
   try {
-    const roundId = parseInt(req.params.id);
-    if (isNaN(roundId)) {
-      return sendErrorResponse(res, new Error('Invalid round ID'), 'Invalid round ID', 400);
-    }
-    
     // Sanitize input data to prevent XSS
     const sanitizedData = sanitizeEntity.round(req.body);
     const normalizedData = normalizeData(sanitizedData, {
@@ -181,15 +177,15 @@ router.put('/:id', ...adminMiddleware(), async (req, res) => {
       normalizedData.total_jury_members || 5,
       normalizedData.competition_type || 'Einzelwettbewerb',
       JSON.stringify(normalizedData.groups || []),
-      roundId
+      req.validatedId
     ]);
-    
+
     if (result.rows.length === 0) {
       return sendNotFoundResponse(res, 'Round');
     }
-    
+
     // Update assignments
-    await simplifiedRoundsService.updateRoundAssignments(roundId, normalizedData.assignments);
+    await simplifiedRoundsService.updateRoundAssignments(req.validatedId, normalizedData.assignments);
     
     const duration = endTiming(startTime);
     sendSuccessResponse(res, result.rows[0], 'UPDATE_ROUND', duration);
@@ -199,15 +195,10 @@ router.put('/:id', ...adminMiddleware(), async (req, res) => {
 });
 
 // Delete round
-router.delete('/:id', ...adminMiddleware(), async (req, res) => {
+router.delete('/:id', ...adminMiddleware(), validateIdMiddleware('id', 'Round'), async (req, res) => {
   try {
-    const roundId = parseInt(req.params.id);
-    if (isNaN(roundId)) {
-      return sendErrorResponse(res, new Error('Invalid round ID'), 'Invalid round ID', 400);
-    }
-    
     const startTime = startTiming();
-    const result = await executeQuery('DELETE FROM rounds WHERE id = $1 RETURNING *', [roundId]);
+    const result = await executeQuery('DELETE FROM rounds WHERE id = $1 RETURNING *', [req.validatedId]);
     const duration = endTiming(startTime);
     
     if (result.rows.length === 0) {

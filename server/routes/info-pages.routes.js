@@ -23,6 +23,7 @@ import { generateSlug, generateUniqueSlug, validateSlugInput } from '../utils/sl
 import { generateUniqueSlugInTransaction, generateRequestIdFromReq } from '../services/slugGenerationService.js';
 import { executeTransaction } from '../config/database.js';
 import { safeDeleteFile } from '../utils/fileUtils.js';
+import { validateIdMiddleware } from '../utils/validators.js';
 
 const router = express.Router();
 
@@ -162,8 +163,7 @@ router.post('/', ...adminMiddleware(), async (req, res) => {
 });
 
 // Update info page (admin endpoint)
-router.put('/:id', ...adminMiddleware(), async (req, res) => { // Optimistic locking removed
-  const { id } = req.params;
+router.put('/:id', ...adminMiddleware(), validateIdMiddleware('id', 'Info Page'), async (req, res) => {
   // Sanitize input data to prevent XSS
   const sanitizedData = sanitizeEntity.infoPage(req.body);
   
@@ -188,8 +188,8 @@ router.put('/:id', ...adminMiddleware(), async (req, res) => { // Optimistic loc
      category = $5, display_order = $6, status = $7, file_url = $8, 
      file_type = $9, file_description = $10, additional_links = $11, tags = $12, published_at = $13, 
      updated_at = NOW() WHERE id = $14 RETURNING *`,
-    [title, slug, content, excerpt, category, normalizedData.display_order, normalizedData.status, 
-     file_url, file_type, file_description, JSON.stringify(additionalLinksArray), tagsArray, published_at, parseInt(id)],
+    [title, slug, content, excerpt, category, normalizedData.display_order, normalizedData.status,
+     file_url, file_type, file_description, JSON.stringify(additionalLinksArray), tagsArray, published_at, req.validatedId],
     'info-pages',
     'UPDATE_INFO_PAGE',
     res
@@ -197,13 +197,11 @@ router.put('/:id', ...adminMiddleware(), async (req, res) => { // Optimistic loc
 });
 
 // Delete info page (admin endpoint)
-router.delete('/:id', ...adminMiddleware(), async (req, res) => {
-  const { id } = req.params;
-  
+router.delete('/:id', ...adminMiddleware(), validateIdMiddleware('id', 'Info Page'), async (req, res) => {
   await executeCrudOperation(
     'delete',
     'DELETE FROM info_pages WHERE id = $1 RETURNING *',
-    [parseInt(id)],
+    [req.validatedId],
     'info-pages',
     'DELETE_INFO_PAGE',
     res

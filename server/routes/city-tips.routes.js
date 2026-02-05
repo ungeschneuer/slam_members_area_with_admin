@@ -189,13 +189,13 @@ router.put('/:id', ...adminMiddleware(), ...validateCityTipId, ...validateCityTi
     }
 
     // Merge existing with provided to avoid NOT NULL errors
-    const name = typeof req.body.name === 'string' ? req.body.name : existing.name;
-    const category = typeof req.body.category === 'string' ? req.body.category : existing.category;
-    const description = req.body.description !== undefined ? req.body.description : existing.description;
-    const address = req.body.address !== undefined ? req.body.address : existing.address;
-    const latitude = req.body.latitude !== undefined ? req.body.latitude : existing.latitude;
-    const longitude = req.body.longitude !== undefined ? req.body.longitude : existing.longitude;
-    const price_range = req.body.price_range !== undefined ? req.body.price_range : existing.price_range;
+    const name = typeof req.body.name === 'string' ? req.body.name : existing.rows[0].name;
+    const category = typeof req.body.category === 'string' ? req.body.category : existing.rows[0].category;
+    const description = req.body.description !== undefined ? req.body.description : existing.rows[0].description;
+    const address = req.body.address !== undefined ? req.body.address : existing.rows[0].address;
+    const latitude = req.body.latitude !== undefined ? req.body.latitude : existing.rows[0].latitude;
+    const longitude = req.body.longitude !== undefined ? req.body.longitude : existing.rows[0].longitude;
+    const price_range = req.body.price_range !== undefined ? req.body.price_range : existing.rows[0].price_range;
 
     const normalizedData = normalizeData(req.body, {
       opening_hours: { type: 'string', fallback: '' },
@@ -206,7 +206,7 @@ router.put('/:id', ...adminMiddleware(), ...validateCityTipId, ...validateCityTi
     const normalizedStatus = normalizeData(req.body, {
       status: { type: 'string', fallback: 'ACTIVE' }
     });
-    const status = req.body.status !== undefined ? normalizedStatus.status : existing.status;
+    const status = req.body.status !== undefined ? normalizedStatus.status : existing.rows[0].status;
     
     const startTime = startTiming();
     

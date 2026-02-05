@@ -22,6 +22,7 @@ import { sanitizeEntity } from '../utils/sanitization.js';
 import { generateSlug, generateUniqueSlug, validateSlugInput } from '../utils/slugUtils.js';
 import { generateUniqueSlugInTransaction, generateRequestIdFromReq } from '../services/slugGenerationService.js';
 import { executeTransaction } from '../config/database.js';
+import { formatDate, formatTime, normalizeTimetableEvent } from '../utils/dateUtils.js';
 
 const router = express.Router();
 
@@ -40,46 +41,7 @@ router.get('/:slug', async (req, res) => {
     }
     
     // Normalize date/time formatting using env TZ: YYYY-MM-DD / HH:mm
-    const toDate = (d) => {
-      if (!d) return d;
-      const dt = new Date(d);
-      if (Number.isNaN(dt.getTime())) return d;
-      const year = dt.getFullYear();
-      const month = String(dt.getMonth() + 1).padStart(2, '0');
-      const day = String(dt.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
-    };
-    const toTime = (t) => {
-      if (!t) return t;
-      try {
-        if (typeof t === 'string' && /^\d{2}:\d{2}$/.test(t)) return t;
-        const dt = new Date(`1970-01-01T${t}Z`);
-        if (Number.isNaN(dt.getTime())) {
-          logger.warn('Time normalization: invalid date format', {
-            originalValue: t,
-            result: 'returning_original',
-            context: 'individual_event'
-          });
-          return t;
-        }
-        const hh = String(dt.getUTCHours()).padStart(2, '0');
-        const mm = String(dt.getUTCMinutes()).padStart(2, '0');
-        return `${hh}:${mm}`;
-      } catch (error) {
-        logger.error('Time normalization: unexpected error', {
-          error: error.message,
-          originalValue: t,
-          result: 'returning_original',
-          context: 'individual_event'
-        });
-        return t;
-      }
-    };
-    const normalized = {
-      ...timetableEvent,
-      date: toDate(timetableEvent.date),
-      time: toTime(timetableEvent.time)
-    };
+    const normalized = normalizeTimetableEvent(timetableEvent, 'individual_event');
 
     logger.info('Optimized timetable event by slug query completed', {
       slug,
@@ -101,55 +63,19 @@ router.get('/', async (req, res) => {
     const timetable = await simplifiedTimetableService.getTimetableWithAssignments();
     
     // Normalize date/time formatting using env TZ: YYYY-MM-DD / HH:mm
-    const tz = process.env.TZ;
-    const toDate = (d) => {
-      if (!d) return d;
-      const dt = new Date(d);
-      if (Number.isNaN(dt.getTime())) return d;
-      const year = dt.getFullYear();
-      const month = String(dt.getMonth() + 1).padStart(2, '0');
-      const day = String(dt.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
-    };
-    const toTime = (t) => {
-      if (!t) return null; // Handle null/undefined/empty
-      try {
-        // If already HH:mm, keep it
-        if (typeof t === 'string' && /^\d{2}:\d{2}$/.test(t)) return t;
-        const dt = new Date(`1970-01-01T${t}Z`);
-        if (isNaN(dt.getTime())) {
-          logger.warn('Time normalization: invalid date format', {
-            originalValue: t,
-            result: 'returning_original'
-          });
-          return t; // Return original value instead of null
-        }
-        const hh = String(dt.getUTCHours()).padStart(2, '0');
-        const mm = String(dt.getUTCMinutes()).padStart(2, '0');
-        return `${hh}:${mm}`;
-      } catch (error) {
-        logger.error('Time normalization: unexpected error', {
-          error: error.message,
-          originalValue: t,
-          result: 'returning_original'
-        });
-        return t; // Return original value to prevent data loss
-      }
-    };
-    // Debug logging to identify the issue
     logger.debug('Timetable entries:', { count: timetable?.length || 0 });
     if (Array.isArray(timetable) && timetable.length > 0) {
       logger.debug('Sample entry:', { id: timetable[0]?.id, title: timetable[0]?.title });
     }
-    
+
     const normalized = Array.isArray(timetable) ? timetable.map(e => {
       const normalizedEvent = {
         ...e,
-        date: toDate(e.date),
-        time: toTime(e.time),
-        end_time: toTime(e.end_time)
+        date: formatDate(e.date),
+        time: formatTime(e.time, 'timetable_list'),
+        end_time: formatTime(e.end_time, 'timetable_list')
       };
-      
+
       // Debug logging for end_time normalization
       if (e.end_time && !normalizedEvent.end_time) {
         logger.warn('end_time normalization issue:', {
@@ -158,7 +84,7 @@ router.get('/', async (req, res) => {
           eventTitle: e.title
         });
       }
-      
+
       return normalizedEvent;
     }) : timetable;
     const duration = endTiming(startTime);

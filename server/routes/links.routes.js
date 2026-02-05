@@ -14,6 +14,8 @@ import { adminMiddleware } from '../middleware/simpleAuth.js';
 // Idempotency and optimistic locking removed - using simple error handling instead
 import logger from '../config/logger.js';
 import { sanitizeEntity } from '../utils/sanitization.js';
+import { normalizeBoolean } from '../utils/normalizers.js';
+import { validateIdMiddleware } from '../utils/validators.js';
 
 const router = express.Router();
 
@@ -84,11 +86,10 @@ router.post('/', ...adminMiddleware(), async (req, res) => { // Idempotency remo
     url: sanitizedData.url,
     icon: sanitizedData.icon || '🔗',
     category: sanitizedData.category || 'Sonstiges',
-    // Correct boolean handling: treat false/'false' as false, everything else as true if not explicitly false
-    is_external: sanitizedData.is_external !== false && sanitizedData.is_external !== 'false',
+    is_external: normalizeBoolean(sanitizedData.is_external, false),
     color: sanitizedData.color || 'blue',
     sort_order: parseInt(sanitizedData.sort_order) || 0,
-    is_active: sanitizedData.is_active !== false && sanitizedData.is_active !== 'false'
+    is_active: normalizeBoolean(sanitizedData.is_active, true)
   };
   
   await executeCrudOperation(
@@ -108,14 +109,13 @@ router.post('/', ...adminMiddleware(), async (req, res) => { // Idempotency remo
 });
 
 // Update link (admin endpoint)
-router.put('/:id', ...adminMiddleware(), async (req, res) => { // Optimistic locking removed
-  const { id } = req.params;
+router.put('/:id', ...adminMiddleware(), validateIdMiddleware('id', 'Link'), async (req, res) => {
   // Sanitize input data to prevent XSS
   const sanitizedData = sanitizeEntity.link(req.body);
-  
+
   // Log incoming data for debugging
   logger.info('Links UPDATE attempt', {
-    id,
+    id: req.validatedId,
     sanitizedData,
     rawBody: req.body
   });
@@ -127,30 +127,30 @@ router.put('/:id', ...adminMiddleware(), async (req, res) => { // Optimistic loc
     url: sanitizedData.url,
     icon: sanitizedData.icon || '🔗',
     category: sanitizedData.category || 'Sonstiges',
-    is_external: sanitizedData.is_external !== false && sanitizedData.is_external !== 'false',
+    is_external: normalizeBoolean(sanitizedData.is_external, false),
     color: sanitizedData.color || 'blue',
     sort_order: parseInt(sanitizedData.sort_order) || 0,
-    is_active: sanitizedData.is_active !== false && sanitizedData.is_active !== 'false'
+    is_active: normalizeBoolean(sanitizedData.is_active, true)
   };
   
   // Log normalized data
   logger.info('Links UPDATE normalized data', {
     normalizedData,
-    params: [normalizedData.title, normalizedData.description, normalizedData.url, 
-             normalizedData.icon, normalizedData.category, normalizedData.is_external, 
-             normalizedData.color, normalizedData.sort_order, normalizedData.is_active, parseInt(id)]
+    params: [normalizedData.title, normalizedData.description, normalizedData.url,
+             normalizedData.icon, normalizedData.category, normalizedData.is_external,
+             normalizedData.color, normalizedData.sort_order, normalizedData.is_active, req.validatedId]
   });
-  
+
   await executeCrudOperation(
     'update',
-    `UPDATE links 
-     SET title = $1, description = $2, url = $3, icon = $4, category = $5, 
+    `UPDATE links
+     SET title = $1, description = $2, url = $3, icon = $4, category = $5,
          is_external = $6, color = $7, sort_order = $8, is_active = $9, updated_at = CURRENT_TIMESTAMP
      WHERE id = $10
      RETURNING *`,
-    [normalizedData.title, normalizedData.description, normalizedData.url, 
-     normalizedData.icon, normalizedData.category, normalizedData.is_external, 
-     normalizedData.color, normalizedData.sort_order, normalizedData.is_active, parseInt(id)],
+    [normalizedData.title, normalizedData.description, normalizedData.url,
+     normalizedData.icon, normalizedData.category, normalizedData.is_external,
+     normalizedData.color, normalizedData.sort_order, normalizedData.is_active, req.validatedId],
     'links',
     'UPDATE_LINK',
     res
@@ -160,13 +160,11 @@ router.put('/:id', ...adminMiddleware(), async (req, res) => { // Optimistic loc
 });
 
 // Delete link (admin endpoint)
-router.delete('/:id', ...adminMiddleware(), async (req, res) => {
-  const { id } = req.params;
-  
+router.delete('/:id', ...adminMiddleware(), validateIdMiddleware('id', 'Link'), async (req, res) => {
   await executeCrudOperation(
     'delete',
     'DELETE FROM links WHERE id = $1 RETURNING *',
-    [parseInt(id)],
+    [req.validatedId],
     'links',
     'DELETE_LINK',
     res

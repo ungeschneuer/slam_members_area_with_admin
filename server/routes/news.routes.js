@@ -22,6 +22,8 @@ import { entityNormalizers } from '../utils/normalizers.js';
 import { newsSchema, breakingNewsSchema } from '../../shared/schemas/newsSchema.js';
 import { uploadNewsFile, handleUploadError } from '../middleware/upload.js';
 import { safeDeleteFile } from '../utils/fileUtils.js';
+import { setBreakingNews } from '../services/breakingNewsService.js';
+import { validateIdMiddleware } from '../utils/validators.js';
 
 // Simple sanitization middleware
 const sanitizeBody = (req, _res, next) => {
@@ -164,8 +166,7 @@ router.post('/', ...adminMiddleware(), sanitizeBody, async (req, res) => {
 });
 
 // Update news (admin endpoint)
-router.put('/:id', ...adminMiddleware(), sanitizeBody, async (req, res) => { // Optimistic locking removed
-  const { id } = req.params;
+router.put('/:id', ...adminMiddleware(), validateIdMiddleware('id', 'News'), sanitizeBody, async (req, res) => {
   // Sanitize input data to prevent XSS
   const sanitizedData = sanitizeEntity.news(req.body);
   
@@ -186,8 +187,8 @@ router.put('/:id', ...adminMiddleware(), sanitizeBody, async (req, res) => { // 
     `UPDATE news SET title = $1, content = $2, excerpt = $3, category = $4, 
      priority = $5, featured_image_url = $6, tags = $7, status = $8, published_at = $9, 
      slug = $10, updated_at = NOW() WHERE id = $11 RETURNING *`,
-    [title, content, excerpt, category, priority, featured_image_url, 
-     tagsArray, normalizedData.status, published_at, slug, parseInt(id)],
+    [title, content, excerpt, category, priority, featured_image_url,
+     tagsArray, normalizedData.status, published_at, slug, req.validatedId],
     'news',
     'UPDATE_NEWS',
     res
@@ -195,13 +196,11 @@ router.put('/:id', ...adminMiddleware(), sanitizeBody, async (req, res) => { // 
 });
 
 // Delete news (admin endpoint)
-router.delete('/:id', ...adminMiddleware(), async (req, res) => {
-  const { id } = req.params;
-  
+router.delete('/:id', ...adminMiddleware(), validateIdMiddleware('id', 'News'), async (req, res) => {
   await executeCrudOperation(
     'delete',
     'DELETE FROM news WHERE id = $1 RETURNING *',
-    [parseInt(id)],
+    [req.validatedId],
     'news',
     'DELETE_NEWS',
     res
@@ -252,63 +251,8 @@ router.post('/breaking-news/:id', ...adminMiddleware(), async (req, res) => {
       });
     }
 
-    // Use transaction to ensure all 3 updates succeed or all fail
-    const result = await executeTransaction(async (client) => {
-      // 1. Clean up expired breaking news before setting new one
-      const expiredCleanup = await client.query(
-        'UPDATE news SET is_breaking_news = false, breaking_news_until = NULL WHERE is_breaking_news = true AND breaking_news_until < NOW() RETURNING id'
-      );
-
-      if (expiredCleanup.rows.length > 0) {
-        logger.info('Cleaned up expired breaking news', {
-          count: expiredCleanup.rows.length,
-          articleIds: expiredCleanup.rows.map(r => r.id)
-        });
-      }
-
-      // 2. Clear any existing breaking news
-      const existingCleanup = await client.query(
-        'UPDATE news SET is_breaking_news = false, breaking_news_until = NULL WHERE is_breaking_news = true RETURNING id, title'
-      );
-
-      if (existingCleanup.rows.length > 0) {
-        logger.info('Cleared existing breaking news', {
-          count: existingCleanup.rows.length,
-          previousArticles: existingCleanup.rows.map(r => ({ id: r.id, title: r.title }))
-        });
-      }
-
-      // 2a. Validate no breaking news remains (defensive check)
-      const validationResult = await client.query(
-        'SELECT COUNT(*) as count FROM news WHERE is_breaking_news = true'
-      );
-
-      if (parseInt(validationResult.rows[0].count) > 0) {
-        logger.error('Breaking news transaction validation failed: breaking news still exists after cleanup', {
-          remainingCount: validationResult.rows[0].count
-        });
-        throw new Error('Failed to clear existing breaking news - transaction state inconsistent');
-      }
-
-      // 3. Set the new breaking news
-      const updateResult = await client.query(`
-        UPDATE news
-        SET is_breaking_news = true,
-            breaking_news_until = $2,
-            "updated_at" = NOW()
-        WHERE id = $1 AND status = 'PUBLISHED'
-        RETURNING *
-      `, [parseInt(id), breaking_news_until]);
-
-      if (updateResult.rows.length === 0) {
-        logger.error('Breaking news transaction failed: article disappeared or unpublished during transaction', {
-          articleId: id
-        });
-        throw new Error('News article not found or not published');
-      }
-
-      return updateResult.rows[0];
-    });
+    // Use service to set breaking news in a transaction
+    const result = await setBreakingNews(parseInt(id), breaking_news_until);
 
     const duration_ms = endTiming(startTime);
 

@@ -22,34 +22,9 @@ import { generateSlug, generateUniqueSlug, validateSlugInput } from '../utils/sl
 import { generateUniqueSlugInTransaction, generateRequestIdFromReq } from '../services/slugGenerationService.js';
 import { executeTransaction } from '../config/database.js';
 import { ALLOWED_PARTICIPANT_ROLES } from '../../shared/constants/roles.js';
-const allowedRegions = [
-  'Bayern',
-  'Baden-Württemberg',
-  'Berlin-Brandenburg',
-  'Hamburg',
-  'Hessen',
-  'Mecklenburg-Vorpommern',
-  'Niedersachsen/Bremen',
-  'Nordrhein-Westfalen',
-  'Rheinland-Pfalz',
-  'Saarland',
-  'Sachsen',
-  'Sachsen-Anhalt',
-  'Schleswig-Holstein',
-  'Thüringen',
-  'Liechtenstein',
-  'Luxemburg',
-  'Österreich',
-  'Ostbelgien',
-  'Schweiz',
-  'Südtirol',
-  'Slam Alphas',
-  'BiPOC/Migra',
-  'i,Slam',
-  'TINte',
-  'U20',
-  'Chemnitz'
-];
+import { ALLOWED_REGIONS } from '../../shared/constants/regions.js';
+import { PAGINATION_LIMITS } from '../constants/pagination.js';
+import { validateIdMiddleware } from '../utils/validators.js';
 
 // Initialize participants service
 const participantsService = new ParticipantsService();
@@ -84,7 +59,7 @@ router.get('/search', async (req, res) => {
     const role = req.query.role || '';
     const region = req.query.region || '';
     const page = Math.max(1, parseInt(req.query.page) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 25));
+    const limit = Math.min(PAGINATION_LIMITS.MAX, Math.max(1, parseInt(req.query.limit) || PAGINATION_LIMITS.DEFAULT));
     const offset = (page - 1) * limit;
 
     // Build dynamic WHERE clause
@@ -226,7 +201,7 @@ router.get('/:slug', async (req, res) => {
 router.get('/', async (req, res) => {
   try {
     // Simple query parameter parsing with bounds
-    const limit = Math.min(1000, Math.max(1, parseInt(req.query.limit) || 50));
+    const limit = Math.min(PAGINATION_LIMITS.BULK_MAX, Math.max(1, parseInt(req.query.limit) || PAGINATION_LIMITS.BULK_DEFAULT));
     const offset = Math.max(0, parseInt(req.query.offset) || 0);
     const startTime = startTiming();
 
@@ -324,12 +299,7 @@ router.post('/', ...adminMiddleware(), async (req, res) => {
 });
 
 // Update participant (admin endpoint)
-router.put('/:id', ...adminMiddleware(), async (req, res) => { // Optimistic locking removed
-  const { id } = req.params;
-  if (!id || Number.isNaN(parseInt(id))) {
-    return sendErrorResponse(res, new Error('Invalid ID'), 'Invalid ID format', 400);
-  }
-
+router.put('/:id', ...adminMiddleware(), validateIdMiddleware('id', 'Participant'), async (req, res) => {
   // Sanitize input data to prevent XSS
   const sanitizedData = sanitizeEntity.participant(req.body);
 
@@ -337,7 +307,7 @@ router.put('/:id', ...adminMiddleware(), async (req, res) => { // Optimistic loc
   try {
     const existing = await executeQuery(
       'SELECT * FROM participants WHERE id = $1',
-      [parseInt(id)]
+      [req.validatedId]
     );
     if (!existing.rows || existing.rows.length === 0) {
       return sendNotFoundResponse(res, 'Participant');
@@ -353,7 +323,7 @@ router.put('/:id', ...adminMiddleware(), async (req, res) => { // Optimistic loc
     await executeCrudOperation(
       'update',
       'UPDATE participants SET name = $1, role = $2, region = $3, pronouns = $4, instagram = $5, slug = $6, updated_at = NOW() WHERE id = $7 RETURNING *',
-      [name, role, region, pronouns, instagram, slug, parseInt(id)],
+      [name, role, region, pronouns, instagram, slug, req.validatedId],
       'participants',
       'UPDATE_PARTICIPANT',
       res
@@ -366,17 +336,15 @@ router.put('/:id', ...adminMiddleware(), async (req, res) => { // Optimistic loc
 });
 
 // Delete participant (admin endpoint)
-router.delete('/:id', ...adminMiddleware(), async (req, res) => {
-  const { id } = req.params;
-  const participantId = parseInt(id);
+router.delete('/:id', ...adminMiddleware(), validateIdMiddleware('id', 'Participant'), async (req, res) => {
   const startTime = startTiming();
-  
+
   try {
-    const participant = await participantsService.deleteParticipant(participantId);
+    const participant = await participantsService.deleteParticipant(req.validatedId);
     const duration = endTiming(startTime);
-    
+
     logger.info('Participant deleted', {
-      participantId,
+      participantId: req.validatedId,
       participantName: participant.name,
       duration: `${Math.round(duration)}ms`
     });
@@ -446,8 +414,8 @@ router.post('/bulk-import', ...adminMiddleware(), async (req, res) => {
       errors: []
     };
     
-    // Process in batches of 100
-    const BATCH_SIZE = 100;
+    // Process in batches
+    const BATCH_SIZE = PAGINATION_LIMITS.BULK_IMPORT_BATCH_SIZE;
     for (let i = 0; i < participants.length; i += BATCH_SIZE) {
       const batch = participants.slice(i, i + BATCH_SIZE);
       
@@ -480,7 +448,7 @@ router.post('/bulk-import', ...adminMiddleware(), async (req, res) => {
             continue;
           }
           
-          if (validated.region && !allowedRegions.includes(validated.region)) {
+          if (validated.region && !ALLOWED_REGIONS.includes(validated.region)) {
             results.errors.push({
               row: rowNumber,
               name: validated.name,

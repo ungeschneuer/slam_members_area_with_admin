@@ -15,6 +15,7 @@ import { teamSchema, createTeamSchema, updateTeamSchema, addTeamMemberSchema, re
 import logger from '../config/logger.js';
 import { generateSlug, generateUniqueSlug } from '../utils/slugUtils.js';
 import { executeTransaction } from '../config/database.js';
+import { validateIdMiddleware } from '../utils/validators.js';
 
 const router = express.Router();
 
@@ -101,26 +102,19 @@ router.post('/', ...adminMiddleware(), async (req, res) => {
 });
 
 // Update team (admin only)
-router.put('/:id', ...adminMiddleware(), async (req, res) => {
-  const { id } = req.params;
-  const teamId = parseInt(id);
-  
-  if (isNaN(teamId)) {
-    return sendErrorResponse(res, new Error('Invalid team ID'), 'Invalid team ID', 400);
-  }
-  
+router.put('/:id', ...adminMiddleware(), validateIdMiddleware('id', 'Team'), async (req, res) => {
   try {
     // Sanitize input data
     const sanitizedData = sanitizeEntity.team ? sanitizeEntity.team(req.body) : req.body;
-    
+
     // Validate with Zod
     const validationResult = updateTeamSchema.safeParse(sanitizedData);
     if (!validationResult.success) {
       return sendErrorResponse(res, new Error('Validation failed'), 'Validation failed', 400);
     }
-    
+
     const startTime = startTiming();
-    const team = await teamsService.updateTeam(teamId, validationResult.data);
+    const team = await teamsService.updateTeam(req.validatedId, validationResult.data);
     const duration = endTiming(startTime);
     
     logger.info('Team updated', {
@@ -135,22 +129,15 @@ router.put('/:id', ...adminMiddleware(), async (req, res) => {
 });
 
 // Delete team (admin only)
-router.delete('/:id', ...adminMiddleware(), async (req, res) => {
-  const { id } = req.params;
-  const teamId = parseInt(id);
-  
-  if (isNaN(teamId)) {
-    return sendErrorResponse(res, new Error('Invalid team ID'), 'Invalid team ID', 400);
-  }
-  
+router.delete('/:id', ...adminMiddleware(), validateIdMiddleware('id', 'Team'), async (req, res) => {
   const startTime = startTiming();
-  
+
   try {
-    const team = await teamsService.deleteTeam(teamId);
+    const team = await teamsService.deleteTeam(req.validatedId);
     const duration = endTiming(startTime);
     
     logger.info('Team deleted', {
-      teamId,
+      teamId: req.validatedId,
       teamName: team.name,
       duration: `${Math.round(duration)}ms`
     });
@@ -161,7 +148,7 @@ router.delete('/:id', ...adminMiddleware(), async (req, res) => {
     
     if (error.code === 'ACTIVE_ROUNDS_CONSTRAINT') {
       logger.warn('Attempted to delete team with active round assignments', {
-        teamId,
+        teamId: req.validatedId,
         activeRounds: error.details.activeRounds,
         duration: `${Math.round(duration)}ms`
       });
@@ -178,17 +165,10 @@ router.delete('/:id', ...adminMiddleware(), async (req, res) => {
 });
 
 // Get team members
-router.get('/:id/members', async (req, res) => {
-  const { id } = req.params;
-  const teamId = parseInt(id);
-  
-  if (isNaN(teamId)) {
-    return sendErrorResponse(res, new Error('Invalid team ID'), 'Invalid team ID', 400);
-  }
-  
+router.get('/:id/members', validateIdMiddleware('id', 'Team'), async (req, res) => {
   try {
     const startTime = startTiming();
-    const members = await teamsService.getTeamMembers(teamId);
+    const members = await teamsService.getTeamMembers(req.validatedId);
     const duration = endTiming(startTime);
     
     sendSuccessResponse(res, members, 'GET_TEAM_MEMBERS', duration);
@@ -198,14 +178,9 @@ router.get('/:id/members', async (req, res) => {
 });
 
 // Add member to team (admin only)
-router.post('/:id/members', ...adminMiddleware(), async (req, res) => {
-  const { id } = req.params;
-  const teamId = parseInt(id);
-  
-  if (isNaN(teamId)) {
-    return sendErrorResponse(res, new Error('Invalid team ID'), 'Invalid team ID', 400);
-  }
-  
+router.post('/:id/members', ...adminMiddleware(), validateIdMiddleware('id', 'Team'), async (req, res) => {
+  const teamId = req.validatedId;
+
   try {
     // Validate request body
     const validationResult = addTeamMemberSchema.safeParse(req.body);
@@ -236,11 +211,11 @@ router.delete('/:id/members/:participantId', ...adminMiddleware(), async (req, r
   const { id, participantId } = req.params;
   const teamId = parseInt(id);
   const participantIdInt = parseInt(participantId);
-  
+
   if (isNaN(teamId) || isNaN(participantIdInt)) {
     return sendErrorResponse(res, new Error('Invalid IDs'), 'Invalid team or participant ID', 400);
   }
-  
+
   try {
     const startTime = startTiming();
     const teamMember = await teamsService.removeTeamMember(teamId, participantIdInt);
