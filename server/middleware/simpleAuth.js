@@ -8,10 +8,49 @@ const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
 
 // Simple in-memory token blacklist (for production, use Redis)
-const tokenBlacklist = new Set();
+// Stores { token, expiresAt } to allow periodic cleanup
+const tokenBlacklist = new Map();
 
 // Refresh token storage (for production, use Redis)
 const refreshTokens = new Map();
+
+// Max entries to prevent unbounded growth even if cleanup fails
+const MAX_BLACKLIST_SIZE = 10000;
+const MAX_REFRESH_TOKENS = 5000;
+
+// Periodic cleanup of expired tokens to prevent memory leaks
+const CLEANUP_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
+setInterval(() => {
+  try {
+    const now = Date.now();
+    let blacklistCleaned = 0;
+    let refreshCleaned = 0;
+    // Clean expired blacklisted tokens
+    for (const [token, expiresAt] of tokenBlacklist) {
+      if (expiresAt <= now) {
+        tokenBlacklist.delete(token);
+        blacklistCleaned++;
+      }
+    }
+    // Clean expired refresh tokens
+    for (const [token, data] of refreshTokens) {
+      if (new Date() > data.expiresAt) {
+        refreshTokens.delete(token);
+        refreshCleaned++;
+      }
+    }
+    if (blacklistCleaned > 0 || refreshCleaned > 0) {
+      logger.info('Token cleanup completed', {
+        blacklistCleaned,
+        refreshCleaned,
+        blacklistRemaining: tokenBlacklist.size,
+        refreshRemaining: refreshTokens.size
+      });
+    }
+  } catch (error) {
+    logger.error('Token cleanup failed', { error: error.message });
+  }
+}, CLEANUP_INTERVAL_MS).unref();
 
 // Generate JWT token
 export const generateToken = (payload, rememberMe = false) => {
@@ -24,6 +63,20 @@ export const generateRefreshToken = (userId) => {
   const refreshToken = crypto.randomBytes(64).toString('hex');
   const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
   
+  // Guard against unbounded growth
+  if (refreshTokens.size >= MAX_REFRESH_TOKENS) {
+    // Evict oldest entries to make room
+    const entriesToRemove = Math.ceil(MAX_REFRESH_TOKENS * 0.1);
+    const iter = refreshTokens.keys();
+    for (let i = 0; i < entriesToRemove; i++) {
+      const key = iter.next().value;
+      if (key) refreshTokens.delete(key);
+    }
+    logger.warn('Refresh tokens reached max size, evicted oldest entries', {
+      evicted: entriesToRemove,
+      remaining: refreshTokens.size
+    });
+  }
   refreshTokens.set(refreshToken, {
     userId,
     expiresAt,
@@ -64,8 +117,8 @@ export const revokeRefreshToken = (token) => {
 
 // Verify JWT token with proper error handling
 export const verifyToken = (token) => {
-  // Check if token is blacklisted
-  if (tokenBlacklist.has(token)) {
+  // Check if token is blacklisted (Map: token -> expiresAt)
+  if (tokenBlacklist.has(token) && tokenBlacklist.get(token) > Date.now()) {
     logger.warn('Blacklisted token attempted use', {
       timestamp: new Date().toISOString()
     });
@@ -173,8 +226,31 @@ export const setAuthCookie = (res, token, rememberMe = false) => {
 };
 
 // Blacklist a token (for logout security)
+// Store with expiration to allow cleanup and prevent memory leaks
 export const blacklistToken = (token) => {
-  tokenBlacklist.add(token);
+  // Decode token to get expiration, default to 24h if decode fails
+  let expiresAt;
+  try {
+    const decoded = jwt.decode(token);
+    expiresAt = decoded?.exp ? decoded.exp * 1000 : Date.now() + 24 * 60 * 60 * 1000;
+  } catch {
+    expiresAt = Date.now() + 24 * 60 * 60 * 1000;
+  }
+  // Guard against unbounded growth
+  if (tokenBlacklist.size >= MAX_BLACKLIST_SIZE) {
+    // Evict oldest entries (first inserted) to make room
+    const entriesToRemove = Math.ceil(MAX_BLACKLIST_SIZE * 0.1);
+    const iter = tokenBlacklist.keys();
+    for (let i = 0; i < entriesToRemove; i++) {
+      const key = iter.next().value;
+      if (key) tokenBlacklist.delete(key);
+    }
+    logger.warn('Token blacklist reached max size, evicted oldest entries', {
+      evicted: entriesToRemove,
+      remaining: tokenBlacklist.size
+    });
+  }
+  tokenBlacklist.set(token, expiresAt);
   logger.info('Token blacklisted', {
     timestamp: new Date().toISOString()
   });
@@ -212,8 +288,9 @@ export const checkUserAuth = (req) => {
   const adminToken = req.cookies?.authToken;
   if (adminToken) {
     const decoded = verifyToken(adminToken);
-    // Only return true if token is valid AND user is admin
-    if (decoded && decoded.valid && decoded.role === 'admin') {
+    // verifyToken returns the decoded JWT payload on success (no .valid property),
+    // or { valid: false, ... } on failure. Check that it's not an error response.
+    if (decoded && decoded.valid !== false && decoded.role === 'admin') {
       return true;
     }
   }

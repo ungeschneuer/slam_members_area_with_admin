@@ -1,5 +1,6 @@
 import express from 'express';
 import bcryptjs from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 import { body, validationResult } from 'express-validator';
 import xss from 'xss';
 import {
@@ -132,7 +133,6 @@ router.get('/status', rateLimitConfig.general, async (req, res) => {
     
     if (adminToken) {
       try {
-        const jwt = require('jsonwebtoken');
         const decoded = jwt.verify(adminToken, process.env.JWT_SECRET);
         isAdmin = decoded && decoded.role === 'admin';
       } catch (error) {

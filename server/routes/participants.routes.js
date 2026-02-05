@@ -56,6 +56,24 @@ const participantsService = new ParticipantsService();
 
 const router = express.Router();
 
+// Get distinct filter options (lightweight endpoint for dropdowns)
+router.get('/filter-options', async (req, res) => {
+  try {
+    const startTime = startTiming();
+    const result = await executeQuery(
+      `SELECT
+        COALESCE(json_agg(DISTINCT region ORDER BY region) FILTER (WHERE region IS NOT NULL AND region != ''), '[]'::json) AS regions,
+        COALESCE(json_agg(DISTINCT role ORDER BY role) FILTER (WHERE role IS NOT NULL AND role != ''), '[]'::json) AS roles
+      FROM participants`
+    );
+    const duration = endTiming(startTime);
+    const { regions, roles } = result.rows[0] || { regions: [], roles: [] };
+    sendSuccessResponse(res, { regions, roles }, 'FILTER_OPTIONS', duration);
+  } catch (error) {
+    sendErrorResponse(res, error, 'Failed to fetch filter options');
+  }
+});
+
 // Search participants with server-side filtering
 router.get('/search', async (req, res) => {
   try {
@@ -65,8 +83,8 @@ router.get('/search', async (req, res) => {
     const searchTerm = req.query.search || '';
     const role = req.query.role || '';
     const region = req.query.region || '';
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 25;
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 25));
     const offset = (page - 1) * limit;
 
     // Build dynamic WHERE clause
@@ -195,7 +213,7 @@ router.get('/:slug', async (req, res) => {
       queryType: 'JOIN_OPTIMIZED'
     });
     
-    sendSuccessResponse(res, participant, 'GET_PARTICIPANT', duration);
+    sendSuccessResponse(res, participant.rows[0], 'GET_PARTICIPANT', duration);
   } catch (error) {
     sendErrorResponse(res, error, 'Failed to fetch participant by slug');
   }
@@ -207,45 +225,53 @@ router.get('/:slug', async (req, res) => {
 
 router.get('/', async (req, res) => {
   try {
-    // Simple query parameter parsing
-    const limit = parseInt(req.query.limit) || 50;
-    const offset = parseInt(req.query.offset) || 0;
+    // Simple query parameter parsing with bounds
+    const limit = Math.min(1000, Math.max(1, parseInt(req.query.limit) || 50));
+    const offset = Math.max(0, parseInt(req.query.offset) || 0);
     const startTime = startTiming();
-    
-    // Get paginated participants
-    const participants = await executeQuery(
-      'SELECT * FROM participants ORDER BY name LIMIT $1 OFFSET $2',
+
+    // Use CTE to get both count and paginated results in a single atomic query
+    // Prevents race conditions where data changes between count and data queries
+    const result = await executeQuery(
+      `WITH total AS (
+        SELECT COUNT(*) as count FROM participants
+      )
+      SELECT
+        (SELECT count FROM total) as total_count,
+        json_agg(sub.* ORDER BY sub.name) FILTER (WHERE sub.id IS NOT NULL) as participants
+      FROM (
+        SELECT * FROM participants ORDER BY name LIMIT $1 OFFSET $2
+      ) sub`,
       [limit, offset]
     );
-    
-    // Get total count for pagination metadata
-    const countResult = await executeQuery('SELECT COUNT(*) FROM participants', []);
-    const totalCount = countResult.rows[0].count;
-    
+
+    const totalCount = parseInt(result.rows[0]?.total_count || 0);
+    const participants = result.rows[0]?.participants || [];
+
     const duration = endTiming(startTime);
-    
+
     logger.info('Optimized participants query completed', {
       duration: `${Math.round(duration)}ms`,
       participantCount: participants.length,
       totalCount,
       limit,
       offset,
-      queryType: 'JOIN_OPTIMIZED_PAGINATED'
+      queryType: 'ATOMIC_CTE_PAGINATED'
     });
-    
+
     // Include pagination metadata in response
     const responseData = {
-      data: participants.rows || participants,
+      data: participants,
       meta: {
-        totalCount: parseInt(totalCount),
+        totalCount,
         limit,
         offset,
         currentPage: Math.floor(offset / limit) + 1,
-        totalPages: Math.ceil(parseInt(totalCount) / limit)
+        totalPages: Math.ceil(totalCount / limit)
       }
     };
-    
-    sendSuccessResponse(res, responseData, 'JOIN_OPTIMIZED_PAGINATED', duration);
+
+    sendSuccessResponse(res, responseData, 'ATOMIC_CTE_PAGINATED', duration);
   } catch (error) {
     sendErrorResponse(res, error, 'Failed to fetch participants with statistics');
   }
@@ -316,12 +342,13 @@ router.put('/:id', ...adminMiddleware(), async (req, res) => { // Optimistic loc
     if (!existing.rows || existing.rows.length === 0) {
       return sendNotFoundResponse(res, 'Participant');
     }
-    const name = typeof sanitizedData.name === 'string' ? sanitizedData.name : existing.name;
-    const role = typeof sanitizedData.role === 'string' ? sanitizedData.role : existing.role;
-    const region = sanitizedData.region !== undefined ? sanitizedData.region : existing.region;
-    const pronouns = typeof sanitizedData.pronouns === 'string' ? sanitizedData.pronouns : existing.pronouns;
-    const instagram = sanitizedData.instagram !== undefined ? entityNormalizers.participant({ instagram: sanitizedData.instagram }).instagram : existing.instagram;
-    const slug = typeof sanitizedData.slug === 'string' ? sanitizedData.slug : existing.slug;
+    const current = existing.rows[0];
+    const name = typeof sanitizedData.name === 'string' ? sanitizedData.name : current.name;
+    const role = typeof sanitizedData.role === 'string' ? sanitizedData.role : current.role;
+    const region = sanitizedData.region !== undefined ? sanitizedData.region : current.region;
+    const pronouns = typeof sanitizedData.pronouns === 'string' ? sanitizedData.pronouns : current.pronouns;
+    const instagram = sanitizedData.instagram !== undefined ? entityNormalizers.participant({ instagram: sanitizedData.instagram }).instagram : current.instagram;
+    const slug = typeof sanitizedData.slug === 'string' ? sanitizedData.slug : current.slug;
 
     await executeCrudOperation(
       'update',
@@ -332,12 +359,7 @@ router.put('/:id', ...adminMiddleware(), async (req, res) => { // Optimistic loc
       res
     );
     
-    // Clear cache and notify clients
-('participants', null, {
-      operation: 'update',
-      resourceId: parseInt(id),
-      correlationId: req.headers['x-correlation-id']
-    });
+    // Cache invalidation removed (was calling removed function)
   } catch (error) {
     return sendErrorResponse(res, error, 'Failed to update participant');
   }
@@ -396,6 +418,14 @@ router.post('/bulk-import', ...adminMiddleware(), async (req, res) => {
     return res.status(400).json({
       success: false,
       error: 'Participants array is required and must not be empty'
+    });
+  }
+
+  const MAX_BULK_IMPORT = 500;
+  if (participants.length > MAX_BULK_IMPORT) {
+    return res.status(400).json({
+      success: false,
+      error: `Bulk import limited to ${MAX_BULK_IMPORT} participants per request. Received: ${participants.length}`
     });
   }
 
