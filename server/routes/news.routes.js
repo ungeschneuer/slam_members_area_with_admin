@@ -11,8 +11,8 @@ import {
   sendNotFoundResponse,
   executeCrudOperation,
   normalizeData,
-} from '../utils/simpleRouteHelpers.js';
-import { adminMiddleware } from '../middleware/simpleAuth.js';
+} from '../utils/routeHelpers.js';
+import { adminMiddleware } from '../middleware/authMiddleware.js';
 import { generateSlug, generateUniqueSlug } from '../utils/slugUtils.js';
 // Idempotency and optimistic locking removed - using simple error handling instead
 import logger from '../config/logger.js';
@@ -254,16 +254,16 @@ router.post('/breaking-news/:id', ...adminMiddleware(), async (req, res) => {
     // Use service to set breaking news in a transaction
     const result = await setBreakingNews(parseInt(id), breaking_news_until);
 
-    const duration_ms = endTiming(startTime);
+    const duration = endTiming(startTime);
 
     logger.info('Breaking news set successfully', {
       articleId: id,
       title: result.title,
-      duration: `${Math.round(duration_ms)}ms`,
+      duration: `${Math.round(duration)}ms`,
       expiresAt: breaking_news_until
     });
 
-    sendSuccessResponse(res, result, 'SET_BREAKING_NEWS', duration_ms);
+    sendSuccessResponse(res, result, 'SET_BREAKING_NEWS', duration);
   } catch (error) {
     logger.error('Failed to set breaking news', {
       articleId: req.params.id,

@@ -1,7 +1,7 @@
-// Simplified rounds routes using consolidated round_assignments table
+// Rounds routes using consolidated round_assignments table
 import express from 'express';
 import { executeQuery, executeTransaction } from '../config/database.js';
-import simplifiedRoundsService from '../services/simplifiedRoundsService.js';
+import roundsService from '../services/roundsService.js';
 import roundStatusService from '../services/roundStatusService.js';
 import { 
   startTiming, 
@@ -11,8 +11,8 @@ import {
   sendNotFoundResponse,
   normalizeData,
   executeCrudOperation
-} from '../utils/simpleRouteHelpers.js';
-import { adminMiddleware } from '../middleware/simpleAuth.js';
+} from '../utils/routeHelpers.js';
+import { adminMiddleware } from '../middleware/authMiddleware.js';
 import { generateSlug, generateUniqueSlug } from '../utils/slugUtils.js';
 import logger from '../config/logger.js';
 import { sanitizeEntity } from '../utils/sanitization.js';
@@ -24,7 +24,7 @@ const router = express.Router();
 router.get('/', async (req, res) => {
   try {
     const startTime = startTiming();
-    const rounds = await simplifiedRoundsService.getRoundsWithAssignments();
+    const rounds = await roundsService.getRoundsWithAssignments();
     
     // Enhance rounds with calculated status based on current time and timezone
     const enhancedRounds = rounds.map(round => roundStatusService.enhanceRoundWithStatus(round));
@@ -48,14 +48,14 @@ router.get('/:id', async (req, res) => {
     // Try to parse as numeric ID first
     const roundId = parseInt(param);
     if (!isNaN(roundId)) {
-      round = await simplifiedRoundsService.getRoundWithAssignments(roundId);
+      round = await roundsService.getRoundWithAssignments(roundId);
     } else {
       // Try to find by slug
       const slugQuery = 'SELECT * FROM rounds WHERE slug = $1';
       const slugResult = await executeQuery(slugQuery, [param]);
       
       if (slugResult.rows.length > 0) {
-        round = await simplifiedRoundsService.getRoundWithAssignments(slugResult.rows[0].id);
+        round = await roundsService.getRoundWithAssignments(slugResult.rows[0].id);
       }
     }
     
@@ -111,7 +111,7 @@ router.post('/', ...adminMiddleware(), async (req, res) => {
       const uniqueSlug = generateUniqueSlug(normalizedData.title, existingSlugs);
       
       // Create round with unique slug
-      return await simplifiedRoundsService.createRoundWithAssignments(
+      return await roundsService.createRoundWithAssignments(
         {
           ...normalizedData,
           slug: uniqueSlug
@@ -185,7 +185,7 @@ router.put('/:id', ...adminMiddleware(), validateIdMiddleware('id', 'Round'), as
     }
 
     // Update assignments
-    await simplifiedRoundsService.updateRoundAssignments(req.validatedId, normalizedData.assignments);
+    await roundsService.updateRoundAssignments(req.validatedId, normalizedData.assignments);
     
     const duration = endTiming(startTime);
     sendSuccessResponse(res, result.rows[0], 'UPDATE_ROUND', duration);
@@ -222,7 +222,7 @@ router.get('/:id/participants/:role', async (req, res) => {
     }
     
     const startTime = startTiming();
-    const participants = await simplifiedRoundsService.getRoundParticipantsByRole(roundId, role);
+    const participants = await roundsService.getRoundParticipantsByRole(roundId, role);
     const duration = endTiming(startTime);
     
     sendSuccessResponse(res, participants, 'GET_ROUND_PARTICIPANTS', duration);

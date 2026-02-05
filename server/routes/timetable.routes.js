@@ -1,7 +1,7 @@
 import express from 'express';
-// Using simplified timetable service following project patterns
+// Using timetable service following project patterns
 import { executeQuery } from '../config/database.js';
-import simplifiedTimetableService from '../services/simplifiedTimetableService.js';
+import timetableService from '../services/timetableService.js';
 import { 
   startTiming, 
   endTiming, 
@@ -10,8 +10,8 @@ import {
   sendNotFoundResponse,
   executeCrudOperation,
   normalizeData
-} from '../utils/simpleRouteHelpers.js';
-import { adminMiddleware } from '../middleware/simpleAuth.js';
+} from '../utils/routeHelpers.js';
+import { adminMiddleware } from '../middleware/authMiddleware.js';
 // Idempotency and optimistic locking removed - using simple error handling instead
 import logger from '../config/logger.js';
 import { 
@@ -32,7 +32,7 @@ router.get('/:slug', async (req, res) => {
   const startTime = startTiming();
   
   try {
-    const timetableEvent = await simplifiedTimetableService.getTimetableEntryBySlugWithAssignments(slug);
+    const timetableEvent = await timetableService.getTimetableEntryBySlugWithAssignments(slug);
     const duration = endTiming(startTime);
     
     if (!timetableEvent) {
@@ -60,7 +60,7 @@ router.get('/:slug', async (req, res) => {
 router.get('/', async (req, res) => {
   try {
     const startTime = startTiming();
-    const timetable = await simplifiedTimetableService.getTimetableWithAssignments();
+    const timetable = await timetableService.getTimetableWithAssignments();
     
     // Normalize date/time formatting using env TZ: YYYY-MM-DD / HH:mm
     logger.debug('Timetable entries:', { count: timetable?.length || 0 });
@@ -139,7 +139,7 @@ router.post('/', ...adminMiddleware(), ...validateTimetableEvent, async (req, re
           );
 
           // Create timetable entry with unique slug
-          return await simplifiedTimetableService.createTimetableWithAssignments(
+          return await timetableService.createTimetableWithAssignments(
             {
               title: normalizedData.title,
               description: normalizedData.description,
@@ -202,7 +202,7 @@ router.put('/:id', ...adminMiddleware(), ...validateTimetableEventId, ...validat
     const startTime = startTiming();
     
     // Use service to update entry with participants in a transaction
-    const entry = await simplifiedTimetableService.updateTimetableWithAssignments(
+    const entry = await timetableService.updateTimetableWithAssignments(
       entryId,
       {
         title: normalizedData.title,

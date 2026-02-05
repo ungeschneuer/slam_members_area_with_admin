@@ -11,14 +11,14 @@ import {
   executeCrudOperation,
   normalizeData,
   executeQuery
-} from '../utils/simpleRouteHelpers.js';
-import { adminMiddleware } from '../middleware/simpleAuth.js';
+} from '../utils/routeHelpers.js';
+import { adminMiddleware } from '../middleware/authMiddleware.js';
 // Idempotency and optimistic locking removed - using simple error handling instead
 import logger from '../config/logger.js';
 import { sanitizeEntity } from '../utils/sanitization.js';
 import { uploadInfoPageFile, handleUploadError } from '../middleware/upload.js';
 import { rateLimitConfig } from '../config/security.js';
-import { UPLOAD_ERRORS, UPLOAD_SUCCESS_MESSAGES } from '../utils/uploadConstants.js';
+import { UPLOAD_ERRORS, UPLOAD_SUCCESS_MESSAGES } from '../constants/uploadConstants.js';
 import { generateSlug, generateUniqueSlug, validateSlugInput } from '../utils/slugUtils.js';
 import { generateUniqueSlugInTransaction, generateRequestIdFromReq } from '../services/slugGenerationService.js';
 import { executeTransaction } from '../config/database.js';

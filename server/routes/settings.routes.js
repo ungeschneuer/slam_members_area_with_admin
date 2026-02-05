@@ -7,8 +7,8 @@ import {
   sendSuccessResponse,
   sendErrorResponse,
   executeQuery
-} from '../utils/simpleRouteHelpers.js';
-import { adminMiddleware } from '../middleware/simpleAuth.js';
+} from '../utils/routeHelpers.js';
+import { adminMiddleware } from '../middleware/authMiddleware.js';
 import { USER_PASSWORD_CONSTANTS } from '../constants/userPasswordConstants.js';
 import logger from '../config/logger.js';
 

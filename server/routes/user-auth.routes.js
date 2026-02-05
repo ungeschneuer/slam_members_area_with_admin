@@ -9,8 +9,8 @@ import {
   sendSuccessResponse,
   sendErrorResponse,
   executeQuery
-} from '../utils/simpleRouteHelpers.js';
-import { setUserAuthCookie, clearUserAuthCookie, checkUserAuth } from '../middleware/simpleAuth.js';
+} from '../utils/routeHelpers.js';
+import { setUserAuthCookie, clearUserAuthCookie, checkUserAuth } from '../middleware/authMiddleware.js';
 import { USER_PASSWORD_CONSTANTS, PASSWORD_VALIDATION_RULES } from '../constants/userPasswordConstants.js';
 import { rateLimitConfig } from '../config/security.js';
 import logger from '../config/logger.js';

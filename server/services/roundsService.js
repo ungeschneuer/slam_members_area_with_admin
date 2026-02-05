@@ -1,8 +1,8 @@
-// Simplified rounds service using consolidated round_assignments table
+// Rounds service using consolidated round_assignments table
 import { executeQuery, executeTransaction } from '../config/database.js';
 import logger from '../config/logger.js';
 
-export class SimplifiedRoundsService {
+export class RoundsService {
   
   constructor() {
     this._hasAssignmentsTable = null;
@@ -404,4 +404,4 @@ export class SimplifiedRoundsService {
 
 }
 
-export default new SimplifiedRoundsService();
+export default new RoundsService();

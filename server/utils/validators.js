@@ -1,4 +1,4 @@
-import { sendErrorResponse } from './simpleRouteHelpers.js';
+import { sendErrorResponse } from './routeHelpers.js';
 
 /**
  * Validate and parse an ID from a string

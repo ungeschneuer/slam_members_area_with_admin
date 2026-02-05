@@ -1,8 +1,8 @@
-// Simplified timetable service using consolidated timetable_participants table
+// Timetable service using consolidated timetable_participants table
 import { executeQuery, executeTransaction } from '../config/database.js';
 import logger from '../config/logger.js';
 
-export class SimplifiedTimetableService {
+export class TimetableService {
   
   // Get all timetable entries with participant assignments
   async getTimetableWithAssignments() {
@@ -363,4 +363,4 @@ export class SimplifiedTimetableService {
   }
 }
 
-export default new SimplifiedTimetableService();
+export default new TimetableService();

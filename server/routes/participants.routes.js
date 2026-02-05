@@ -7,8 +7,8 @@ import {
   sendErrorResponse, 
   sendNotFoundResponse,
   executeCrudOperation,
-} from '../utils/simpleRouteHelpers.js';
-import { adminMiddleware } from '../middleware/simpleAuth.js';
+} from '../utils/routeHelpers.js';
+import { adminMiddleware } from '../middleware/authMiddleware.js';
 // Idempotency and optimistic locking removed - using simple error handling instead
 // Query validation removed - using simple validation instead
 import { executeQuery, pool } from '../config/database.js';
@@ -23,7 +23,7 @@ import { generateUniqueSlugInTransaction, generateRequestIdFromReq } from '../se
 import { executeTransaction } from '../config/database.js';
 import { ALLOWED_PARTICIPANT_ROLES } from '../../shared/constants/roles.js';
 import { ALLOWED_REGIONS } from '../../shared/constants/regions.js';
-import { PAGINATION_LIMITS } from '../constants/pagination.js';
+import { PAGINATION_LIMITS } from '../constants/paginationConstants.js';
 import { validateIdMiddleware } from '../utils/validators.js';
 
 // Initialize participants service

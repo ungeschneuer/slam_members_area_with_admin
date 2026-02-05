@@ -8,8 +8,8 @@ import {
   sendErrorResponse, 
   sendNotFoundResponse,
   executeCrudOperation
-} from '../utils/simpleRouteHelpers.js';
-import { adminMiddleware } from '../middleware/simpleAuth.js';
+} from '../utils/routeHelpers.js';
+import { adminMiddleware } from '../middleware/authMiddleware.js';
 import { sanitizeEntity } from '../utils/sanitization.js';
 import { teamSchema, createTeamSchema, updateTeamSchema, addTeamMemberSchema, removeTeamMemberSchema } from '../../shared/schemas/teamSchema.js';
 import logger from '../config/logger.js';

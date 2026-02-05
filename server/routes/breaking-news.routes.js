@@ -5,8 +5,8 @@ import {
   endTiming, 
   sendSuccessResponse, 
   sendErrorResponse 
-} from '../utils/simpleRouteHelpers.js';
-import { adminMiddleware } from '../middleware/simpleAuth.js';
+} from '../utils/routeHelpers.js';
+import { adminMiddleware } from '../middleware/authMiddleware.js';
 import logger from '../config/logger.js';
 import { sanitizeEntity } from '../utils/sanitization.js';
 

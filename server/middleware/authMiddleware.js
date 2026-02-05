@@ -1,4 +1,4 @@
-// Simplified authentication middleware
+// Authentication middleware
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { USER_PASSWORD_CONSTANTS, USER_AUTH_COOKIE_CONFIG } from '../constants/userPasswordConstants.js';

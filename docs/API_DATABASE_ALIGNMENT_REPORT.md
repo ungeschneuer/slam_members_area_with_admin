@@ -26,8 +26,8 @@ The API and database schema are properly aligned with:
 | Table | Records | Route File | CRUD Operations |
 |-------|---------|------------|-----------------|
 | **participants** | 234 | participants.routes.js | ✅ Full CRUD |
-| **rounds** | 16 | simplifiedRounds.routes.js | ✅ Full CRUD |
-| **round_assignments** | - | simplifiedRounds.routes.js | ✅ Managed via rounds |
+| **rounds** | 16 | rounds.routes.js | ✅ Full CRUD |
+| **round_assignments** | - | rounds.routes.js | ✅ Managed via rounds |
 | **news** | 3 | news.routes.js | ✅ Full CRUD |
 | **city_tips** | 22 | city-tips.routes.js | ✅ Full CRUD |
 | **timetable_entries** | 24 | timetable.routes.js | ✅ Full CRUD |
@@ -89,7 +89,7 @@ All foreign keys properly enforce referential integrity.
 - ✅ `teams` → `/api/teams`
 
 ### Composite Routes (Multiple Tables)
-- ✅ `rounds` + `round_assignments` → `/api/rounds` (simplifiedRounds.routes.js)
+- ✅ `rounds` + `round_assignments` → `/api/rounds` (rounds.routes.js)
 - ✅ `timetable_entries` + `timetable_participants` → `/api/timetable` (timetable.routes.js)
 
 ### Special Routes

@@ -1,4 +1,4 @@
-// Simplified route helpers
+// Route helpers
 import { executeQuery } from '../config/database.js';
 import logger from '../config/logger.js';
 

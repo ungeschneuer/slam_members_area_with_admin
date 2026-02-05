@@ -7,7 +7,7 @@ import express from 'express';
 import bcryptjs from 'bcryptjs';
 import { body, validationResult } from 'express-validator';
 import { executeQuery } from '../config/database.js';
-import { generateToken, generateRefreshToken, verifyRefreshToken, revokeRefreshToken, setAuthCookie, clearAuthCookie, authenticate, adminMiddleware } from '../middleware/simpleAuth.js';
+import { generateToken, generateRefreshToken, verifyRefreshToken, revokeRefreshToken, setAuthCookie, clearAuthCookie, authenticate, adminMiddleware } from '../middleware/authMiddleware.js';
 import { rateLimitConfig } from '../config/security.js';
 import logger from '../config/logger.js';
 
