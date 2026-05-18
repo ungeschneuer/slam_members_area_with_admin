@@ -13,7 +13,7 @@ export function AuthProvider({ children }) {
     // Check authentication status on mount
     const checkAuth = async () => {
       try {
-        const isAuthenticated = authService.isLoggedIn();
+        const isAuthenticated = authService.isAdmin();
         setIsAdmin(isAuthenticated);
         
         // If admin, automatically set user as authenticated

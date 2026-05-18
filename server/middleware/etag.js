@@ -50,22 +50,17 @@ export function etagMiddleware(req, res, next) {
 
   // Override res.json to add ETag
   res.json = function(data) {
-    // Generate ETag from response data
-    const etag = generateETag(data);
-
-    // Set ETag header
-    res.set('ETag', etag);
-
-    // Check if client sent If-None-Match header
-    const clientETag = req.headers['if-none-match'];
-
-    if (clientETag && clientETag === etag) {
-      // ETag matches - return 304 Not Modified
-      res.status(304).end();
-      return res;
+    try {
+      const etag = generateETag(data);
+      res.set('ETag', etag);
+      const clientETag = req.headers['if-none-match'];
+      if (clientETag && clientETag === etag) {
+        res.status(304).end();
+        return res;
+      }
+    } catch {
+      // Non-serialisable response (circular ref, BigInt, etc.) — skip ETag silently
     }
-
-    // ETag doesn't match or not provided - return full response
     return originalJson(data);
   };
 

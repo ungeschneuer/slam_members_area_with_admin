@@ -17,7 +17,13 @@ export async function safeDeleteFile(filePath) {
       return { success: false, deleted: false, error: { code: 'INVALID_PATH', message: 'No file path provided', serious: false } };
     }
 
-    const fullPath = path.join(process.cwd(), 'public', filePath);
+    const publicRoot = path.resolve(process.cwd(), 'public');
+    const fullPath = path.resolve(publicRoot, filePath);
+
+    // Prevent path traversal: resolved path must stay inside public/
+    if (!fullPath.startsWith(publicRoot + path.sep) && fullPath !== publicRoot) {
+      return { success: false, deleted: false, error: { code: 'INVALID_PATH', message: 'Path traversal detected', serious: true } };
+    }
 
     const fileExists = await exists(fullPath);
     if (!fileExists) {

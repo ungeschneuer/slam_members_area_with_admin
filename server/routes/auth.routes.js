@@ -67,12 +67,14 @@ router.post('/login', rateLimitConfig.login, validateLogin, async (req, res) => 
       });
     }
 
-    // Generate token
+    // Generate token — include display name so /me never needs a DB round-trip
     const tokenPayload = {
       userId: user.id,
       username: user.username,
       email: user.email,
-      role: user.role
+      role: user.role,
+      firstName: user.first_name || '',
+      lastName: user.last_name || ''
     };
 
     const accessToken = generateToken(tokenPayload, rememberMe);
@@ -226,11 +228,11 @@ router.get('/me', authenticate, async (req, res) => {
     res.json({
       success: true,
       user: {
-        id: req.user.id,
+        id: req.user.userId,
         username: req.user.username,
         email: req.user.email,
-        firstName: 'Admin', // Default values since not in JWT
-        lastName: 'User',
+        firstName: req.user.firstName || '',
+        lastName: req.user.lastName || '',
         role: req.user.role,
         pronouns: null,
         createdAt: null,

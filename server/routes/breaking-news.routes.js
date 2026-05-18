@@ -1,14 +1,15 @@
 import express from 'express';
 import { executeQuery } from '../config/database.js';
-import { 
-  startTiming, 
-  endTiming, 
-  sendSuccessResponse, 
-  sendErrorResponse 
+import {
+  startTiming,
+  endTiming,
+  sendSuccessResponse,
+  sendErrorResponse
 } from '../utils/routeHelpers.js';
 import { adminMiddleware } from '../middleware/authMiddleware.js';
 import logger from '../config/logger.js';
 import { sanitizeEntity } from '../utils/sanitization.js';
+import { setBreakingNews } from '../services/breakingNewsService.js';
 
 const router = express.Router();
 
@@ -41,34 +42,30 @@ router.get('/', async (req, res) => {
 // Set breaking news (admin endpoint)
 router.post('/:id', ...adminMiddleware(), async (req, res) => {
   try {
-    const { id } = req.params;
-    // Sanitize input data to prevent XSS
+    const articleId = parseInt(req.params.id, 10);
+    if (isNaN(articleId) || articleId <= 0) {
+      return res.status(400).json({ success: false, error: 'Invalid article ID' });
+    }
+
     const sanitizedData = sanitizeEntity.breakingNews(req.body);
-    const { breaking_news_until } = sanitizedData;
-    
+    const breaking_news_until = sanitizedData.breaking_news_until ?? null;
+
     const startTime = startTiming();
-    
-    // Clear existing breaking news
-    await executeQuery('UPDATE news SET is_breaking_news = false, breaking_news_until = NULL WHERE is_breaking_news = true');
-    
-    // Set new breaking news
-    const result = await executeQuery(`
-      UPDATE news 
-      SET is_breaking_news = true, breaking_news_until = $1 
-      WHERE id = $2 
-      RETURNING *
-    `, [breaking_news_until, id]);
-    
+
+    // Delegates to the transactional service: clears existing breaking news,
+    // validates the article is PUBLISHED, and sets the new one atomically.
+    const result = await setBreakingNews(articleId, breaking_news_until);
+
     const duration = endTiming(startTime);
-    
+
     logger.info('Breaking news set successfully', {
-      newsId: id,
+      newsId: articleId,
       breaking_news_until,
       duration: `${duration}ms`,
       queryType: 'SET_BREAKING_NEWS'
     });
-    
-    sendSuccessResponse(res, result.rows[0], 'SET_BREAKING_NEWS', duration);
+
+    sendSuccessResponse(res, result, 'SET_BREAKING_NEWS', duration);
   } catch (error) {
     logger.error('API Error:', error);
     sendErrorResponse(res, error, 'Failed to set breaking news');

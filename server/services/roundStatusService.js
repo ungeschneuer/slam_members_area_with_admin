@@ -20,18 +20,19 @@ export class RoundStatusService {
 
     try {
       const now = getCurrentTimeInConfiguredTimezone();
-      
-      // Create datetime objects for round timing
+
       const roundStart = this.createRoundDateTime(round.date, round.start_time);
       const roundEnd = this.createRoundDateTime(round.date, round.end_time);
-      
-      // If round spans multiple days, adjust end time
+
+      // Treat malformed date/time data as unscheduled rather than masking it
+      if (!roundStart || !roundEnd) {
+        return 'SCHEDULED';
+      }
+
       if (roundEnd <= roundStart) {
-        // Round ends next day
         roundEnd.setDate(roundEnd.getDate() + 1);
       }
-      
-      // Calculate status based on current time
+
       if (now < roundStart) {
         return 'SCHEDULED';
       } else if (now >= roundStart && now <= roundEnd) {
@@ -101,8 +102,7 @@ export class RoundStatusService {
       return dateTime;
     } catch (error) {
       logger.error('Error creating round datetime', { error: error.message, stack: error.stack });
-      // Return current time as fallback
-      return new Date();
+      return null;
     }
   }
 
@@ -119,7 +119,8 @@ export class RoundStatusService {
     try {
       const now = getCurrentTimeInConfiguredTimezone();
       const roundStart = this.createRoundDateTime(round.date, round.start_time);
-      
+      if (!roundStart) return null;
+
       const diff = roundStart.getTime() - now.getTime();
       
       if (diff <= 0) {
@@ -153,12 +154,12 @@ export class RoundStatusService {
     try {
       const now = getCurrentTimeInConfiguredTimezone();
       const roundEnd = this.createRoundDateTime(round.date, round.end_time);
-      
-      // If round spans multiple days, adjust end time
+      if (!roundEnd) return null;
+
       if (round.start_time && round.start_time > round.end_time) {
         roundEnd.setDate(roundEnd.getDate() + 1);
       }
-      
+
       const diff = roundEnd.getTime() - now.getTime();
       
       if (diff <= 0) {

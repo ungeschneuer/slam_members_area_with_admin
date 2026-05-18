@@ -271,10 +271,21 @@ export const clearAuthCookie = (res, token = null) => {
   });
 };
 
+// Generate a cryptographically signed token for user-area auth.
+// Uses HMAC-SHA256 so the value is only reproducible with the server secret,
+// preventing forgery by anyone who reads the source or the JS bundle.
+const generateUserAuthToken = () => {
+  const secret = process.env.SESSION_SECRET || process.env.JWT_SECRET;
+  return crypto.createHmac('sha256', secret)
+    .update('user-area-authenticated-v1')
+    .digest('hex');
+};
+
 // User area authentication helpers
 // Set user authentication cookie (14 days)
 export const setUserAuthCookie = (res) => {
-  res.cookie(USER_PASSWORD_CONSTANTS.COOKIE_NAME, USER_PASSWORD_CONSTANTS.COOKIE_VALUE, USER_AUTH_COOKIE_CONFIG);
+  const token = generateUserAuthToken();
+  res.cookie(USER_PASSWORD_CONSTANTS.COOKIE_NAME, token, USER_AUTH_COOKIE_CONFIG);
 };
 
 // Clear user authentication cookie
@@ -288,14 +299,21 @@ export const checkUserAuth = (req) => {
   const adminToken = req.cookies?.authToken;
   if (adminToken) {
     const decoded = verifyToken(adminToken);
-    // verifyToken returns the decoded JWT payload on success (no .valid property),
-    // or { valid: false, ... } on failure. Check that it's not an error response.
     if (decoded && decoded.valid !== false && decoded.role === 'admin') {
       return true;
     }
   }
-  
-  // Check user authentication
+
+  // Validate user-area cookie against the HMAC-signed expected value
   const userAuth = req.cookies?.[USER_PASSWORD_CONSTANTS.COOKIE_NAME];
-  return userAuth === USER_PASSWORD_CONSTANTS.COOKIE_VALUE;
+  if (!userAuth) return false;
+  try {
+    const expected = generateUserAuthToken();
+    return crypto.timingSafeEqual(
+      Buffer.from(userAuth, 'hex'),
+      Buffer.from(expected, 'hex')
+    );
+  } catch {
+    return false;
+  }
 };

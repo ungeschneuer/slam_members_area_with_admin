@@ -125,6 +125,13 @@ export const normalizeData = (data, schema) => {
       case 'int':
         normalized[key] = parseInt(value) || config.fallback || 0;
         break;
+      case 'number': {
+        const n = Number(value);
+        normalized[key] = (value !== undefined && value !== null && value !== '' && !isNaN(n))
+          ? n
+          : (config.fallback ?? 0);
+        break;
+      }
       case 'boolean':
         normalized[key] = Boolean(value);
         break;
