@@ -195,6 +195,19 @@ router.put('/:id', ...adminMiddleware(), validateIdMiddleware('id', 'News'), san
   );
 });
 
+// Clear breaking news (admin endpoint) — must be before /:id to avoid route shadowing
+router.delete('/breaking-news', ...adminMiddleware(), async (req, res) => {
+  try {
+    const startTime = startTiming();
+    await executeQuery('UPDATE news SET is_breaking_news = false, breaking_news_until = NULL WHERE is_breaking_news = true');
+    const duration = endTiming(startTime);
+    logger.info('Breaking news cleared', { duration: `${Math.round(duration)}ms` });
+    sendSuccessResponse(res, { message: 'Breaking news cleared successfully' }, 'CLEAR_BREAKING_NEWS', duration);
+  } catch (error) {
+    sendErrorResponse(res, error, 'Failed to clear breaking news');
+  }
+});
+
 // Delete news (admin endpoint)
 router.delete('/:id', ...adminMiddleware(), validateIdMiddleware('id', 'News'), async (req, res) => {
   await executeCrudOperation(
@@ -254,16 +267,16 @@ router.post('/breaking-news/:id', ...adminMiddleware(), async (req, res) => {
     // Use service to set breaking news in a transaction
     const result = await setBreakingNews(parseInt(id), breaking_news_until);
 
-    const duration = endTiming(startTime);
+    const timingDuration = endTiming(startTime);
 
     logger.info('Breaking news set successfully', {
       articleId: id,
       title: result.title,
-      duration: `${Math.round(duration)}ms`,
+      duration: `${Math.round(timingDuration)}ms`,
       expiresAt: breaking_news_until
     });
 
-    sendSuccessResponse(res, result, 'SET_BREAKING_NEWS', duration);
+    sendSuccessResponse(res, result, 'SET_BREAKING_NEWS', timingDuration);
   } catch (error) {
     logger.error('Failed to set breaking news', {
       articleId: req.params.id,
@@ -271,26 +284,6 @@ router.post('/breaking-news/:id', ...adminMiddleware(), async (req, res) => {
       stack: error.stack
     });
     sendErrorResponse(res, error, 'Failed to set breaking news');
-  }
-});
-
-// Clear breaking news (admin endpoint)
-router.delete('/breaking-news', ...adminMiddleware(), async (req, res) => {
-  try {
-    const startTime = startTiming();
-    
-    // Clear all breaking news flags
-    await executeQuery('UPDATE news SET is_breaking_news = false, breaking_news_until = NULL WHERE is_breaking_news = true');
-    
-    const duration = endTiming(startTime);
-    
-    logger.info('Breaking news cleared', {
-      duration: `${Math.round(duration)}ms`
-    });
-    
-    sendSuccessResponse(res, { message: 'Breaking news cleared successfully' }, 'CLEAR_BREAKING_NEWS', duration);
-  } catch (error) {
-    sendErrorResponse(res, error, 'Failed to clear breaking news');
   }
 });
 

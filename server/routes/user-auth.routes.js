@@ -18,14 +18,16 @@ import logger from '../config/logger.js';
 const router = express.Router();
 
 // Verify user password and set cookie
-router.post('/verify', [
+router.post('/verify', rateLimitConfig.login, [
   body('password')
     .notEmpty()
     .withMessage(USER_PASSWORD_CONSTANTS.ERROR_MESSAGES.PASSWORD_REQUIRED)
     .isLength({ min: PASSWORD_VALIDATION_RULES.minLength, max: PASSWORD_VALIDATION_RULES.maxLength })
     .withMessage(USER_PASSWORD_CONSTANTS.ERROR_MESSAGES.PASSWORD_TOO_LONG)
     .trim()
-    .escape()
+    // No .escape() — HTML-escaping before bcrypt.compare creates asymmetry with the
+    // storage path in settings.routes.js (which does not escape), breaking auth for
+    // passwords that contain < > & " ' characters.
 ], async (req, res) => {
   try {
     const startTime = startTiming();

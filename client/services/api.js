@@ -113,43 +113,30 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        // Attempt to refresh the token
         logger.debug('Attempting token refresh');
 
         await axios.post(
           `${api.defaults.baseURL}/auth/refresh`,
           {},
-          {
-            withCredentials: true,
-            timeout: 10000 // 10 second timeout for refresh
-          }
+          { withCredentials: true, timeout: 10000 }
         );
 
         logger.debug('Token refresh successful');
-
-        // Token refreshed successfully
-        isRefreshing = false;
         processQueue(null);
-
-        // Retry the original request
         return api(originalRequest);
 
       } catch (refreshError) {
-        // Token refresh failed
         logger.warn('Token refresh failed, logging out user');
-
-        isRefreshing = false;
         processQueue(refreshError);
 
-        // Clear authentication and redirect to login
         window.dispatchEvent(new CustomEvent('slam:auth-expired'));
-
-        // Redirect to login page
         if (!window.location.pathname.includes('/login')) {
           window.location.href = '/admin/login';
         }
 
         return Promise.reject(refreshError);
+      } finally {
+        isRefreshing = false; // always reset, even on cancel/abort
       }
     }
 

@@ -392,37 +392,6 @@ export const sanitizeInput = (req, res, next) => {
   next();
 };
 
-// Rate limiting for admin operations
-export const adminRateLimit = (req, res, next) => {
-  // Simple rate limiting - in production, use redis-based rate limiting
-  const now = Date.now();
-  const windowMs = 15 * 60 * 1000; // 15 minutes
-  const maxRequests = 100; // 100 requests per window
-  
-  if (!req.rateLimit) {
-    req.rateLimit = {
-      requests: [],
-      windowStart: now
-    };
-  }
-  
-  // Clean old requests
-  req.rateLimit.requests = req.rateLimit.requests.filter(
-    timestamp => now - timestamp < windowMs
-  );
-  
-  if (req.rateLimit.requests.length >= maxRequests) {
-    return res.status(429).json({
-      success: false,
-      error: 'Too many requests',
-      code: 'RATE_LIMIT_EXCEEDED',
-      retryAfter: Math.ceil(windowMs / 1000)
-    });
-  }
-  
-  req.rateLimit.requests.push(now);
-  next();
-};
 
 // ID validation middleware
 export const validateSchnellzugriffId = [

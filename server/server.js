@@ -161,18 +161,7 @@ app.use((req, res, next) => {
 app.use('/api/', rateLimitConfig.general);
 
 // Body parsing middleware with security limits
-app.use(express.json({ 
-  limit: '10mb',
-  verify: (req, res, buf) => {
-    // Check for potential JSON injection
-    if (buf && buf.length > 0) {
-      const body = buf.toString();
-      if (body.includes('__proto__') || body.includes('constructor')) {
-        throw new Error('Potentially malicious JSON detected');
-      }
-    }
-  }
-}));
+app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 
@@ -397,8 +386,6 @@ process.on('unhandledRejection', async (reason, promise) => {
   }
 });
 
-export default app;
-
 // Malformed JSON handler: return consistent 400 with success:false
 app.use((err, req, res, next) => {
   if (err instanceof SyntaxError && 'body' in err) {
@@ -407,12 +394,13 @@ app.use((err, req, res, next) => {
   return next(err);
 });
 
-// Sentry error handler should be last
+// Sentry error handler must be last
 if (process.env.SENTRY_DSN) {
-  // Support both Sentry v8 (expressErrorHandler) and older versions (Handlers.errorHandler)
   if (typeof Sentry.expressErrorHandler === 'function') {
     app.use(Sentry.expressErrorHandler());
   } else if (Sentry.Handlers && typeof Sentry.Handlers.errorHandler === 'function') {
     app.use(Sentry.Handlers.errorHandler());
   }
 }
+
+export default app;

@@ -260,11 +260,6 @@ const Navigation = React.memo(function Navigation() {
 });
 
 function App() {
-  // Initialize token refresh service
-  useEffect(() => {
-    // Token refresh service is automatically initialized when imported
-    console.log('Token refresh service initialized');
-  }, []);
 
   return (
     <ThemeProvider>

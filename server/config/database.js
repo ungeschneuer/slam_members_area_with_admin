@@ -477,9 +477,13 @@ const executeTransaction = async (queries, retries = 3) => {
     } finally {
       if (client) {
         client.release();
+        client = undefined; // prevent double-release if pool.connect() throws on retry
       }
     }
   }
+
+  // Reached only when retries === 0; every other path returns or throws.
+  throw new Error('Transaction failed after maximum retries');
 };
 
 
